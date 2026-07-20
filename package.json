@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
+    "db:migrate:categories": "node --env-file=.env.local scripts/migrate-home-categories.mjs",
+    "db:migrate:reseller": "node --env-file=.env.local scripts/migrate-reseller-parity.mjs",
     "db:seed:gen": "node --experimental-strip-types -e \"import('./src/lib/products.ts').then(m=>require('fs').writeFileSync('db/products.seed.json',JSON.stringify(m.products,null,2)))\""
   },
   "dependencies": {

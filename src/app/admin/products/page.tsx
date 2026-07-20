@@ -34,7 +34,7 @@ const blank = {
   productionCost: "", saleStart: "", saleEnd: "",
   stock: "", lowStockThreshold: "10", stockStatus: "in_stock", allowBackorder: false, soldIndividually: false,
   sizes: "", colors: "", image: "", images: "",
-  badge: "", featured: false, isPublish: true, visibility: "public", isResellerProduct: true,
+  badge: "", featured: true, isPublish: true, visibility: "public", isResellerProduct: true,
   paymentMethods: [] as string[], tags: "",
   weightKg: "", lengthCm: "", widthCm: "", heightCm: "",
   metaTitle: "", metaDescription: "", metaKeywords: "",

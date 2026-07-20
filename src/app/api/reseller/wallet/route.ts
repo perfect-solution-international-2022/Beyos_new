@@ -9,14 +9,9 @@ export async function GET() {
   try {
     const balance = await walletBalance(reseller.id);
 
-    const credits = await query<{
-      order_ref: string;
-      profit: string;
-      created_at: string;
-    }>(
-      `SELECT order_ref, profit, created_at FROM reseller_orders
-       WHERE reseller_id = ? AND status = 'completed' ORDER BY created_at DESC`,
-      [reseller.id]
+    const credits = await query<{ total: string }>(
+      `SELECT COALESCE(SUM(amount),0) AS total FROM reseller_wallet_transactions
+       WHERE reseller_id = ? AND type = 'credit' AND reference_type = 'order'`, [reseller.id]
     );
     const debits = await query<{
       withdraw_ref: string;
@@ -29,27 +24,19 @@ export async function GET() {
       [reseller.id]
     );
 
-    const transactions = [
-      ...credits.map((c) => ({
-        type: "credit" as const,
-        ref: c.order_ref,
-        label: "Order commission",
-        amount: Number(c.profit),
-        status: "completed",
-        createdAt: c.created_at,
-      })),
-      ...debits.map((d) => ({
-        type: "debit" as const,
-        ref: d.withdraw_ref,
-        label: "Withdrawal",
-        amount: Number(d.amount),
-        status: d.status,
-        createdAt: d.created_at,
-      })),
-    ].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    const ledger = await query<{ type: "credit" | "debit" | "reversal"; amount: string; reference_id: string; description: string; created_at: string }>(
+      `SELECT type, amount, reference_id, description, created_at FROM reseller_wallet_transactions
+       WHERE reseller_id = ? ORDER BY created_at DESC, id DESC`, [reseller.id]
     );
+    const withdrawalStatus = new Map(debits.map((item) => [item.withdraw_ref, item.status]));
+    const transactions = ledger.map((item) => ({
+      type: item.type === "debit" ? "debit" as const : "credit" as const,
+      ref: item.reference_id,
+      label: item.description || (item.type === "credit" ? "Order commission" : item.type === "reversal" ? "Withdrawal returned" : "Withdrawal"),
+      amount: Number(item.amount),
+      status: item.type === "debit" ? (withdrawalStatus.get(item.reference_id) ?? "pending") : "completed",
+      createdAt: item.created_at,
+    }));
 
     const pendingWithdrawals = debits
       .filter((d) => d.status === "pending")
@@ -58,7 +45,7 @@ export async function GET() {
     return NextResponse.json({
       balance,
       pendingWithdrawals,
-      lifetimeEarnings: credits.reduce((s, c) => s + Number(c.profit), 0),
+      lifetimeEarnings: Number(credits[0]?.total ?? 0),
       transactions,
     });
   } catch (err) {

@@ -26,9 +26,15 @@ export async function GET(request: Request) {
       phone: string;
       city: string | null;
       reseller_status: string;
+      allow_price_override: number;
+      min_markup_pct: string;
+      max_markup_pct: string | null;
+      credit_limit: string;
       created_at: string;
     }>(
-      `SELECT id, name, email, role, phone, city, reseller_status, created_at FROM users ${where} ORDER BY created_at DESC`,
+      `SELECT id, name, email, role, phone, city, reseller_status, allow_price_override,
+              min_markup_pct, max_markup_pct, credit_limit, created_at
+       FROM users ${where} ORDER BY created_at DESC`,
       params
     );
     return NextResponse.json({
@@ -40,6 +46,10 @@ export async function GET(request: Request) {
         phone: u.phone,
         city: u.city,
         resellerStatus: u.reseller_status,
+        allowPriceOverride: !!u.allow_price_override,
+        minMarkupPct: Number(u.min_markup_pct),
+        maxMarkupPct: u.max_markup_pct == null ? null : Number(u.max_markup_pct),
+        creditLimit: Number(u.credit_limit),
         createdAt: u.created_at,
       })),
     });
@@ -109,14 +119,14 @@ export async function PATCH(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let body: { id?: number; role?: string; resellerStatus?: string };
+  let body: { id?: number; role?: string; resellerStatus?: string; pricingRules?: { allowPriceOverride?: boolean; minMarkupPct?: number; maxMarkupPct?: number | null; creditLimit?: number } };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { id, role, resellerStatus } = body;
-  if (!id || (!role && !resellerStatus)) {
+  const { id, role, resellerStatus, pricingRules } = body;
+  if (!id || (!role && !resellerStatus && !pricingRules)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (id === admin.id) {
@@ -131,13 +141,24 @@ export async function PATCH(request: Request) {
         "UPDATE users SET role = ?, reseller_status = ?, session_version = session_version + 1 WHERE id = ?",
         [role, "approved", id]
       );
-    } else {
-      if (!["approved", "rejected"].includes(resellerStatus || "")) {
+    } else if (resellerStatus) {
+      if (!["approved", "suspended", "rejected"].includes(resellerStatus || "")) {
         return NextResponse.json({ error: "Invalid reseller status" }, { status: 400 });
       }
       await query(
         "UPDATE users SET reseller_status = ?, session_version = session_version + 1 WHERE id = ? AND role = 'reseller'",
         [resellerStatus, id]
+      );
+    } else if (pricingRules) {
+      const min = Math.max(0, Number(pricingRules.minMarkupPct) || 0);
+      const max = pricingRules.maxMarkupPct == null ? null : Number(pricingRules.maxMarkupPct);
+      if (max != null && (!Number.isFinite(max) || max < min)) {
+        return NextResponse.json({ error: "Maximum markup must be greater than or equal to minimum markup" }, { status: 400 });
+      }
+      await query(
+        `UPDATE users SET allow_price_override = ?, min_markup_pct = ?, max_markup_pct = ?, credit_limit = ?
+         WHERE id = ? AND role = 'reseller'`,
+        [pricingRules.allowPriceOverride === false ? 0 : 1, min, max, Math.max(0, Number(pricingRules.creditLimit) || 0), id]
       );
     }
     return NextResponse.json({ ok: true });

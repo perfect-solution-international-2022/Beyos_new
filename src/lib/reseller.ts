@@ -21,7 +21,7 @@ export function makeRef(prefix: string): string {
 /** Wallet balance = profit from completed orders − non-rejected withdrawals. */
 export async function walletBalance(resellerId: number): Promise<number> {
   const earned = await query<{ total: string | null }>(
-    "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND status = 'completed'",
+    "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND status IN ('completed','delivered')",
     [resellerId]
   );
   const withdrawn = await query<{ total: string | null }>(

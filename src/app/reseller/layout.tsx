@@ -228,14 +228,16 @@ export default function ResellerLayout({ children }: { children: React.ReactNode
           </div>
 
           <div className="flex items-center gap-2.5 sm:gap-3">
-            {/* New Order quick access */}
-            <Link
-              href="/reseller/orders/new"
-              className="flex items-center gap-2 rounded-xl bg-brand px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-brand/25 transition hover:bg-brand/90"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
-              <span className="hidden sm:inline">New Order</span>
-            </Link>
+            {/* New Order quick access — hidden when already creating an order. */}
+            {pathname !== "/reseller/orders/new" && (
+              <Link
+                href="/reseller/orders/new"
+                className="flex items-center gap-2 rounded-xl bg-brand px-3.5 py-2 text-sm font-semibold text-white shadow-md shadow-brand/25 transition hover:bg-brand/90"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                <span className="hidden sm:inline">New Order</span>
+              </Link>
+            )}
 
             {/* Account menu */}
             <div ref={menuRef} className="relative">

@@ -24,7 +24,7 @@ interface Order {
 }
 
 const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
-const RESELLER_STATUSES = ["pending", "completed", "rejected"];
+const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled", "rejected"];
 
 const paymentBadge: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",
@@ -103,7 +103,7 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
       const response = await fetch("/api/admin/orders/koombiyo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderRef: o.orderRef, action }),
+        body: JSON.stringify({ orderRef: o.orderRef, action, type: o.type }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Koombiyo request failed");
@@ -194,7 +194,7 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {o.type === "customer" ? (
+                    {o.type === "customer" || o.type === "reseller" ? (
                       <div className="flex min-w-[130px] flex-col gap-1.5">
                         {o.koombiyoWaybillId && (
                           <>

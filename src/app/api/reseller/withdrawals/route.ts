@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { pool, query } from "@/lib/db";
 import { requireReseller, makeRef, walletBalance } from "@/lib/reseller";
 
 interface Row {
@@ -58,30 +58,47 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   const amount = Number(body.amount);
-  if (!amount || amount <= 0) {
-    return NextResponse.json({ error: "Enter a valid amount" }, { status: 400 });
+  if (!amount || amount < 1000) {
+    return NextResponse.json({ error: "Minimum withdrawal amount is LKR 1,000" }, { status: 400 });
   }
 
+  const conn = await pool.getConnection();
   try {
-    const balance = await walletBalance(reseller.id);
+    await conn.beginTransaction();
+    await conn.execute("SELECT id FROM users WHERE id = ? FOR UPDATE", [reseller.id]);
+    const [pendingRows] = await conn.execute(
+      "SELECT id FROM withdrawals WHERE reseller_id = ? AND status = 'pending' LIMIT 1 FOR UPDATE", [reseller.id]
+    );
+    if ((pendingRows as unknown[]).length) {
+      await conn.rollback();
+      return NextResponse.json({ error: "You already have a pending withdrawal request" }, { status: 400 });
+    }
+    const [earnedRows] = await conn.execute(
+      "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND status IN ('completed','delivered')", [reseller.id]
+    );
+    const [withdrawnRows] = await conn.execute(
+      "SELECT COALESCE(SUM(amount),0) AS total FROM withdrawals WHERE reseller_id = ? AND status <> 'rejected'", [reseller.id]
+    );
+    const balance = Number((earnedRows as any[])[0]?.total ?? 0) - Number((withdrawnRows as any[])[0]?.total ?? 0);
     if (amount > balance) {
+      await conn.rollback();
       return NextResponse.json(
         { error: "Amount exceeds your available balance" },
         { status: 400 }
       );
     }
 
-    const bank = await query<{
+    const [bankRows] = await conn.execute(
+      "SELECT bank_name, account_name, account_number, bank_branch FROM users WHERE id = ?", [reseller.id]
+    );
+    const b = (bankRows as {
       bank_name: string | null;
       account_name: string | null;
       account_number: string | null;
       bank_branch: string | null;
-    }>(
-      "SELECT bank_name, account_name, account_number, bank_branch FROM users WHERE id = ?",
-      [reseller.id]
-    );
-    const b = bank[0];
+    }[])[0];
     if (!b?.bank_name || !b?.account_number) {
+      await conn.rollback();
       return NextResponse.json(
         { error: "Please add your bank details before withdrawing" },
         { status: 400 }
@@ -90,14 +107,21 @@ export async function POST(request: Request) {
     const snapshot = `${b.bank_name} · ${b.account_name ?? ""} · ${b.account_number}`;
 
     const ref = makeRef("WD");
-    await query(
+    await conn.execute(
       `INSERT INTO withdrawals (withdraw_ref, reseller_id, amount, status, bank_snapshot)
        VALUES (?,?,?,'pending',?)`,
       [ref, reseller.id, amount, snapshot]
     );
+    await conn.execute(
+      `INSERT INTO reseller_wallet_transactions
+       (reseller_id, type, amount, reference_type, reference_id, description)
+       VALUES (?,'debit',?,'withdrawal',?,'Withdrawal requested')`, [reseller.id, amount, ref]
+    );
+    await conn.commit();
     return NextResponse.json({ success: true, withdrawRef: ref });
   } catch (err) {
+    await conn.rollback().catch(() => {});
     console.error("withdrawals POST error:", err);
     return NextResponse.json({ error: "Could not create withdrawal" }, { status: 500 });
-  }
+  } finally { conn.release(); }
 }

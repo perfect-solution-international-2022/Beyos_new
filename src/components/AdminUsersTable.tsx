@@ -10,7 +10,11 @@ interface AdminUser {
   role: string;
   phone: string;
   city: string | null;
-  resellerStatus: "pending" | "approved" | "rejected";
+  resellerStatus: "pending" | "approved" | "suspended" | "rejected";
+  allowPriceOverride: boolean;
+  minMarkupPct: number;
+  maxMarkupPct: number | null;
+  creditLimit: number;
   createdAt: string;
 }
 
@@ -63,7 +67,7 @@ export default function AdminUsersTable({
     } finally { setSaving(0); }
   };
 
-  const changeResellerStatus = async (id: number, resellerStatus: "approved" | "rejected") => {
+  const changeResellerStatus = async (id: number, resellerStatus: "approved" | "suspended" | "rejected") => {
     setSaving(id);
     try {
       const res = await fetch("/api/admin/users", {
@@ -74,12 +78,29 @@ export default function AdminUsersTable({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not update reseller");
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, resellerStatus } : u)));
-      toast(resellerStatus === "approved" ? "Reseller approved" : "Reseller rejected");
+      toast(`Reseller ${resellerStatus}`);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Could not update reseller");
     } finally {
       setSaving(0);
     }
+  };
+
+  const savePricingRules = async (u: AdminUser) => {
+    setSaving(u.id);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: u.id, pricingRules: {
+          allowPriceOverride: u.allowPriceOverride, minMarkupPct: u.minMarkupPct,
+          maxMarkupPct: u.maxMarkupPct, creditLimit: u.creditLimit,
+        } }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not save pricing rules");
+      toast("Reseller pricing rules saved");
+    } catch (error) { toast(error instanceof Error ? error.message : "Could not save pricing rules", "error"); }
+    finally { setSaving(0); }
   };
 
   const del = async (u: AdminUser) => {
@@ -117,14 +138,15 @@ export default function AdminUsersTable({
               <th className="px-6 py-4">Phone</th>
               <th className="px-6 py-4">Joined</th>
               <th className="px-6 py-4">Role</th>
+              {role === "reseller" && <th className="px-6 py-4">Pricing Rules</th>}
               {manage && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={role === "reseller" ? 6 : manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
+              <tr><td colSpan={role === "reseller" ? 6 : manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
             ) : (
               filtered.map((u) => (
                 <tr key={u.id} className="border-b border-navy-800/5 last:border-0">
@@ -163,11 +185,28 @@ export default function AdminUsersTable({
                             {u.resellerStatus !== "rejected" && (
                               <button disabled={saving === u.id} onClick={() => changeResellerStatus(u.id, "rejected")} className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100">Reject</button>
                             )}
+                            {u.resellerStatus !== "suspended" && (
+                              <button disabled={saving === u.id} onClick={() => changeResellerStatus(u.id, "suspended")} className="rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100">Suspend</button>
+                            )}
                           </>
                         )}
                       </div>
                     )}
                   </td>
+                  {role === "reseller" && (
+                    <td className="px-6 py-4">
+                      <div className="grid min-w-[340px] grid-cols-4 gap-2 text-xs">
+                        <label className="col-span-4 flex items-center gap-2">
+                          <input type="checkbox" checked={u.allowPriceOverride} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, allowPriceOverride: e.target.checked } : x))} />
+                          Allow custom customer price
+                        </label>
+                        <input aria-label="Minimum markup percent" title="Minimum markup %" type="number" min="0" value={u.minMarkupPct} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, minMarkupPct: Number(e.target.value) } : x))} className="input px-2 py-1" placeholder="Min %" />
+                        <input aria-label="Maximum markup percent" title="Maximum markup %" type="number" min="0" value={u.maxMarkupPct ?? ""} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, maxMarkupPct: e.target.value === "" ? null : Number(e.target.value) } : x))} className="input px-2 py-1" placeholder="Max %" />
+                        <input aria-label="Credit limit" title="Credit limit" type="number" min="0" value={u.creditLimit} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, creditLimit: Number(e.target.value) } : x))} className="input px-2 py-1" placeholder="Credit" />
+                        <button disabled={saving === u.id} onClick={() => savePricingRules(u)} className="rounded-lg bg-brand px-2 py-1 font-semibold text-white disabled:opacity-50">Save</button>
+                      </div>
+                    </td>
+                  )}
                   {manage && (
                     <td className="px-6 py-4">
                       <div className="flex justify-end">

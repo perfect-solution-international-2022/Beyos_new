@@ -7,7 +7,6 @@ const columns = [
     links: [
       { href: "/shop?category=men", label: "Men" },
       { href: "/shop?category=women", label: "Women" },
-      { href: "/shop?category=accessories", label: "Accessories" },
       { href: "/shop", label: "All Products" },
     ],
   },
@@ -92,8 +91,28 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-white/50 sm:flex-row">
-          <p>© {new Date().getFullYear()} Beyos Clothing. All rights reserved.</p>
+        <div className="mt-14 flex flex-col items-center justify-between gap-5 border-t border-white/10 pt-8 text-sm text-white/50 sm:flex-row">
+          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:text-left">
+            <p>© {new Date().getFullYear()} Beyos Clothing. All rights reserved.</p>
+            <div className="flex items-center gap-2">
+              <span>Developed by</span>
+              <a
+                href="https://perfectsolutioninternational.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Perfect Solution International"
+                className="rounded bg-white px-2 py-1 transition hover:opacity-90"
+              >
+                <Image
+                  src="/images/logo/psi-logo.png"
+                  alt="Perfect Solution International"
+                  width={130}
+                  height={40}
+                  className="h-8 w-auto object-contain"
+                />
+              </a>
+            </div>
+          </div>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             <a href="#" className="hover:text-white">Privacy Policy</a>
             <a href="#" className="hover:text-white">Terms of Service</a>

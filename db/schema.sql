@@ -16,7 +16,11 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   role          ENUM('buyer','reseller','admin') NOT NULL DEFAULT 'buyer',
-  reseller_status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved',
+  reseller_status ENUM('pending','approved','suspended','rejected') NOT NULL DEFAULT 'approved',
+  allow_price_override TINYINT(1) NOT NULL DEFAULT 1,
+  min_markup_pct DECIMAL(6,2) NOT NULL DEFAULT 0,
+  max_markup_pct DECIMAL(6,2) NULL,
+  credit_limit DECIMAL(12,2) NOT NULL DEFAULT 0,
   session_version INT NOT NULL DEFAULT 0,
   phone         VARCHAR(40) NOT NULL DEFAULT '',
   address_line1 VARCHAR(255) NULL,
@@ -82,12 +86,19 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- Categories (hierarchical) --------------------------------------------
 CREATE TABLE IF NOT EXISTS categories (
-  id         INT AUTO_INCREMENT PRIMARY KEY,
-  name       VARCHAR(255) NOT NULL,
-  slug       VARCHAR(255) NOT NULL UNIQUE,
-  parent_id  INT NULL,
-  image_url  VARCHAR(500) NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  name              VARCHAR(255) NOT NULL,
+  slug              VARCHAR(255) NOT NULL UNIQUE,
+  parent_id         INT NULL,
+  image_url         VARCHAR(500) NULL,
+  image_data        LONGBLOB NULL,
+  image_mime        VARCHAR(100) NULL,
+  homepage_visible  TINYINT(1) NOT NULL DEFAULT 0,
+  shop_visible      TINYINT(1) NOT NULL DEFAULT 0,
+  homepage_order    INT NOT NULL DEFAULT 0,
+  homepage_href     VARCHAR(500) NULL,
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_cat_parent FOREIGN KEY (parent_id)
     REFERENCES categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
@@ -118,12 +129,30 @@ CREATE TABLE IF NOT EXISTS reseller_orders (
   customer_name  VARCHAR(160) NOT NULL,
   customer_phone VARCHAR(40) NOT NULL DEFAULT '',
   customer_address VARCHAR(255) NOT NULL DEFAULT '',
+  customer_email VARCHAR(190) NULL,
+  address_line1 VARCHAR(255) NOT NULL DEFAULT '',
+  address_line2 VARCHAR(255) NULL,
+  province VARCHAR(120) NOT NULL DEFAULT '',
+  district VARCHAR(120) NOT NULL DEFAULT '',
+  district_id INT NULL,
+  city VARCHAR(120) NOT NULL DEFAULT '',
+  city_id INT NULL,
+  postal_code VARCHAR(30) NULL,
+  notes VARCHAR(500) NULL,
+  subtotal DECIMAL(10,2) NOT NULL DEFAULT 0,
+  delivery_fee DECIMAL(10,2) NOT NULL DEFAULT 300,
   amount         DECIMAL(10,2) NOT NULL,
   cost           DECIMAL(10,2) NOT NULL,
   profit         DECIMAL(10,2) NOT NULL,
   status         VARCHAR(30) NOT NULL DEFAULT 'pending',
   reject_reason  VARCHAR(255) NULL,
   payment_status VARCHAR(30) NOT NULL DEFAULT 'unpaid',
+  koombiyo_waybill_id VARCHAR(100) NULL,
+  koombiyo_status VARCHAR(100) NULL,
+  koombiyo_response JSON NULL,
+  koombiyo_updated_at TIMESTAMP NULL,
+  inventory_reverted_at TIMESTAMP NULL,
+  wallet_credited_at TIMESTAMP NULL,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_rorder_user FOREIGN KEY (reseller_id)
     REFERENCES users(id) ON DELETE CASCADE,
@@ -135,6 +164,9 @@ CREATE TABLE IF NOT EXISTS reseller_order_items (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   order_id       INT NOT NULL,
   product_slug   VARCHAR(160) NOT NULL,
+  product_id     INT NULL,
+  variant_id     INT NULL,
+  variant_summary VARCHAR(255) NULL,
   sku            VARCHAR(60) NOT NULL DEFAULT '',
   name           VARCHAR(200) NOT NULL,
   quantity       INT NOT NULL,
@@ -144,6 +176,20 @@ CREATE TABLE IF NOT EXISTS reseller_order_items (
   CONSTRAINT fk_ritem_order FOREIGN KEY (order_id)
     REFERENCES reseller_orders(id) ON DELETE CASCADE,
   INDEX idx_ritem_order (order_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS reseller_wallet_transactions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  reseller_id INT NOT NULL,
+  type ENUM('credit','debit','reversal') NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  reference_type VARCHAR(30) NOT NULL,
+  reference_id VARCHAR(40) NOT NULL,
+  description VARCHAR(255) NOT NULL DEFAULT '',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_wallet_user FOREIGN KEY (reseller_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_wallet_reference (reference_type, reference_id, type),
+  INDEX idx_wallet_reseller (reseller_id)
 ) ENGINE=InnoDB;
 
 -- Reseller withdrawals --------------------------------------------------

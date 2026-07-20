@@ -70,7 +70,12 @@ async function main() {
     ["account_name", "VARCHAR(160) NULL"],
     ["account_number", "VARCHAR(60) NULL"],
     ["bank_branch", "VARCHAR(120) NULL"],
+    ["allow_price_override", "TINYINT(1) NOT NULL DEFAULT 1"],
+    ["min_markup_pct", "DECIMAL(6,2) NOT NULL DEFAULT 0"],
+    ["max_markup_pct", "DECIMAL(6,2) NULL"],
+    ["credit_limit", "DECIMAL(12,2) NOT NULL DEFAULT 0"],
   ]);
+  await db.query("ALTER TABLE users MODIFY COLUMN reseller_status ENUM('pending','approved','suspended','rejected') NOT NULL DEFAULT 'approved'");
 
   // Reseller-specific product pricing columns.
   await ensureColumns(db, "products", [
@@ -131,6 +136,56 @@ async function main() {
     CONSTRAINT fk_link_linked FOREIGN KEY (linked_product_id) REFERENCES products(id) ON DELETE CASCADE,
     INDEX idx_link_product (product_id)
   ) ENGINE=InnoDB`);
+
+  await ensureColumns(db, "reseller_orders", [
+    ["customer_email", "VARCHAR(190) NULL"],
+    ["address_line1", "VARCHAR(255) NOT NULL DEFAULT ''"],
+    ["address_line2", "VARCHAR(255) NULL"],
+    ["province", "VARCHAR(120) NOT NULL DEFAULT ''"],
+    ["district", "VARCHAR(120) NOT NULL DEFAULT ''"],
+    ["district_id", "INT NULL"],
+    ["city", "VARCHAR(120) NOT NULL DEFAULT ''"],
+    ["city_id", "INT NULL"],
+    ["postal_code", "VARCHAR(30) NULL"],
+    ["notes", "VARCHAR(500) NULL"],
+    ["subtotal", "DECIMAL(10,2) NOT NULL DEFAULT 0"],
+    ["delivery_fee", "DECIMAL(10,2) NOT NULL DEFAULT 300"],
+    ["koombiyo_waybill_id", "VARCHAR(100) NULL"],
+    ["koombiyo_status", "VARCHAR(100) NULL"],
+    ["koombiyo_response", "JSON NULL"],
+    ["koombiyo_updated_at", "TIMESTAMP NULL"],
+    ["inventory_reverted_at", "TIMESTAMP NULL"],
+    ["wallet_credited_at", "TIMESTAMP NULL"],
+  ]);
+  await ensureColumns(db, "reseller_order_items", [
+    ["product_id", "INT NULL AFTER product_slug"],
+    ["variant_id", "INT NULL AFTER product_id"],
+    ["variant_summary", "VARCHAR(255) NULL AFTER variant_id"],
+  ]);
+  await db.query(`CREATE TABLE IF NOT EXISTS reseller_wallet_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    reseller_id INT NOT NULL,
+    type ENUM('credit','debit','reversal') NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    reference_type VARCHAR(30) NOT NULL,
+    reference_id VARCHAR(40) NOT NULL,
+    description VARCHAR(255) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_wallet_user FOREIGN KEY (reseller_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uq_wallet_reference (reference_type, reference_id, type),
+    INDEX idx_wallet_reseller (reseller_id)
+  ) ENGINE=InnoDB`);
+  await db.query(`INSERT IGNORE INTO reseller_wallet_transactions
+    (reseller_id, type, amount, reference_type, reference_id, description)
+    SELECT reseller_id, 'credit', profit, 'order', order_ref, 'Reseller order profit'
+    FROM reseller_orders WHERE status IN ('completed','delivered')`);
+  await db.query(`INSERT IGNORE INTO reseller_wallet_transactions
+    (reseller_id, type, amount, reference_type, reference_id, description)
+    SELECT reseller_id, 'debit', amount, 'withdrawal', withdraw_ref, 'Withdrawal requested' FROM withdrawals`);
+  await db.query(`INSERT IGNORE INTO reseller_wallet_transactions
+    (reseller_id, type, amount, reference_type, reference_id, description)
+    SELECT reseller_id, 'reversal', amount, 'withdrawal', withdraw_ref, 'Rejected withdrawal returned'
+    FROM withdrawals WHERE status = 'rejected'`);
 
   console.log(`→ Seeding ${products.length} products…`);
 
@@ -201,17 +256,43 @@ async function main() {
   // Make product category free-form so admin-created categories work.
   await db.query("ALTER TABLE products MODIFY COLUMN category VARCHAR(120) NOT NULL DEFAULT 'men'");
 
-  // Seed base categories.
+  // Store homepage category settings and uploaded category images in MySQL.
+  // Keeping image bytes in the database makes uploads survive app deployments.
+  await ensureColumns(db, "categories", [
+    ["image_data", "LONGBLOB NULL AFTER image_url"],
+    ["image_mime", "VARCHAR(100) NULL AFTER image_data"],
+    ["homepage_visible", "TINYINT(1) NOT NULL DEFAULT 0 AFTER image_mime"],
+    ["shop_visible", "TINYINT(1) NOT NULL DEFAULT 0 AFTER homepage_visible"],
+    ["homepage_order", "INT NOT NULL DEFAULT 0 AFTER shop_visible"],
+    ["homepage_href", "VARCHAR(500) NULL AFTER homepage_order"],
+    ["updated_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at"],
+  ]);
+
+  // Seed the categories currently shown on the storefront homepage. Existing
+  // admin changes are preserved on later setup runs.
   const baseCats = [
-    ["Men", "men"],
-    ["Women", "women"],
-    ["Accessories", "accessories"],
+    ["Men", "men", "/images/men-category.svg", "/shop?category=men", 1, 1, 10],
+    ["Men T-Shirt", "men-t-shirt", "/images/products/tshirt-aqua.webp", "/product/classic-crew-tee", 1, 0, 20],
+    ["Women", "women", "/images/women-category.svg", "/shop?category=women", 1, 1, 30],
+    ["Women T-Shirt", "women-t-shirt", "/images/products/tshirt-coral.webp", "/product/everyday-knit-top", 1, 0, 40],
+    ["Accessories", "accessories", null, "/shop?category=accessories", 0, 0, 50],
   ];
-  for (const [name, slug] of baseCats) {
+  for (const [name, slug, imageUrl, homepageHref, homepageVisible, shopVisible, homepageOrder] of baseCats) {
     await db.execute(
-      "INSERT INTO categories (name, slug) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name)",
-      [name, slug]
+      `INSERT INTO categories
+         (name, slug, image_url, homepage_href, homepage_visible, shop_visible, homepage_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE id = id`,
+      [name, slug, imageUrl, homepageHref, homepageVisible, shopVisible, homepageOrder]
     );
+    if (homepageVisible) {
+      await db.execute(
+        `UPDATE categories
+         SET image_url = ?, homepage_href = ?, homepage_visible = 1, homepage_order = ?
+         WHERE slug = ? AND image_url IS NULL AND homepage_href IS NULL AND homepage_order = 0`,
+        [imageUrl, homepageHref, homepageOrder, slug]
+      );
+    }
   }
 
   // Seed base attributes and their values.

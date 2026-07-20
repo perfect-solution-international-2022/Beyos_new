@@ -17,7 +17,7 @@ export interface DbUser {
   email: string;
   password_hash: string;
   role: UserRole;
-  reseller_status: "pending" | "approved" | "rejected";
+  reseller_status: "pending" | "approved" | "suspended" | "rejected";
   session_version: number;
   created_at: string;
 }

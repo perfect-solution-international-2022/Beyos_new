@@ -5,6 +5,7 @@ import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import Newsletter from "@/components/Newsletter";
 import { getFeaturedProducts } from "@/lib/products-db";
+import { getHomeCategories } from "@/lib/categories-db";
 
 // Featured products come from MySQL (admin-managed) — must not be cached
 // at build time, or admin edits wouldn't show up until a rebuild.
@@ -54,31 +55,11 @@ const testimonials = [
   },
 ];
 
-const homeCategories = [
-  {
-    name: "Men",
-    href: "/shop?category=men",
-    image: "/images/men-category.svg",
-  },
-  {
-    name: "Men T-Shirt",
-    href: "/product/classic-crew-tee",
-    image: "/images/products/tshirt-aqua.webp",
-  },
-  {
-    name: "Women",
-    href: "/shop?category=women",
-    image: "/images/women-category.svg",
-  },
-  {
-    name: "Women T-Shirt",
-    href: "/product/everyday-knit-top",
-    image: "/images/products/tshirt-coral.webp",
-  },
-];
-
 export default async function HomePage() {
-  const featured = await getFeaturedProducts();
+  const [featured, homeCategories] = await Promise.all([
+    getFeaturedProducts(),
+    getHomeCategories(),
+  ]);
 
   return (
     <>
@@ -97,7 +78,7 @@ export default async function HomePage() {
         <div className="mt-8 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-4 sm:gap-x-8">
           {homeCategories.map((cat) => (
             <Link
-              key={cat.name}
+              key={cat.id}
               href={cat.href}
               className="group flex flex-col items-center text-center"
             >

@@ -39,6 +39,37 @@ async function postForm(path: string, fields: Record<string, string | number>) {
   return data;
 }
 
+export interface KoombiyoDistrict { id: number; name: string }
+export interface KoombiyoCity { id: number; name: string }
+
+export async function getDistricts(): Promise<KoombiyoDistrict[]> {
+  const raw = await postForm("Districts/users", {});
+  const list = Array.isArray(raw) ? raw : [];
+  const parsed = list.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as JsonObject;
+    const id = Number(row.district_id);
+    const name = String(row.district_name || "").trim();
+    return id && name ? [{ id, name }] : [];
+  });
+  return [...new Map(parsed.map((item) => [item.name.toLowerCase(), item])).values()]
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getCities(districtId: number): Promise<KoombiyoCity[]> {
+  const raw = await postForm("Cities/users", { district_id: districtId });
+  const list = Array.isArray(raw) ? raw : [];
+  const parsed = list.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as JsonObject;
+    const id = Number(row.city_id);
+    const name = String(row.city_name || "").trim();
+    return id && name && name.length <= 100 ? [{ id, name }] : [];
+  });
+  return [...new Map(parsed.map((item) => [item.name.toLowerCase(), item])).values()]
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function findWaybill(value: unknown): string | null {
   if (Array.isArray(value)) {
     for (const item of value) {

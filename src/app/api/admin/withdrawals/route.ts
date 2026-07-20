@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { pool, query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
@@ -49,7 +49,29 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   try {
-    await query("UPDATE withdrawals SET status = ? WHERE withdraw_ref = ?", [status, withdrawRef]);
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const [rows] = await conn.execute(
+        "SELECT reseller_id, amount, status FROM withdrawals WHERE withdraw_ref = ? LIMIT 1 FOR UPDATE", [withdrawRef]
+      );
+      const withdrawal = (rows as { reseller_id: number; amount: string; status: string }[])[0];
+      if (!withdrawal) { await conn.rollback(); return NextResponse.json({ error: "Withdrawal not found" }, { status: 404 }); }
+      if (["completed", "rejected"].includes(withdrawal.status) && withdrawal.status !== status) {
+        await conn.rollback();
+        return NextResponse.json({ error: "A completed withdrawal decision cannot be changed" }, { status: 400 });
+      }
+      await conn.execute("UPDATE withdrawals SET status = ? WHERE withdraw_ref = ?", [status, withdrawRef]);
+      if (status === "rejected" && withdrawal.status !== "rejected") {
+        await conn.execute(
+          `INSERT IGNORE INTO reseller_wallet_transactions
+           (reseller_id, type, amount, reference_type, reference_id, description)
+           VALUES (?,'reversal',?,'withdrawal',?,'Rejected withdrawal returned')`,
+          [withdrawal.reseller_id, Number(withdrawal.amount), withdrawRef]
+        );
+      }
+      await conn.commit();
+    } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin withdrawals PATCH error:", err);

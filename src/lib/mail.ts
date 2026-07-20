@@ -42,3 +42,16 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
     `Reset your password: ${resetUrl} (expires in 1 hour, ignore if you didn't request this)`
   );
 }
+
+export async function sendOrderEmail(
+  to: string,
+  details: { orderRef: string; total: number; status: string }
+): Promise<void> {
+  const subject = `Beyos order ${details.orderRef}`;
+  await deliver(
+    to,
+    subject,
+    `<div style="font-family:sans-serif;max-width:520px;margin:0 auto"><h2 style="color:#0f2540">Order received</h2><p>Your order <strong>${details.orderRef}</strong> is ${details.status}.</p><p style="font-size:20px;font-weight:700;color:#f5851f">LKR ${details.total.toFixed(2)}</p></div>`,
+    `Your Beyos order ${details.orderRef} is ${details.status}. Total: LKR ${details.total.toFixed(2)}`
+  );
+}

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { pool, query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { sendOrderStatusSms } from "@/lib/sms";
+import { sendOrderEmail } from "@/lib/mail";
 
 const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
-const RESELLER_STATUSES = ["pending", "completed", "rejected"];
+const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled", "rejected"];
 const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"];
 
 export async function GET() {
@@ -36,9 +37,15 @@ export async function GET() {
       amount: string;
       status: string;
       payment_status: string;
+      customer_phone: string;
+      koombiyo_waybill_id: string | null;
+      koombiyo_status: string | null;
+      koombiyo_updated_at: string | null;
       created_at: string;
     }>(
-      `SELECT order_ref, customer_name, amount, status, payment_status, created_at FROM reseller_orders ORDER BY created_at DESC`
+      `SELECT order_ref, customer_name, customer_phone, amount, status, payment_status,
+              koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
+       FROM reseller_orders ORDER BY created_at DESC`
     );
     const pos = await query<{
       receipt_number: string;
@@ -85,10 +92,10 @@ export async function GET() {
         paymentMethod: "reseller",
         paymentStatus: o.payment_status,
         paymentRef: null as string | null,
-        customerPhone: "",
-        koombiyoWaybillId: null as string | null,
-        koombiyoStatus: null as string | null,
-        koombiyoUpdatedAt: null as string | null,
+        customerPhone: o.customer_phone,
+        koombiyoWaybillId: o.koombiyo_waybill_id,
+        koombiyoStatus: o.koombiyo_status,
+        koombiyoUpdatedAt: o.koombiyo_updated_at,
         createdAt: o.created_at,
       })),
       ...pos.map((o) => ({
@@ -165,6 +172,55 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    if (type === "reseller" && status) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.execute(
+          `SELECT id, reseller_id, profit, status, inventory_reverted_at
+           FROM reseller_orders WHERE order_ref = ? LIMIT 1 FOR UPDATE`, [orderRef]
+        );
+        const order = (rows as { id: number; reseller_id: number; profit: string; status: string; inventory_reverted_at: string | null }[])[0];
+        if (!order) { await conn.rollback(); return NextResponse.json({ error: "Order not found" }, { status: 404 }); }
+        const terminal = ["cancelled", "rejected", "delivered", "completed"];
+        if (terminal.includes(order.status) && order.status !== status) {
+          await conn.rollback();
+          return NextResponse.json({ error: "A completed or cancelled reseller order cannot be reopened" }, { status: 400 });
+        }
+        if (["cancelled", "rejected"].includes(status) && !order.inventory_reverted_at) {
+          const [items] = await conn.execute(
+            "SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?", [order.id]
+          );
+          for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
+            if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+            else if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+            else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+          }
+          await conn.execute("UPDATE reseller_orders SET inventory_reverted_at = NOW() WHERE id = ?", [order.id]);
+        }
+        if (["delivered", "completed"].includes(status)) {
+          await conn.execute(
+            `INSERT IGNORE INTO reseller_wallet_transactions
+             (reseller_id, type, amount, reference_type, reference_id, description)
+             VALUES (?,'credit',?,'order',?,'Reseller order profit')`,
+            [order.reseller_id, Number(order.profit), orderRef]
+          );
+          await conn.execute(
+            "UPDATE reseller_orders SET wallet_credited_at = COALESCE(wallet_credited_at, NOW()), payment_status = 'paid' WHERE id = ?", [order.id]
+          );
+        }
+        await conn.execute("UPDATE reseller_orders SET status = ? WHERE id = ?", [status, order.id]);
+        await conn.commit();
+      } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
+      const recipient = await query<{ phone: string; email: string; amount: string }>(
+        `SELECT u.phone, u.email, ro.amount FROM reseller_orders ro JOIN users u ON u.id = ro.reseller_id WHERE ro.order_ref = ? LIMIT 1`, [orderRef]
+      );
+      await Promise.allSettled([
+        sendOrderStatusSms(recipient[0]?.phone, orderRef, status),
+        recipient[0]?.email ? sendOrderEmail(recipient[0].email, { orderRef, total: Number(recipient[0].amount), status }) : Promise.resolve(),
+      ]);
+      return NextResponse.json({ ok: true });
+    }
     const recipient = type === "reseller"
       ? await query<{ phone: string; status: string }>(
           `SELECT u.phone, ro.status FROM reseller_orders ro

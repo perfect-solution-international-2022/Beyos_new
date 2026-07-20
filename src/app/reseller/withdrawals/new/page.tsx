@@ -71,6 +71,7 @@ export default function CreateWithdrawPage() {
               />
             </div>
             <p className="text-xs text-navy-800/50">
+              Minimum withdrawal: LKR 1,000. Only one request can be pending at a time.{" "}
               Funds are transferred to the bank account in your{" "}
               <Link href="/reseller/bank" className="font-medium text-brand hover:underline">
                 Bank Details

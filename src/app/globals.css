@@ -58,6 +58,34 @@ body {
   scrollbar-width: none;
 }
 
+/* Two-handle price filter used on the shop sidebar. */
+.shop-range {
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+}
+.shop-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid white;
+  border-radius: 9999px;
+  background: #0f2540;
+  box-shadow: 0 0 0 1px rgb(15 37 64 / 20%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.shop-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid white;
+  border-radius: 9999px;
+  background: #0f2540;
+  box-shadow: 0 0 0 1px rgb(15 37 64 / 20%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
 @keyframes fadeUp {
   from {
     opacity: 0;
