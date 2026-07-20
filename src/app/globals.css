@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Playfair Display", Georgia, serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-navy-800 antialiased;
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-[1280px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand text-white hover:bg-brand-600 active:scale-[0.98] shadow-sm hover:shadow-md;
+  }
+
+  .btn-dark {
+    @apply btn bg-navy-800 text-white hover:bg-navy-700 active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply btn border border-navy-800/20 bg-white text-navy-800 hover:border-navy-800 hover:bg-navy-50;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-navy-800/15 bg-white px-4 py-3 text-sm text-navy-800 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 placeholder:text-navy-800/40;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide;
+  }
+}
+
+/* Hide scrollbar utility for horizontal scrollers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.5s ease-out both;
+}

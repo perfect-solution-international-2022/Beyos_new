@@ -1,0 +1,265 @@
+import type { Product } from "./types";
+
+const P = "/images/products";
+
+// Shared product photos (real garment shots) used across the catalog for now.
+export const GALLERY = [
+  `${P}/tshirt-aqua.webp`,
+  `${P}/tshirt-teal.webp`,
+  `${P}/tshirt-coral.webp`,
+];
+
+export const products: Product[] = [
+  {
+    id: "1",
+    slug: "classic-crew-tee",
+    name: "Classic Crew T-Shirt",
+    category: "men",
+    price: 1890,
+    compareAtPrice: 2500,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "A timeless crew-neck tee cut from breathable premium cotton. Pre-shrunk, soft to the touch, and built to keep its shape wash after wash. An everyday essential that layers effortlessly.",
+    sizes: ["S", "M", "L", "XL", "XXL"],
+    colors: ["Black", "White", "Navy"],
+    rating: 4.6,
+    reviews: 128,
+    badge: "Bestseller",
+    featured: true,
+    stock: 42,
+  },
+  {
+    id: "2",
+    slug: "heritage-graphic-tee",
+    name: "Heritage Graphic Tee",
+    category: "men",
+    price: 2290,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "Bold statement graphics printed on heavyweight cotton. A relaxed fit that pairs as well with denim as it does with joggers.",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Charcoal", "Sand"],
+    rating: 4.4,
+    reviews: 76,
+    badge: "New",
+    featured: true,
+    stock: 30,
+  },
+  {
+    id: "3",
+    slug: "essential-long-sleeve",
+    name: "Essential Long Sleeve",
+    category: "men",
+    price: 2790,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "A refined long-sleeve tee with a clean silhouette and ribbed cuffs. Mid-weight jersey that transitions seamlessly between seasons.",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Olive", "Black", "Grey"],
+    rating: 4.7,
+    reviews: 54,
+    featured: true,
+    stock: 25,
+  },
+  {
+    id: "4",
+    slug: "urban-pullover-hoodie",
+    name: "Urban Pullover Hoodie",
+    category: "men",
+    price: 4500,
+    compareAtPrice: 5900,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "Cozy brushed-fleece hoodie with a double-lined hood, kangaroo pocket, and ribbed hem. Your go-to for cool evenings and easy weekends.",
+    sizes: ["S", "M", "L", "XL", "XXL"],
+    colors: ["Navy", "Heather Grey", "Black"],
+    rating: 4.8,
+    reviews: 203,
+    badge: "Sale",
+    featured: true,
+    stock: 18,
+  },
+  {
+    id: "5",
+    slug: "signature-summer-dress",
+    name: "Signature Summer Dress",
+    category: "women",
+    price: 5900,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "A flowing midi dress crafted from lightweight, breathable fabric. Flattering A-line cut with an adjustable waist tie for effortless elegance.",
+    sizes: ["XS", "S", "M", "L"],
+    colors: ["Coral", "Ivory", "Emerald"],
+    rating: 4.9,
+    reviews: 167,
+    badge: "Bestseller",
+    featured: true,
+    stock: 22,
+  },
+  {
+    id: "6",
+    slug: "silk-touch-blouse",
+    name: "Silk-Touch Blouse",
+    category: "women",
+    price: 3900,
+    compareAtPrice: 4900,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "An elegant blouse with a satin-smooth finish and a relaxed drape. Dress it up for the office or down for brunch.",
+    sizes: ["XS", "S", "M", "L", "XL"],
+    colors: ["Blush", "Black", "Champagne"],
+    rating: 4.5,
+    reviews: 89,
+    badge: "Sale",
+    featured: true,
+    stock: 31,
+  },
+  {
+    id: "7",
+    slug: "everyday-knit-top",
+    name: "Everyday Knit Top",
+    category: "women",
+    price: 2490,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "A soft ribbed-knit top with a fitted silhouette that moves with you. Endlessly versatile and impossibly comfortable.",
+    sizes: ["XS", "S", "M", "L"],
+    colors: ["Mauve", "White", "Navy"],
+    rating: 4.3,
+    reviews: 61,
+    badge: "New",
+    stock: 40,
+  },
+  {
+    id: "8",
+    slug: "explorer-backpack",
+    name: "Explorer Backpack",
+    category: "accessories",
+    price: 6900,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "A durable water-resistant backpack with a padded laptop sleeve, multiple compartments, and ergonomic straps. Made for the daily commute and weekend getaways alike.",
+    sizes: ["One Size"],
+    colors: ["Black", "Tan"],
+    rating: 4.7,
+    reviews: 142,
+    badge: "Bestseller",
+    featured: true,
+    stock: 15,
+  },
+  {
+    id: "9",
+    slug: "minimalist-watch",
+    name: "Minimalist Watch",
+    category: "accessories",
+    price: 9900,
+    compareAtPrice: 12500,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "A sleek analog watch with a stainless-steel case, sapphire-coated glass, and a genuine leather strap. Understated design that pairs with everything.",
+    sizes: ["One Size"],
+    colors: ["Silver / Brown", "Gold / Black"],
+    rating: 4.8,
+    reviews: 98,
+    badge: "Sale",
+    stock: 12,
+  },
+  {
+    id: "10",
+    slug: "aviator-sunglasses",
+    name: "Aviator Sunglasses",
+    category: "accessories",
+    price: 3200,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "Classic aviators with UV400-protective polarized lenses and a lightweight metal frame. Timeless style, all-day comfort.",
+    sizes: ["One Size"],
+    colors: ["Gold", "Gunmetal"],
+    rating: 4.4,
+    reviews: 73,
+    stock: 50,
+  },
+  {
+    id: "11",
+    slug: "premium-leather-belt",
+    name: "Premium Leather Belt",
+    category: "accessories",
+    price: 2900,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "Full-grain leather belt with a polished buckle. Hand-finished edges and a refined grain that only gets better with age.",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["Brown", "Black"],
+    rating: 4.6,
+    reviews: 57,
+    stock: 34,
+  },
+  {
+    id: "12",
+    slug: "premium-cotton-tee",
+    name: "Premium Cotton Tee",
+    category: "men",
+    price: 2190,
+    image: GALLERY[0],
+    images: GALLERY,
+    description:
+      "Our softest tee yet, spun from long-staple combed cotton for a luxuriously smooth hand-feel and a tailored modern fit.",
+    sizes: ["S", "M", "L", "XL"],
+    colors: ["White", "Black", "Sage"],
+    rating: 4.5,
+    reviews: 44,
+    stock: 28,
+  },
+];
+
+export const categories = [
+  {
+    slug: "men" as const,
+    name: "Men",
+    image: "/images/men-category.svg",
+    description: "Tees, hoodies & essentials",
+  },
+  {
+    slug: "women" as const,
+    name: "Women",
+    image: "/images/women-category.svg",
+    description: "Dresses, tops & more",
+  },
+  {
+    slug: "accessories" as const,
+    name: "Accessories",
+    image: "/images/accessories-category.svg",
+    description: "Bags, watches & extras",
+  },
+];
+
+export function getAllProducts(): Product[] {
+  return products;
+}
+
+export function getProductBySlug(slug: string): Product | undefined {
+  return products.find((p) => p.slug === slug);
+}
+
+export function getProductsByCategory(category: string): Product[] {
+  return products.filter((p) => p.category === category);
+}
+
+export function getFeaturedProducts(): Product[] {
+  return products.filter((p) => p.featured);
+}
+
+export function getRelatedProducts(slug: string, category: string): Product[] {
+  return products.filter((p) => p.category === category && p.slug !== slug).slice(0, 4);
+}
