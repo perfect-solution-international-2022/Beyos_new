@@ -57,6 +57,8 @@ async function main() {
     ["first_name", "VARCHAR(120) NOT NULL DEFAULT '' AFTER name"],
     ["last_name", "VARCHAR(120) NOT NULL DEFAULT '' AFTER first_name"],
     ["role", "ENUM('buyer','reseller') NOT NULL DEFAULT 'buyer' AFTER password_hash"],
+    ["reseller_status", "ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved' AFTER role"],
+    ["session_version", "INT NOT NULL DEFAULT 0 AFTER reseller_status"],
     ["phone", "VARCHAR(40) NOT NULL DEFAULT '' AFTER role"],
     ["address_line1", "VARCHAR(255) NULL AFTER phone"],
     ["address_line2", "VARCHAR(255) NULL AFTER address_line1"],
@@ -182,6 +184,10 @@ async function main() {
     ["paid_at", "TIMESTAMP NULL"],
     ["promo_code", "VARCHAR(40) NULL"],
     ["discount", "DECIMAL(10,2) NOT NULL DEFAULT 0"],
+    ["koombiyo_waybill_id", "VARCHAR(100) NULL"],
+    ["koombiyo_status", "VARCHAR(100) NULL"],
+    ["koombiyo_response", "JSON NULL"],
+    ["koombiyo_updated_at", "TIMESTAMP NULL"],
   ]);
 
   // Delivery fulfillment columns for POS sales.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { computeOrderTotals, createPendingOrder, CheckoutLine, CustomerInfo } from "@/lib/orders";
+import { sendOrderConfirmationSms } from "@/lib/sms";
 
 interface CheckoutPayload {
   customer: CustomerInfo;
@@ -58,6 +59,13 @@ export async function POST(request: Request) {
       total: totals.total,
       paymentMethod: "cod",
       appliedPromotion: totals.appliedPromotion,
+    });
+
+    await sendOrderConfirmationSms({
+      phone: customer.phone,
+      orderRef,
+      total: totals.total,
+      status: "pending",
     });
 
     return NextResponse.json({

@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
+import { sendOrderStatusSms } from "@/lib/sms";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { receiptNumber: string } }
+  { params }: { params: Promise<{ receiptNumber: string }> }
 ) {
+  const { receiptNumber } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -13,7 +15,7 @@ export async function GET(
     const rows = await query<any>(
       `SELECT s.*, c.name AS cashier_name FROM pos_sales s
        JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.receipt_number = ? LIMIT 1`,
-      [params.receiptNumber]
+      [receiptNumber]
     );
     const sale = rows[0];
     if (!sale) return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
@@ -56,8 +58,9 @@ const DELIVERY_STATUSES = ["pending", "out_for_delivery", "delivered"];
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { receiptNumber: string } }
+  { params }: { params: Promise<{ receiptNumber: string }> }
 ) {
+  const { receiptNumber } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -68,9 +71,9 @@ export async function PATCH(
   }
 
   try {
-    const rows = await query<{ id: number; fulfillment_type: string }>(
-      "SELECT id, fulfillment_type FROM pos_sales WHERE receipt_number = ? LIMIT 1",
-      [params.receiptNumber]
+    const rows = await query<{ id: number; fulfillment_type: string; customer_phone: string | null; delivery_status: string | null }>(
+      "SELECT id, fulfillment_type, customer_phone, delivery_status FROM pos_sales WHERE receipt_number = ? LIMIT 1",
+      [receiptNumber]
     );
     const sale = rows[0];
     if (!sale) return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
@@ -79,6 +82,9 @@ export async function PATCH(
     }
 
     await query("UPDATE pos_sales SET delivery_status = ? WHERE id = ?", [b.deliveryStatus, sale.id]);
+    if (sale.delivery_status !== b.deliveryStatus) {
+      await sendOrderStatusSms(sale.customer_phone, receiptNumber, b.deliveryStatus);
+    }
     return NextResponse.json({ ok: true, deliveryStatus: b.deliveryStatus });
   } catch (err) {
     console.error("pos delivery status PATCH error:", err);

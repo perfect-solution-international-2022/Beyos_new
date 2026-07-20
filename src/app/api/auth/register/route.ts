@@ -5,6 +5,7 @@ import {
   findUserByEmail,
   hashPassword,
 } from "@/lib/auth";
+import { consumeRateLimit, requestIp } from "@/lib/rateLimit";
 
 interface RegisterBody {
   firstName?: string;
@@ -22,6 +23,13 @@ interface RegisterBody {
 }
 
 export async function POST(request: Request) {
+  const rate = consumeRateLimit(`register:${requestIp(request)}`, 5, 60 * 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many accounts have been created from this connection. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+    );
+  }
   let body: RegisterBody;
   try {
     body = await request.json();
@@ -83,9 +91,9 @@ export async function POST(request: Request) {
     const name = `${firstName} ${lastName}`.trim();
     const result = await query<any>(
       `INSERT INTO users
-        (name, first_name, last_name, email, password_hash, role, phone,
+        (name, first_name, last_name, email, password_hash, role, reseller_status, phone,
          address_line1, address_line2, city, district, province, postal_code)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         name,
         firstName,
@@ -93,6 +101,7 @@ export async function POST(request: Request) {
         email,
         passwordHash,
         role,
+        role === "reseller" ? "pending" : "approved",
         phone,
         addressLine1,
         addressLine2,
@@ -106,7 +115,8 @@ export async function POST(request: Request) {
 
     await createSession(userId);
     return NextResponse.json({
-      user: { id: userId, name, email, role },
+      user: { id: userId, name, email, role: role === "reseller" ? "buyer" : role },
+      resellerPending: role === "reseller",
     });
   } catch (err) {
     console.error("register error:", err);

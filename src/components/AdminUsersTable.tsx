@@ -10,6 +10,7 @@ interface AdminUser {
   role: string;
   phone: string;
   city: string | null;
+  resellerStatus: "pending" | "approved" | "rejected";
   createdAt: string;
 }
 
@@ -60,6 +61,25 @@ export default function AdminUsersTable({
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, role: newRole }),
       });
     } finally { setSaving(0); }
+  };
+
+  const changeResellerStatus = async (id: number, resellerStatus: "approved" | "rejected") => {
+    setSaving(id);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, resellerStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not update reseller");
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, resellerStatus } : u)));
+      toast(resellerStatus === "approved" ? "Reseller approved" : "Reseller rejected");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not update reseller");
+    } finally {
+      setSaving(0);
+    }
   };
 
   const del = async (u: AdminUser) => {
@@ -130,7 +150,22 @@ export default function AdminUsersTable({
                         <option value="admin">admin</option>
                       </select>
                     ) : (
-                      <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {role === "reseller" && (
+                          <>
+                            <span className={`badge capitalize ${u.resellerStatus === "approved" ? "bg-emerald-100 text-emerald-700" : u.resellerStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                              {u.resellerStatus}
+                            </span>
+                            {u.resellerStatus !== "approved" && (
+                              <button disabled={saving === u.id} onClick={() => changeResellerStatus(u.id, "approved")} className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">Approve</button>
+                            )}
+                            {u.resellerStatus !== "rejected" && (
+                              <button disabled={saving === u.id} onClick={() => changeResellerStatus(u.id, "rejected")} className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100">Reject</button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     )}
                   </td>
                   {manage && (

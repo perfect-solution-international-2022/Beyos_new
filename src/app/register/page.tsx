@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthProvider";
 import PasswordInput from "@/components/PasswordInput";
+import { safeInternalRedirect } from "@/lib/safeRedirect";
 
 type Role = "buyer" | "reseller";
 
@@ -34,7 +35,7 @@ function Field({
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/";
+  const redirect = safeInternalRedirect(searchParams.get("redirect"));
   const { register } = useAuth();
 
   const [role, setRole] = useState<Role>("buyer");
@@ -106,7 +107,7 @@ function RegisterForm() {
 
   return (
     <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-navy-50 px-4 py-12">
-      <div className="w-full max-w-[540px] rounded-3xl bg-white p-8 shadow-sm ring-1 ring-navy-800/5 sm:p-10">
+      <div className="w-full max-w-[540px] rounded-3xl bg-white p-5 shadow-sm ring-1 ring-navy-800/5 sm:p-10">
         {/* Logo + heading */}
         <div className="text-center">
           <Link href="/" className="inline-block">
@@ -118,7 +119,7 @@ function RegisterForm() {
               className="mx-auto h-16 w-16 object-contain"
             />
           </Link>
-          <h1 className="mt-3 font-display text-3xl font-bold text-navy-800">
+          <h1 className="mt-3 font-display text-2xl font-bold text-navy-800 min-[360px]:text-3xl">
             Create Account
           </h1>
           <p className="mt-1 text-sm text-navy-800/60">
@@ -151,7 +152,7 @@ function RegisterForm() {
 
         {/* Form */}
         <form onSubmit={submit} className="mt-7 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="First Name">
               <input
                 required
@@ -213,7 +214,7 @@ function RegisterForm() {
                   placeholder="Apartment 4B"
                 />
               </Field>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="City">
                   <input
                     required
@@ -233,7 +234,7 @@ function RegisterForm() {
                   />
                 </Field>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Province">
                   <input
                     required
@@ -256,7 +257,7 @@ function RegisterForm() {
             </>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Password">
               <PasswordInput
                 required

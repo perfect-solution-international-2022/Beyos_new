@@ -9,9 +9,10 @@ import SectionHeader from "@/components/SectionHeader";
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const product = await getProductBySlug(params.slug);
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
   if (!product) return { title: "Product not found" };
   return {
     title: product.name,
@@ -22,9 +23,10 @@ export async function generateMetadata({
 export default async function ProductPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const product = await getProductBySlug(params.slug);
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
   const related = await getRelatedProducts(product.slug, product.category);

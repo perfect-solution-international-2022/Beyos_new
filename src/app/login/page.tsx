@@ -5,11 +5,12 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
 import { useAuth } from "@/context/AuthProvider";
+import { safeInternalRedirect } from "@/lib/safeRedirect";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/";
+  const redirect = safeInternalRedirect(searchParams.get("redirect"));
   const { login } = useAuth();
 
   const [email, setEmail] = useState("");

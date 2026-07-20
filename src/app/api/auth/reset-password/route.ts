@@ -2,8 +2,16 @@ import { NextResponse } from "next/server";
 import { hashPassword } from "@/lib/auth";
 import { consumePasswordResetToken } from "@/lib/passwordReset";
 import { query } from "@/lib/db";
+import { consumeRateLimit, requestIp } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
+  const rate = consumeRateLimit(`reset-password:${requestIp(request)}`, 10, 15 * 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many reset attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+    );
+  }
   let body: { token?: string; password?: string };
   try {
     body = await request.json();
@@ -34,7 +42,10 @@ export async function POST(request: Request) {
     }
 
     const passwordHash = await hashPassword(password);
-    await query("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, userId]);
+    await query(
+      "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+      [passwordHash, userId]
+    );
 
     return NextResponse.json({ ok: true });
   } catch (err) {

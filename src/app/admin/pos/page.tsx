@@ -1,15 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
-
-interface Cashier {
-  id: number;
-  name: string;
-  isActive: boolean;
-  onShift: boolean;
-}
+import { useAuth } from "@/context/AuthProvider";
+import { SRI_LANKA_LOCATIONS } from "@/lib/sri-lanka-locations";
 
 interface Product {
   slug: string;
@@ -28,17 +24,11 @@ interface CartLine {
   name: string;
   price: number;
   stock: number;
+  sizes: string[];
+  colors: string[];
   size: string;
   color: string;
   quantity: number;
-}
-
-interface OpenShift {
-  id: number;
-  cashierId: number;
-  cashierName: string;
-  openingFloat: number;
-  openedAt: string;
 }
 
 interface Receipt {
@@ -58,18 +48,10 @@ interface Receipt {
   createdAt: string;
 }
 
-type Stage = "select-cashier" | "pin" | "open-float" | "register" | "close-shift";
-
 export default function AdminPosRegisterPage() {
   const { toast } = useToast();
-  const [stage, setStage] = useState<Stage>("select-cashier");
-  const [cashiers, setCashiers] = useState<Cashier[]>([]);
-  const [selectedCashier, setSelectedCashier] = useState<Cashier | null>(null);
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState("");
-  const [shift, setShift] = useState<OpenShift | null>(null);
-  const [openingFloat, setOpeningFloat] = useState("0");
-
+  const { user } = useAuth();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -80,30 +62,23 @@ export default function AdminPosRegisterPage() {
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">("pickup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryProvince, setDeliveryProvince] = useState("");
+  const [deliveryDistrict, setDeliveryDistrict] = useState("");
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
   const [amountTendered, setAmountTendered] = useState("");
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
-  const [closingFloat, setClosingFloat] = useState("");
-  const [closeResult, setCloseResult] = useState<{ expectedCash: number; closingFloat: number; cashDifference: number } | null>(null);
-
   useEffect(() => {
-    fetch("/api/admin/pos/cashiers", { cache: "no-store" })
+    fetch("/api/admin/products", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => setCashiers((d.cashiers ?? []).filter((c: Cashier) => c.isActive)));
+      .then((d) => setProducts((d.products ?? []).map((p: any) => ({
+        slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
+        image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [],
+      }))));
   }, []);
-
-  useEffect(() => {
-    if (stage === "register") {
-      fetch("/api/admin/products", { cache: "no-store" })
-        .then((r) => r.json())
-        .then((d) => setProducts((d.products ?? []).map((p: any) => ({
-          slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
-          image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [],
-        }))));
-    }
-  }, [stage]);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -119,58 +94,61 @@ export default function AdminPosRegisterPage() {
   const total = Math.round((taxable + tax) * 100) / 100;
   const tendered = Number(amountTendered) || 0;
   const change = paymentMethod === "cash" ? Math.max(0, Math.round((tendered - total) * 100) / 100) : 0;
+  const deliveryDetailsComplete = Boolean(
+    customerName.trim() && customerPhone.trim() && deliveryProvince && deliveryDistrict && deliveryCity && deliveryAddress.trim()
+  );
+  const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryProvince, deliveryPostalCode.trim()].filter(Boolean).join(", ");
+  const paymentDisabled = completing || cart.length === 0 || (paymentMethod === "cash" && tendered < total) || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
 
-  const selectCashier = (c: Cashier) => {
-    setSelectedCashier(c);
-    setPin("");
-    setPinError("");
-    setStage("pin");
-  };
-
-  const submitPin = async (value: string) => {
-    if (!selectedCashier || value.length < 4) return;
-    setPinError("");
-    const res = await fetch("/api/pos/verify-pin", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cashierId: selectedCashier.id, pin: value }),
-    });
-    const d = await res.json();
-    if (!res.ok) { setPinError(d.error || "Incorrect PIN"); setPin(""); return; }
-    if (d.openShift) {
-      setShift(d.openShift);
-      setStage("register");
-    } else {
-      setStage("open-float");
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      toast("Fullscreen is not available in this browser");
     }
   };
 
-  const openShift = async () => {
-    if (!selectedCashier) return;
-    const res = await fetch("/api/pos/shifts", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cashierId: selectedCashier.id, openingFloat: Number(openingFloat) || 0 }),
-    });
-    const d = await res.json();
-    if (!res.ok) { toast(d.error || "Could not open shift"); return; }
-    setShift({ id: d.shiftId, cashierId: selectedCashier.id, cashierName: selectedCashier.name, openingFloat: Number(openingFloat) || 0, openedAt: new Date().toISOString() });
-    setStage("register");
+  const saveDeliveryDetails = () => {
+    if (!deliveryDetailsComplete) {
+      toast("Enter the customer, phone, province, district, city and address");
+      return;
+    }
+    setFulfillmentType("delivery");
+    setDeliveryModalOpen(false);
   };
 
   const addToCart = (p: Product) => {
+    const size = p.sizes[0] ?? "";
+    const color = p.colors[0] ?? "";
     setCart((prev) => {
-      const existing = prev.find((l) => l.slug === p.slug && !l.size && !l.color);
+      const totalForProduct = prev.filter((l) => l.slug === p.slug).reduce((sum, l) => sum + l.quantity, 0);
+      if (totalForProduct >= p.stock) { toast(`Only ${p.stock} in stock`); return prev; }
+      const existing = prev.find((l) => l.slug === p.slug && l.size === size && l.color === color);
       if (existing) {
-        if (existing.quantity >= p.stock) { toast(`Only ${p.stock} in stock`); return prev; }
         return prev.map((l) => (l === existing ? { ...l, quantity: l.quantity + 1 } : l));
       }
-      return [...prev, { slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock, size: "", color: "", quantity: 1 }];
+      return [...prev, {
+        slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
+        sizes: p.sizes, colors: p.colors, size, color, quantity: 1,
+      }];
     });
   };
 
+  const updateVariant = (idx: number, field: "size" | "color", value: string) => {
+    setCart((prev) => prev.map((line, i) => (i === idx ? { ...line, [field]: value } : line)));
+  };
+
   const updateQty = (idx: number, delta: number) => {
-    setCart((prev) => prev
-      .map((l, i) => (i === idx ? { ...l, quantity: Math.min(l.stock, Math.max(0, l.quantity + delta)) } : l))
-      .filter((l) => l.quantity > 0));
+    setCart((prev) => {
+      const line = prev[idx];
+      if (!line) return prev;
+      const otherQuantity = prev.reduce((sum, item, i) => sum + (i !== idx && item.slug === line.slug ? item.quantity : 0), 0);
+      const maxForLine = Math.max(0, line.stock - otherQuantity);
+      return prev
+        .map((item, i) => (i === idx ? { ...item, quantity: Math.min(maxForLine, Math.max(0, item.quantity + delta)) } : item))
+        .filter((item) => item.quantity > 0);
+    });
   };
 
   const removeLine = (idx: number) => setCart((prev) => prev.filter((_, i) => i !== idx));
@@ -184,24 +162,27 @@ export default function AdminPosRegisterPage() {
     setFulfillmentType("pickup");
     setDeliveryAddress("");
     setDeliveryCity("");
+    setDeliveryProvince("");
+    setDeliveryDistrict("");
+    setDeliveryPostalCode("");
+    setDeliveryModalOpen(false);
     setPaymentMethod("cash");
     setAmountTendered("");
   };
 
   const completeSale = async () => {
-    if (!shift || !selectedCashier || cart.length === 0) return;
+    if (cart.length === 0) return;
     if (paymentMethod === "cash" && tendered < total) { toast("Amount tendered is less than total due"); return; }
-    if (fulfillmentType === "delivery" && !deliveryAddress.trim()) { toast("Delivery address is required"); return; }
+    if (fulfillmentType === "delivery" && !deliveryDetailsComplete) { toast("Complete the delivery customer details first"); return; }
     setCompleting(true);
     try {
       const res = await fetch("/api/pos/sales", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shiftId: shift.id, cashierId: selectedCashier.id,
           items: cart.map((l) => ({ slug: l.slug, size: l.size, color: l.color, quantity: l.quantity })),
           customerName, customerPhone, discountAmount: discount, taxRate: rate,
           paymentMethod, amountTendered: paymentMethod === "cash" ? tendered : undefined,
-          fulfillmentType, deliveryAddress, deliveryCity,
+          fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryCity,
         }),
       });
       const d = await res.json();
@@ -218,174 +199,71 @@ export default function AdminPosRegisterPage() {
     }
   };
 
-  const closeShift = async () => {
-    if (!shift) return;
-    const res = await fetch(`/api/pos/shifts/${shift.id}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ closingFloat: Number(closingFloat) || 0 }),
-    });
-    const d = await res.json();
-    if (!res.ok) { toast(d.error || "Could not close shift"); return; }
-    setCloseResult(d);
-  };
-
-  const endEverything = () => {
-    setShift(null);
-    setSelectedCashier(null);
-    setCloseResult(null);
-    setClosingFloat("");
-    resetSale();
-    setStage("select-cashier");
-    fetch("/api/admin/pos/cashiers", { cache: "no-store" }).then((r) => r.json())
-      .then((d) => setCashiers((d.cashiers ?? []).filter((c: Cashier) => c.isActive)));
-  };
-
-  if (stage === "select-cashier") {
-    return (
-      <div>
-        <h1 className="text-2xl font-bold text-navy-800">POS Register</h1>
-        <p className="mt-1 text-sm text-navy-800/50">Select your name to begin.</p>
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {cashiers.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => selectCashier(c)}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm hover:border-orange-300 hover:shadow-md"
-            >
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-navy-800 text-lg font-bold text-white">
-                {c.name.charAt(0).toUpperCase()}
-              </span>
-              <span className="text-sm font-semibold text-navy-800">{c.name}</span>
-              {c.onShift && <span className="badge bg-blue-100 text-blue-700">On shift</span>}
-            </button>
-          ))}
-          {cashiers.length === 0 && (
-            <p className="col-span-full py-10 text-center text-sm text-navy-800/50">
-              No active cashiers. Add one under POS → Cashiers.
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (stage === "pin") {
-    return (
-      <div className="mx-auto max-w-xs pt-10 text-center">
-        <button onClick={() => setStage("select-cashier")} className="mb-6 text-sm text-navy-800/50 hover:underline">← Back</button>
-        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-navy-800 text-xl font-bold text-white">
-          {selectedCashier?.name.charAt(0).toUpperCase()}
-        </span>
-        <p className="mt-3 text-lg font-bold text-navy-800">{selectedCashier?.name}</p>
-        <p className="text-sm text-navy-800/50">Enter your PIN</p>
-        <input
-          autoFocus
-          type="password"
-          inputMode="numeric"
-          value={pin}
-          onChange={(e) => {
-            const v = e.target.value.replace(/[^0-9]/g, "").slice(0, 6);
-            setPin(v);
-            if (v.length >= 4) submitPin(v);
-          }}
-          className="input mt-4 text-center text-2xl tracking-[0.5em]"
-          placeholder="••••"
-        />
-        {pinError && <p className="mt-3 text-sm text-red-600">{pinError}</p>}
-      </div>
-    );
-  }
-
-  if (stage === "open-float") {
-    return (
-      <div className="mx-auto max-w-xs pt-10 text-center">
-        <p className="text-lg font-bold text-navy-800">Open Shift</p>
-        <p className="text-sm text-navy-800/50">Enter the opening cash float for {selectedCashier?.name}</p>
-        <input
-          type="number"
-          value={openingFloat}
-          onChange={(e) => setOpeningFloat(e.target.value)}
-          className="input mt-4 text-center text-xl"
-        />
-        <button onClick={openShift} className="btn-primary mt-4 w-full">Start Shift</button>
-      </div>
-    );
-  }
-
-  if (stage === "close-shift") {
-    return (
-      <div className="mx-auto max-w-sm pt-10">
-        <p className="text-lg font-bold text-navy-800">End Shift — {shift?.cashierName}</p>
-        {!closeResult ? (
-          <>
-            <p className="mt-1 text-sm text-navy-800/50">Count the cash drawer and enter the total.</p>
-            <input
-              type="number"
-              autoFocus
-              value={closingFloat}
-              onChange={(e) => setClosingFloat(e.target.value)}
-              className="input mt-4 text-center text-xl"
-              placeholder="Closing cash count"
-            />
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => setStage("register")} className="btn-outline flex-1">Cancel</button>
-              <button onClick={closeShift} className="btn-primary flex-1" disabled={!closingFloat}>Close Shift</button>
-            </div>
-          </>
-        ) : (
-          <div className="mt-4 space-y-3 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">
-            <Row label="Expected Cash" value={formatPrice(closeResult.expectedCash)} />
-            <Row label="Counted Cash" value={formatPrice(closeResult.closingFloat)} />
-            <Row
-              label="Difference"
-              value={formatPrice(closeResult.cashDifference)}
-              tone={closeResult.cashDifference === 0 ? "text-emerald-600" : closeResult.cashDifference > 0 ? "text-blue-600" : "text-red-600"}
-            />
-            <button onClick={endEverything} className="btn-primary mt-2 w-full">Done</button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-navy-800">Register</h1>
-          <p className="text-sm text-navy-800/50">Cashier: {shift?.cashierName}</p>
+    <div className="h-screen overflow-hidden bg-[#f5f6f8] p-4 pb-24">
+      <div className="flex h-[74px] items-center justify-between gap-4 rounded-xl border border-[#e5e7eb] bg-white px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+        <div className="hidden w-[250px] items-center rounded-lg border border-[#d9d9d9] bg-[#f9fafb] px-3 md:flex">
+          <CustomerIcon />
+          <input
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
+            placeholder="Search / Select Customer"
+            className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm text-[#374151] outline-none placeholder:text-[#9ca3af]"
+          />
         </div>
-        <button onClick={() => setStage("close-shift")} className="btn-outline">End Shift</button>
-      </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-        <div>
+        <div className="flex max-w-sm flex-1 items-center rounded-lg border border-[#d9d9d9] bg-[#f9fafb] px-3 focus-within:border-[#f5851f]">
+          <PosSearchIcon />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products by name or SKU…"
-            className="input"
+            placeholder="Search Products..."
+            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-[#374151] outline-none placeholder:text-[#9ca3af]"
           />
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button aria-label="View current cart" className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280]">
+            <CartIcon />
+            {cart.length > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f5851f] px-1 text-[10px] font-bold text-white">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>}
+          </button>
+          <button onClick={() => router.push("/admin/pos/sales")} aria-label="Sales history" className="hidden h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280] sm:flex"><ReceiptIcon /></button>
+          <button onClick={toggleFullscreen} aria-label="Toggle fullscreen" className="hidden h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280] sm:flex"><FullscreenIcon /></button>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2937] text-xs font-bold text-white">
+            {(user?.name || "Admin").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid h-[calc(100vh-182px)] items-stretch gap-4 lg:grid-cols-[40%_60%]">
+        <section className="order-2 overflow-hidden rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-bold text-[#111827]">Available Products</h1>
+          </div>
+          <div className="mt-5 grid h-[calc(100%-48px)] grid-cols-2 content-start gap-4 overflow-y-auto pr-2 md:grid-cols-3 xl:grid-cols-4">
             {filteredProducts.map((p) => (
               <button
                 key={p.slug}
                 onClick={() => addToCart(p)}
                 disabled={p.stock <= 0}
-                className="flex flex-col overflow-hidden rounded-xl border border-navy-800/5 bg-white text-left shadow-sm hover:border-orange-300 disabled:cursor-not-allowed disabled:opacity-40"
+                className="group flex flex-col overflow-hidden rounded-xl bg-white text-left shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <div className="aspect-[4/3] w-full bg-navy-50">
+                <div className="h-60 w-full overflow-hidden bg-[#19192b]">
                   {p.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.image} alt={p.name} className="h-full w-full object-cover" />
+                    <img src={p.image} alt={p.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs text-navy-800/30">No image</div>
+                    <div className="flex h-full w-full items-center justify-center text-xs text-white/40">No image</div>
                   )}
                 </div>
-                <div className="p-3">
-                  <p className="line-clamp-2 text-sm font-semibold text-navy-800">{p.name}</p>
-                  <p className="mt-1 text-xs text-navy-800/50">{p.stock} in stock</p>
-                  <p className="mt-1 font-bold text-orange-600">{formatPrice(p.price)}</p>
+                <div className="flex min-h-32 flex-1 flex-col p-3">
+                  <p className="truncate text-sm font-semibold text-[#374151]">{p.name}</p>
+                  <p className="mt-2 text-xs text-[#9ca3af]">SKU : {p.sku || "—"}</p>
+                  <p className="mt-2 text-xs text-[#6b7280]">{p.stock} Pcs</p>
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                    <p className="font-bold text-[#ff8746]">{formatPrice(p.price)}</p>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8746] text-xl font-light text-white transition group-hover:bg-[#f5851f]">+</span>
+                  </div>
                 </div>
               </button>
             ))}
@@ -393,33 +271,75 @@ export default function AdminPosRegisterPage() {
               <p className="col-span-full py-10 text-center text-sm text-navy-800/50">No products found</p>
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-2xl border border-navy-800/5 bg-white p-5 shadow-sm">
-          <p className="text-sm font-bold text-navy-800">Cart</p>
-          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+        <aside className="order-1 overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#fff4e8] text-[#f5851f]"><CartIcon /></span>
+              <div>
+                <p className="font-bold text-[#1f2937]">Current Order</p>
+                <p className="text-xs text-[#6b7280]">{cart.reduce((sum, item) => sum + item.quantity, 0)} items</p>
+              </div>
+            </div>
+            {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs font-semibold text-red-500 hover:text-red-600">Clear</button>}
+          </div>
+          <div className="max-h-72 space-y-3 overflow-y-auto px-5 py-4">
             {cart.length === 0 ? (
-              <p className="py-6 text-center text-sm text-navy-800/40">Cart is empty</p>
+              <div className="py-8 text-center">
+                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f9fafb] text-[#9ca3af]"><CartIcon /></span>
+                <p className="mt-3 text-sm font-medium text-[#6b7280]">Your order is empty</p>
+                <p className="mt-1 text-xs text-[#9ca3af]">Select a product to add it here</p>
+              </div>
             ) : (
               cart.map((l, idx) => (
-                <div key={idx} className="flex items-center justify-between gap-2 border-b border-navy-800/5 pb-2 text-sm">
+                <div key={idx} className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-navy-800">{l.name}</p>
-                    <p className="text-xs text-navy-800/50">{formatPrice(l.price)} each</p>
+                    <p className="truncate font-semibold text-[#374151]">{l.name}</p>
+                    <p className="text-xs text-[#6b7280]">{formatPrice(l.price)} each</p>
+                    {(l.sizes.length > 0 || l.colors.length > 0) && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {l.sizes.length > 0 && (
+                          <select
+                            value={l.size}
+                            onChange={(e) => updateVariant(idx, "size", e.target.value)}
+                            aria-label={`Size for ${l.name}`}
+                            className="rounded-md border border-[#d1d5db] bg-white px-2 py-1 text-xs text-[#374151]"
+                          >
+                            {l.sizes.map((size) => <option key={size} value={size}>Size: {size}</option>)}
+                          </select>
+                        )}
+                        {l.colors.length > 0 && (
+                          <select
+                            value={l.color}
+                            onChange={(e) => updateVariant(idx, "color", e.target.value)}
+                            aria-label={`Colour for ${l.name}`}
+                            className="rounded-md border border-[#d1d5db] bg-white px-2 py-1 text-xs text-[#374151]"
+                          >
+                            {l.colors.map((color) => <option key={color} value={color}>Colour: {color}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => updateQty(idx, -1)} className="h-6 w-6 rounded bg-navy-50 text-navy-800">−</button>
-                    <span className="w-6 text-center">{l.quantity}</span>
-                    <button onClick={() => updateQty(idx, 1)} className="h-6 w-6 rounded bg-navy-50 text-navy-800">+</button>
+                  <button onClick={() => removeLine(idx)} aria-label={`Remove ${l.name}`} className="text-lg leading-none text-[#9ca3af] hover:text-red-500">×</button>
                   </div>
-                  <p className="w-16 text-right font-semibold text-navy-800">{formatPrice(l.price * l.quantity)}</p>
-                  <button onClick={() => removeLine(idx)} className="text-red-500">×</button>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center overflow-hidden rounded-lg border border-[#d1d5db] bg-white">
+                      <button onClick={() => updateQty(idx, -1)} className="h-8 w-8 text-[#6b7280] hover:bg-[#f3f4f6]">−</button>
+                      <span className="w-8 text-center font-semibold text-[#374151]">{l.quantity}</span>
+                      <button onClick={() => updateQty(idx, 1)} className="h-8 w-8 text-[#6b7280] hover:bg-[#f3f4f6]">+</button>
+                    </div>
+                    <p className="font-bold text-[#1f2937]">{formatPrice(l.price * l.quantity)}</p>
+                  </div>
                 </div>
               ))
             )}
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="border-t border-[#e5e7eb] px-5 py-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Discount (LKR)</label>
               <input type="number" value={discountAmount} onChange={(e) => setDiscountAmount(e.target.value)} className="input" />
@@ -438,36 +358,16 @@ export default function AdminPosRegisterPage() {
             </div>
           </div>
 
-          <div className="mt-4">
-            <label className="mb-1.5 block text-xs font-medium text-navy-800/60">Fulfillment</label>
-            <div className="flex gap-2">
-              <button onClick={() => setFulfillmentType("pickup")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${fulfillmentType === "pickup" ? "bg-navy-800 text-white" : "bg-navy-50 text-navy-800"}`}>Walk-in / Pickup</button>
-              <button onClick={() => setFulfillmentType("delivery")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${fulfillmentType === "delivery" ? "bg-navy-800 text-white" : "bg-navy-50 text-navy-800"}`}>Delivery</button>
-            </div>
-            {fulfillmentType === "delivery" && (
-              <div className="mt-3 space-y-3 rounded-lg bg-navy-50 p-3">
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-navy-800/60">Delivery address</label>
-                  <input value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} className="input" placeholder="Street address" />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-medium text-navy-800/60">City</label>
-                  <input value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} className="input" placeholder="City" />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 space-y-1.5 border-t border-navy-800/10 pt-3 text-sm">
+          <div className="mt-4 space-y-2 rounded-xl bg-[#f9fafb] p-4 text-sm">
             <Row label="Subtotal" value={formatPrice(subtotal)} />
             {discount > 0 && <Row label="Discount" value={`-${formatPrice(discount)}`} />}
             {tax > 0 && <Row label="Tax" value={formatPrice(tax)} />}
-            <Row label="Total" value={formatPrice(total)} bold />
+            <div className="border-t border-[#e5e7eb] pt-2"><Row label="Total" value={formatPrice(total)} bold /></div>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <button onClick={() => setPaymentMethod("cash")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${paymentMethod === "cash" ? "bg-navy-800 text-white" : "bg-navy-50 text-navy-800"}`}>Cash</button>
-            <button onClick={() => setPaymentMethod("card")} className={`flex-1 rounded-lg py-2 text-sm font-semibold ${paymentMethod === "card" ? "bg-navy-800 text-white" : "bg-navy-50 text-navy-800"}`}>Card</button>
+            <button onClick={() => setPaymentMethod("cash")} className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold ${paymentMethod === "cash" ? "border-[#f5851f] bg-[#fff4e8] text-[#e0720f]" : "border-[#e5e7eb] bg-white text-[#6b7280]"}`}>Cash</button>
+            <button onClick={() => setPaymentMethod("card")} className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold ${paymentMethod === "card" ? "border-[#f5851f] bg-[#fff4e8] text-[#e0720f]" : "border-[#e5e7eb] bg-white text-[#6b7280]"}`}>Card</button>
           </div>
 
           {paymentMethod === "cash" && (
@@ -480,18 +380,171 @@ export default function AdminPosRegisterPage() {
             </div>
           )}
 
+          </div>
+        </aside>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 flex h-20 items-center justify-between gap-4 border-t border-[#e5e7eb] bg-white px-4 shadow-[0_-2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push("/admin")} className="rounded-lg border border-[#d1d5db] px-6 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f9fafb]">Home</button>
+          <button onClick={resetSale} className="rounded-lg border border-[#d1d5db] px-6 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f9fafb]">Reset</button>
+          <button onClick={() => router.push("/admin/pos/sales")} className="hidden rounded-lg border border-[#d1d5db] px-6 py-2.5 text-sm font-semibold text-[#6b7280] hover:bg-[#f9fafb] sm:block">Recent Sales</button>
+        </div>
+
+        <div className="flex items-center gap-5">
+          <button
+            onClick={() => {
+              if (fulfillmentType === "delivery") setFulfillmentType("pickup");
+              else setDeliveryModalOpen(true);
+            }}
+            className="hidden items-center gap-2 text-sm font-semibold text-[#4b5563] md:flex"
+          >
+            <span className={`h-5 w-5 rounded border-2 ${fulfillmentType === "delivery" ? "border-[#f5851f] bg-[#f5851f]" : "border-[#d1d5db] bg-white"}`}>
+              {fulfillmentType === "delivery" && <span className="block text-center text-xs leading-4 text-white">✓</span>}
+            </span>
+            Delivery
+          </button>
+          <div className="hidden text-right sm:block">
+            <p className="text-xs text-[#9ca3af]">Total Payable</p>
+            <p className="text-2xl font-bold text-[#ff8746]">{formatPrice(total)}</p>
+          </div>
           <button
             onClick={completeSale}
-            disabled={completing || cart.length === 0 || (paymentMethod === "cash" && tendered < total) || (fulfillmentType === "delivery" && !deliveryAddress.trim())}
-            className="btn-primary mt-4 w-full"
+            disabled={paymentDisabled}
+            className="min-w-36 rounded-lg bg-[#ff8746] px-8 py-3 text-sm font-bold text-white transition hover:bg-[#f5851f] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {completing ? "Processing…" : `Complete Sale — ${formatPrice(total)}`}
+            {completing ? "Processing…" : fulfillmentType === "delivery" ? "Delivery Now" : "Pay Now"}
           </button>
         </div>
       </div>
 
+      {deliveryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setDeliveryModalOpen(false)}>
+          <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-center text-xl font-bold text-[#1f2937]">Delivery Customer Details</h2>
+
+            <div className="mt-5 rounded-xl bg-[#f7f8fa] p-6">
+              <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
+                <DeliveryField label="Customer Name">
+                  <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="delivery-input" />
+                </DeliveryField>
+                <DeliveryField label="Phone Number">
+                  <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/[^0-9+]/g, ""))} className="delivery-input" />
+                </DeliveryField>
+                <DeliveryField label="Province">
+                  <select
+                    value={deliveryProvince}
+                    onChange={(e) => {
+                      setDeliveryProvince(e.target.value);
+                      setDeliveryDistrict("");
+                      setDeliveryCity("");
+                    }}
+                    className="delivery-input"
+                  >
+                    <option value="">Select Province</option>
+                    {Object.keys(SRI_LANKA_LOCATIONS).map((province) => <option key={province} value={province}>{province}</option>)}
+                  </select>
+                </DeliveryField>
+                <DeliveryField label="District">
+                  <select
+                    value={deliveryDistrict}
+                    disabled={!deliveryProvince}
+                    onChange={(e) => {
+                      setDeliveryDistrict(e.target.value);
+                      setDeliveryCity("");
+                    }}
+                    className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f3f4f6] disabled:text-[#9ca3af]"
+                  >
+                    <option value="">{deliveryProvince ? "Select District" : "Select province first"}</option>
+                    {deliveryProvince && Object.keys(SRI_LANKA_LOCATIONS[deliveryProvince]).map((district) => <option key={district} value={district}>{district}</option>)}
+                  </select>
+                </DeliveryField>
+                <DeliveryField label="City">
+                  <select
+                    value={deliveryCity}
+                    disabled={!deliveryDistrict}
+                    onChange={(e) => setDeliveryCity(e.target.value)}
+                    className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f3f4f6] disabled:text-[#9ca3af]"
+                  >
+                    <option value="">{deliveryDistrict ? "Select City" : "Select district first"}</option>
+                    {deliveryProvince && deliveryDistrict && SRI_LANKA_LOCATIONS[deliveryProvince][deliveryDistrict].map((city) => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                </DeliveryField>
+                <DeliveryField label="Postal Code (Optional)">
+                  <input value={deliveryPostalCode} onChange={(e) => setDeliveryPostalCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 5))} className="delivery-input" />
+                </DeliveryField>
+                <div className="md:col-span-2">
+                  <DeliveryField label="Address Line">
+                    <textarea value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} className="delivery-input min-h-20 resize-none" />
+                  </DeliveryField>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-7 flex justify-end gap-3">
+              <button onClick={() => setDeliveryModalOpen(false)} className="rounded-lg border border-[#d1d5db] px-6 py-3 text-sm font-semibold text-[#6b7280] hover:bg-[#f9fafb]">Cancel</button>
+              <button onClick={saveDeliveryDetails} className="rounded-lg bg-[#ff8746] px-6 py-3 text-sm font-bold text-white hover:bg-[#f5851f]">Save Details</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {receipt && <ReceiptModal receipt={receipt} onClose={() => setReceipt(null)} />}
     </div>
+  );
+}
+
+function PosSearchIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0 text-[#9ca3af]">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
+function DeliveryField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-[#374151]">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function CartIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="20" r="1" />
+      <circle cx="19" cy="20" r="1" />
+      <path d="M3 4h2l2.5 11h10l2-7H7" />
+    </svg>
+  );
+}
+
+function CustomerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0 text-[#9ca3af]">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21a8 8 0 0 1 16 0" />
+    </svg>
+  );
+}
+
+function ReceiptIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2Z" />
+      <path d="M9 7h6M9 11h6M9 15h4" />
+    </svg>
+  );
+}
+
+function FullscreenIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+    </svg>
   );
 }
 
@@ -531,6 +584,9 @@ function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
             <div key={i} className="flex justify-between text-sm">
               <div>
                 <p className="text-navy-800">{it.name}</p>
+                {(it.size || it.color) && (
+                  <p className="text-xs text-navy-800/50">{[it.size, it.color].filter(Boolean).join(" / ")}</p>
+                )}
                 <p className="text-xs text-navy-800/50">{it.quantity} × {formatPrice(it.unitPrice)}</p>
               </div>
               <p className="font-semibold text-navy-800">{formatPrice(it.lineTotal)}</p>

@@ -39,7 +39,7 @@ export default function CartDrawer() {
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-navy-800/10 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-navy-800/10 px-4 py-5 sm:px-6">
           <h2 className="text-lg font-bold text-navy-800">
             Your Cart{" "}
             <span className="text-navy-800/40">({items.length})</span>
@@ -72,7 +72,7 @@ export default function CartDrawer() {
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
               <ul className="divide-y divide-navy-800/10">
                 {items.map((item) => (
                   <li
@@ -128,7 +128,7 @@ export default function CartDrawer() {
                                 item.quantity - 1
                               )
                             }
-                            className="flex h-7 w-7 items-center justify-center text-navy-800 hover:text-brand"
+                            className="flex h-10 w-10 items-center justify-center text-navy-800 hover:text-brand"
                             aria-label="Decrease quantity"
                           >
                             −
@@ -145,7 +145,7 @@ export default function CartDrawer() {
                                 item.quantity + 1
                               )
                             }
-                            className="flex h-7 w-7 items-center justify-center text-navy-800 hover:text-brand"
+                            className="flex h-10 w-10 items-center justify-center text-navy-800 hover:text-brand"
                             aria-label="Increase quantity"
                           >
                             +
@@ -161,7 +161,7 @@ export default function CartDrawer() {
               </ul>
             </div>
 
-            <div className="border-t border-navy-800/10 px-6 py-5">
+            <div className="border-t border-navy-800/10 px-4 py-5 sm:px-6">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-navy-800/60">Subtotal</span>
                 <span className="text-lg font-bold text-navy-800">

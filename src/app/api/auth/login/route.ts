@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSession, findUserByEmail, verifyPassword } from "@/lib/auth";
+import { consumeRateLimit, requestIp } from "@/lib/rateLimit";
 
 export async function POST(request: Request) {
   let body: { email?: string; password?: string };
@@ -16,6 +17,16 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Email and password are required" },
       { status: 400 }
+    );
+  }
+
+  const ipRate = consumeRateLimit(`login:ip:${requestIp(request)}`, 20, 15 * 60_000);
+  const accountRate = consumeRateLimit(`login:account:${email}`, 8, 15 * 60_000);
+  if (!ipRate.allowed || !accountRate.allowed) {
+    const retryAfter = Math.max(ipRate.retryAfterSeconds, accountRate.retryAfterSeconds);
+    return NextResponse.json(
+      { error: "Too many sign-in attempts. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
     );
   }
 

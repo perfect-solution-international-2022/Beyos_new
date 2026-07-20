@@ -16,17 +16,17 @@ const columns = [
     links: [
       { href: "/about", label: "About Us" },
       { href: "/about#story", label: "Our Story" },
-      { href: "/about#contact", label: "Contact" },
+      { href: "/contact", label: "Contact" },
       { href: "/shop", label: "New Arrivals" },
     ],
   },
   {
     title: "Support",
     links: [
-      { href: "/about#contact", label: "Help Center" },
-      { href: "/about#contact", label: "Shipping & Returns" },
-      { href: "/about#contact", label: "Size Guide" },
-      { href: "/about#contact", label: "Track Order" },
+      { href: "/contact", label: "Help Center" },
+      { href: "/contact", label: "Shipping & Returns" },
+      { href: "/contact", label: "Size Guide" },
+      { href: "/contact", label: "Track Order" },
     ],
   },
 ];
@@ -35,9 +35,9 @@ export default function Footer() {
   return (
     <footer className="mt-24 bg-navy-800 text-white">
       <div className="container-x py-16">
-        <div className="grid gap-12 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div className="grid grid-cols-2 gap-10 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:gap-12">
           {/* Brand */}
-          <div>
+          <div className="col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3">
               <Image
                 src="/images/logo.png"
@@ -94,7 +94,7 @@ export default function Footer() {
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-white/50 sm:flex-row">
           <p>© {new Date().getFullYear()} Beyos Clothing. All rights reserved.</p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
             <a href="#" className="hover:text-white">Privacy Policy</a>
             <a href="#" className="hover:text-white">Terms of Service</a>
           </div>

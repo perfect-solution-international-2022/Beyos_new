@@ -4,7 +4,6 @@ import HeroCarousel from "@/components/HeroCarousel";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import Newsletter from "@/components/Newsletter";
-import { categories } from "@/lib/products";
 import { getFeaturedProducts } from "@/lib/products-db";
 
 // Featured products come from MySQL (admin-managed) — must not be cached
@@ -55,6 +54,29 @@ const testimonials = [
   },
 ];
 
+const homeCategories = [
+  {
+    name: "Men",
+    href: "/shop?category=men",
+    image: "/images/men-category.svg",
+  },
+  {
+    name: "Men T-Shirt",
+    href: "/product/classic-crew-tee",
+    image: "/images/products/tshirt-aqua.webp",
+  },
+  {
+    name: "Women",
+    href: "/shop?category=women",
+    image: "/images/women-category.svg",
+  },
+  {
+    name: "Women T-Shirt",
+    href: "/product/everyday-knit-top",
+    image: "/images/products/tshirt-coral.webp",
+  },
+];
+
 export default async function HomePage() {
   const featured = await getFeaturedProducts();
 
@@ -63,39 +85,34 @@ export default async function HomePage() {
       <HeroCarousel />
 
       {/* Categories */}
-      <section className="container-x mt-20">
-        <SectionHeader
-          eyebrow="Shop by Category"
-          title="Find Your Style"
-          action={{ href: "/shop", label: "View all" }}
-        />
-        <div className="grid gap-5 sm:grid-cols-3">
-          {categories.map((cat) => (
+      <section className="container-x mt-14">
+        <div className="flex items-start justify-between gap-4">
+          <h2 className="font-display text-xl font-bold text-navy-800 min-[360px]:text-2xl sm:text-3xl">
+            Shopping By Categories
+          </h2>
+          <Link href="/shop" className="shrink-0 pt-1 text-sm font-semibold text-navy-800 transition hover:text-brand">
+            View all <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+        <div className="mt-8 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-4 sm:gap-x-8">
+          {homeCategories.map((cat) => (
             <Link
-              key={cat.slug}
-              href={`/shop?category=${cat.slug}`}
-              className="group relative flex aspect-[4/3] flex-col justify-end overflow-hidden rounded-3xl bg-navy-800 p-7"
+              key={cat.name}
+              href={cat.href}
+              className="group flex flex-col items-center text-center"
             >
-              <Image
-                src={cat.image}
-                alt={cat.name}
-                fill
-                className="object-cover opacity-70 transition-transform duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-navy-900/90 via-navy-900/30 to-transparent" />
-              <div className="relative">
-                <h3 className="font-display text-2xl font-bold text-white">
-                  {cat.name}
-                </h3>
-                <p className="mt-1 text-sm text-white/70">{cat.description}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand">
-                  Shop now
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                    <polyline points="12 5 19 12 12 19" />
-                  </svg>
-                </span>
+              <div className="relative h-24 w-24 overflow-hidden rounded-full bg-navy-50 ring-1 ring-navy-800/5 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-lg min-[360px]:h-28 min-[360px]:w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36">
+                <Image
+                  src={cat.image}
+                  alt={cat.name}
+                  fill
+                  sizes="(min-width: 1024px) 144px, (min-width: 640px) 128px, (min-width: 360px) 112px, 96px"
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
               </div>
+              <h3 className="mt-4 text-base font-semibold text-navy-800 transition group-hover:text-brand">
+                {cat.name}
+              </h3>
             </Link>
           ))}
         </div>
@@ -108,7 +125,7 @@ export default async function HomePage() {
           title="Featured Products"
           action={{ href: "/shop", label: "View all" }}
         />
-        <div className="grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-x-5 gap-y-8 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {featured.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
@@ -118,7 +135,7 @@ export default async function HomePage() {
       {/* Custom printing banner */}
       <section className="container-x mt-20">
         <div className="grid overflow-hidden rounded-3xl bg-navy-50 lg:grid-cols-2">
-          <div className="flex flex-col justify-center p-8 sm:p-14">
+          <div className="flex flex-col justify-center p-6 sm:p-14">
             <p className="text-sm font-semibold uppercase tracking-wider text-brand">
               Custom Clothing
             </p>
@@ -130,7 +147,7 @@ export default async function HomePage() {
               custom sizes, styles and prints. No die & plate charges, low
               minimum order quantities, and premium finishes every time.
             </p>
-            <div className="mt-7 flex gap-4">
+            <div className="mt-7 flex flex-col gap-3 min-[360px]:flex-row min-[360px]:gap-4">
               <Link href="/shop" className="btn-primary">
                 Start Your Design
               </Link>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
 import { requireReseller, makeRef } from "@/lib/reseller";
 import type { PoolConnection } from "mysql2/promise";
+import { sendOrderConfirmationSms } from "@/lib/sms";
 
 interface OrderRow {
   id: number;
@@ -167,6 +168,16 @@ export async function POST(request: Request) {
       );
     }
     await conn.commit();
+    const resellerPhone = await query<{ phone: string }>(
+      "SELECT phone FROM users WHERE id = ? LIMIT 1",
+      [reseller.id]
+    );
+    await sendOrderConfirmationSms({
+      phone: resellerPhone[0]?.phone,
+      orderRef,
+      total: amount,
+      status: "pending",
+    });
     return NextResponse.json({
       success: true,
       order: { orderRef, amount, profit, status: "pending" },

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { findUserByEmail } from "@/lib/auth";
 import { createPasswordResetToken, isRateLimited } from "@/lib/passwordReset";
 import { sendPasswordResetEmail } from "@/lib/mail";
+import { consumeRateLimit, requestIp } from "@/lib/rateLimit";
 
 // Always return the same generic message whether or not the email exists —
 // otherwise this endpoint becomes an account-enumeration oracle.
@@ -10,6 +11,13 @@ const GENERIC_RESPONSE = {
 };
 
 export async function POST(request: Request) {
+  const rate = consumeRateLimit(`forgot-password:${requestIp(request)}`, 5, 15 * 60_000);
+  if (!rate.allowed) {
+    return NextResponse.json(GENERIC_RESPONSE, {
+      status: 429,
+      headers: { "Retry-After": String(rate.retryAfterSeconds) },
+    });
+  }
   let body: { email?: string };
   try {
     body = await request.json();
@@ -32,7 +40,9 @@ export async function POST(request: Request) {
         return NextResponse.json(GENERIC_RESPONSE);
       }
       const token = await createPasswordResetToken(user.id);
-      const origin = new URL(request.url).origin;
+      const configuredOrigin = process.env.APP_BASE_URL?.trim().replace(/\/$/, "");
+      const origin = configuredOrigin || (process.env.NODE_ENV !== "production" ? new URL(request.url).origin : "");
+      if (!origin) throw new Error("APP_BASE_URL must be configured in production");
       const resetUrl = `${origin}/reset-password?token=${token}`;
       await sendPasswordResetEmail(user.email, resetUrl);
     }

@@ -106,7 +106,7 @@ export default function CartPage() {
 
   return (
     <div className="container-x py-10">
-      <h1 className="font-display text-4xl font-bold text-navy-800">
+      <h1 className="font-display text-3xl font-bold text-navy-800 sm:text-4xl">
         Shopping Cart
       </h1>
 
@@ -139,11 +139,11 @@ export default function CartPage() {
               {items.map((item) => (
                 <li
                   key={`${item.productId}-${item.size}-${item.color}`}
-                  className="flex gap-4 py-5"
+                  className="flex gap-3 py-5 sm:gap-4"
                 >
                   <Link
                     href={`/product/${item.slug}`}
-                    className="h-32 w-24 shrink-0 overflow-hidden rounded-xl bg-navy-50"
+                    className="h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-navy-50 sm:h-32 sm:w-24"
                   >
                     <Image
                       src={item.image}
@@ -154,7 +154,7 @@ export default function CartPage() {
                     />
                   </Link>
                   <div className="flex flex-1 flex-col">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex flex-col gap-1 min-[380px]:flex-row min-[380px]:items-start min-[380px]:justify-between min-[380px]:gap-4">
                       <div>
                         <Link
                           href={`/product/${item.slug}`}
@@ -166,11 +166,11 @@ export default function CartPage() {
                           {item.size} · {item.color}
                         </p>
                       </div>
-                      <p className="font-bold text-navy-800">
+                      <p className="text-sm font-bold text-navy-800 min-[380px]:text-base">
                         {formatPrice(item.price * item.quantity)}
                       </p>
                     </div>
-                    <div className="mt-auto flex items-center justify-between pt-3">
+                    <div className="mt-auto flex flex-col items-start gap-2 pt-3 min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between">
                       <div className="flex items-center rounded-full border border-navy-800/15">
                         <button
                           onClick={() =>
@@ -181,7 +181,7 @@ export default function CartPage() {
                               item.quantity - 1
                             )
                           }
-                          className="flex h-9 w-9 items-center justify-center text-navy-800 hover:text-brand"
+                          className="flex h-10 w-10 items-center justify-center text-navy-800 hover:text-brand"
                           aria-label="Decrease quantity"
                         >
                           −
@@ -198,7 +198,7 @@ export default function CartPage() {
                               item.quantity + 1
                             )
                           }
-                          className="flex h-9 w-9 items-center justify-center text-navy-800 hover:text-brand"
+                          className="flex h-10 w-10 items-center justify-center text-navy-800 hover:text-brand"
                           aria-label="Increase quantity"
                         >
                           +
@@ -230,7 +230,7 @@ export default function CartPage() {
           </div>
 
           {/* Summary */}
-          <aside className="h-fit rounded-2xl border border-navy-800/10 bg-navy-50 p-6 lg:sticky lg:top-28">
+          <aside className="h-fit rounded-2xl border border-navy-800/10 bg-navy-50 p-4 sm:p-6 lg:sticky lg:top-28">
             <h2 className="text-lg font-bold text-navy-800">Order Summary</h2>
 
             {/* Promo code */}

@@ -16,7 +16,6 @@ const DELIVERY_STATUS_STYLES: Record<string, string> = {
 
 interface SaleRow {
   receiptNumber: string;
-  cashierName: string;
   customerName: string | null;
   subtotal: number;
   discountAmount: number;
@@ -31,7 +30,6 @@ interface SaleRow {
 
 interface Receipt {
   receiptNumber: string;
-  cashierName: string;
   customerName: string;
   items: { name: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
   subtotal: number;
@@ -104,7 +102,6 @@ export default function AdminPosSalesPage() {
           <thead>
             <tr className="border-b border-navy-800/10 text-xs font-semibold uppercase tracking-wide text-navy-800/50">
               <th className="px-6 py-4">Receipt</th>
-              <th className="px-6 py-4">Cashier</th>
               <th className="px-6 py-4">Customer</th>
               <th className="px-6 py-4">Payment</th>
               <th className="px-6 py-4">Fulfillment</th>
@@ -114,9 +111,9 @@ export default function AdminPosSalesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">No sales found</td></tr>
+              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">No sales found</td></tr>
             ) : (
               sales.map((s) => (
                 <tr
@@ -125,7 +122,6 @@ export default function AdminPosSalesPage() {
                   onClick={() => openReceipt(s.receiptNumber)}
                 >
                   <td className="px-6 py-3 font-mono text-navy-800/80">{s.receiptNumber}</td>
-                  <td className="px-6 py-3 text-navy-800">{s.cashierName}</td>
                   <td className="px-6 py-3 text-navy-800/70">{s.customerName || "Walk-in"}</td>
                   <td className="px-6 py-3">
                     <span className={`badge ${s.paymentMethod === "cash" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
@@ -169,7 +165,6 @@ function ReceiptModal({ receipt, onClose, onStatusChange }: { receipt: Receipt; 
           <p className="text-lg font-black tracking-wide text-navy-800">BEYOS</p>
           <p className="text-xs text-navy-800/50">Receipt #{receipt.receiptNumber}</p>
           <p className="text-xs text-navy-800/50">{new Date(receipt.createdAt).toLocaleString("en-GB")}</p>
-          <p className="mt-1 text-xs text-navy-800/50">Cashier: {receipt.cashierName}</p>
           <p className="text-xs text-navy-800/50">{receipt.customerName}</p>
           {receipt.fulfillmentType === "delivery" && (
             <p className="mt-1 text-xs font-semibold text-blue-600">FOR DELIVERY</p>

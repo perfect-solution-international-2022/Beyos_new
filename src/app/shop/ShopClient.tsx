@@ -30,6 +30,7 @@ export default function ShopClient({ products }: { products: Product[] }) {
     | Category;
   const [category, setCategory] = useState<"all" | Category>(initialCategory);
   const [sort, setSort] = useState("featured");
+  const searchTerm = (searchParams.get("search") || "").trim();
 
   useEffect(() => {
     setCategory((searchParams.get("category") || "all") as "all" | Category);
@@ -50,6 +51,13 @@ export default function ShopClient({ products }: { products: Product[] }) {
         ? [...products]
         : products.filter((p) => p.category === category);
 
+    if (searchTerm) {
+      const query = searchTerm.toLowerCase();
+      list = list.filter((product) =>
+        `${product.name} ${product.description} ${product.category}`.toLowerCase().includes(query)
+      );
+    }
+
     switch (sort) {
       case "price-asc":
         list.sort((a, b) => a.price - b.price);
@@ -67,10 +75,12 @@ export default function ShopClient({ products }: { products: Product[] }) {
         list.sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
     }
     return list;
-  }, [category, sort, products]);
+  }, [category, sort, products, searchTerm]);
 
   const heading =
-    category === "all"
+    searchTerm
+      ? `Search results for “${searchTerm}”`
+      : category === "all"
       ? "All Products"
       : categoryTabs.find((t) => t.value === category)?.label + "'s Collection";
 
@@ -82,7 +92,7 @@ export default function ShopClient({ products }: { products: Product[] }) {
           <span>Home</span> <span className="mx-1">/</span>{" "}
           <span className="text-navy-800">Shop</span>
         </nav>
-        <h1 className="mt-2 font-display text-4xl font-bold text-navy-800">
+        <h1 className="mt-2 font-display text-3xl font-bold text-navy-800 sm:text-4xl">
           {heading}
         </h1>
         <p className="mt-2 text-navy-800/60">
@@ -128,7 +138,7 @@ export default function ShopClient({ products }: { products: Product[] }) {
 
       {/* Grid */}
       {filtered.length > 0 ? (
-        <div className="grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-x-5 gap-y-8 min-[360px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {filtered.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}

@@ -17,7 +17,10 @@ const sections: Section[] = [
   {
     title: "Catalog",
     items: [
-      { label: "Products", icon: "tag", href: "/admin/products" },
+      { label: "Products", icon: "tag", children: [
+        { label: "All Products", href: "/admin/products" },
+        { label: "Create Product", href: "/admin/products/new" },
+      ] },
       { label: "Category", icon: "folder", href: "/admin/categories" },
       { label: "Attributes", icon: "sliders", href: "/admin/attributes" },
       { label: "Inventory", icon: "box", children: [
@@ -34,9 +37,7 @@ const sections: Section[] = [
         { label: "Pending Orders", href: "/admin/orders/pending" },
       ] },
       { label: "POS", icon: "terminal", children: [
-        { label: "Register", href: "/admin/pos" },
-        { label: "Cashiers", href: "/admin/pos/cashiers" },
-        { label: "Shifts", href: "/admin/pos/shifts" },
+        { label: "POS", href: "/admin/pos" },
         { label: "Sales", href: "/admin/pos/sales" },
       ] },
       { label: "Promotions", icon: "percent", href: "/admin/promotions" },
@@ -130,11 +131,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return <div className="flex min-h-screen items-center justify-center bg-navy-50 text-navy-800/50">Loading admin…</div>;
   }
 
+  if (pathname === "/admin/pos") {
+    return <div className="min-h-screen bg-[#f5f6f8]">{children}</div>;
+  }
+
   const toggleGroup = (label: string) =>
     setOpenGroups((g) => (g.includes(label) ? g.filter((x) => x !== label) : [...g, label]));
   const isActive = (href: string) => {
     const base = href.split("?")[0];
-    return base === "/admin" ? pathname === "/admin" : pathname === base || pathname.startsWith(base + "/");
+    return pathname === base;
   };
   const groupActive = (item: Item) => item.children?.some((c) => isActive(c.href)) ?? false;
 

@@ -1,15 +1,13 @@
 import { cookies } from "next/headers";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
 import { query } from "./db";
-
-const COOKIE_NAME = "beyos_session";
-const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
-
-function secretKey() {
-  const secret = process.env.JWT_SECRET || "dev-insecure-secret-change-me";
-  return new TextEncoder().encode(secret);
-}
+import {
+  SESSION_COOKIE_NAME,
+  SESSION_MAX_AGE,
+  sessionSecretKey,
+  verifySessionToken,
+} from "./session";
 
 export type UserRole = "buyer" | "reseller" | "admin";
 
@@ -19,6 +17,8 @@ export interface DbUser {
   email: string;
   password_hash: string;
   role: UserRole;
+  reseller_status: "pending" | "approved" | "rejected";
+  session_version: number;
   created_at: string;
 }
 
@@ -41,46 +41,56 @@ export function verifyPassword(
 }
 
 export async function createSession(userId: number): Promise<void> {
-  const token = await new SignJWT({ uid: userId })
+  const rows = await query<Pick<DbUser, "role" | "reseller_status" | "session_version">>(
+    "SELECT role, reseller_status, session_version FROM users WHERE id = ? LIMIT 1",
+    [userId]
+  );
+  if (!rows[0]) throw new Error("Cannot create a session for an unknown user");
+  const effectiveRole: UserRole = rows[0].role === "reseller" && rows[0].reseller_status !== "approved"
+    ? "buyer"
+    : rows[0].role;
+
+  const token = await new SignJWT({ uid: userId, role: effectiveRole, sv: Number(rows[0].session_version) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${MAX_AGE}s`)
-    .sign(secretKey());
+    .setExpirationTime(`${SESSION_MAX_AGE}s`)
+    .sign(sessionSecretKey());
 
-  cookies().set(COOKIE_NAME, token, {
+  (await cookies()).set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: MAX_AGE,
+    maxAge: SESSION_MAX_AGE,
   });
 }
 
-export function clearSession(): void {
-  cookies().delete(COOKIE_NAME);
+export async function clearSession(): Promise<void> {
+  (await cookies()).delete(SESSION_COOKIE_NAME);
 }
 
 async function getSessionUserId(): Promise<number | null> {
-  const token = cookies().get(COOKIE_NAME)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secretKey());
-    return typeof payload.uid === "number" ? payload.uid : null;
-  } catch {
-    return null;
-  }
+  const payload = await verifySessionToken(token);
+  return payload ? payload.uid : null;
 }
 
 export async function getCurrentUser(): Promise<PublicUser | null> {
   const uid = await getSessionUserId();
   if (!uid) return null;
   const rows = await query<DbUser>(
-    "SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1",
+    "SELECT id, name, email, role, reseller_status, session_version FROM users WHERE id = ? LIMIT 1",
     [uid]
   );
   if (rows.length === 0) return null;
   const u = rows[0];
-  return { id: u.id, name: u.name, email: u.email, role: u.role };
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  const session = token ? await verifySessionToken(token) : null;
+  if (!session || session.sv !== Number(u.session_version)) return null;
+  const effectiveRole: UserRole = u.role === "reseller" && u.reseller_status !== "approved" ? "buyer" : u.role;
+  if (session.role !== effectiveRole) return null;
+  return { id: u.id, name: u.name, email: u.email, role: effectiveRole };
 }
 
 export function findUserByEmail(email: string): Promise<DbUser[]> {

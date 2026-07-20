@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { trackingUrl } from "@/lib/koombiyo";
 
 interface OrderRow {
   id: number;
@@ -9,6 +10,10 @@ interface OrderRow {
   shipping: string;
   total: string;
   status: string;
+  customer_phone: string;
+  koombiyo_waybill_id: string | null;
+  koombiyo_status: string | null;
+  koombiyo_updated_at: string | null;
   created_at: string;
 }
 
@@ -30,7 +35,8 @@ export async function GET() {
 
   try {
     const orders = await query<OrderRow>(
-      `SELECT id, order_ref, subtotal, shipping, total, status, created_at
+      `SELECT id, order_ref, subtotal, shipping, total, status, customer_phone,
+              koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
        FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
       [user.id]
     );
@@ -61,6 +67,12 @@ export async function GET() {
       subtotal: Number(o.subtotal),
       shipping: Number(o.shipping),
       total: Number(o.total),
+      koombiyoWaybillId: o.koombiyo_waybill_id,
+      koombiyoStatus: o.koombiyo_status,
+      koombiyoUpdatedAt: o.koombiyo_updated_at,
+      trackingUrl: o.koombiyo_waybill_id
+        ? trackingUrl(o.koombiyo_waybill_id, o.customer_phone)
+        : null,
       items: (byOrder.get(o.id) ?? []).map((it) => ({
         name: it.name,
         size: it.size,

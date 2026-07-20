@@ -67,7 +67,7 @@ export default function ProductCard({ product }: { product: Product }) {
         <button
           onClick={onWishlist}
           aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-110"
+          className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-110 sm:right-3 sm:top-3"
         >
           <svg
             width="16"
@@ -85,7 +85,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
         <button
           onClick={quickAdd}
-          className="absolute inset-x-3 bottom-3 translate-y-4 rounded-full bg-navy-800 py-2.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-all duration-300 hover:bg-brand group-hover:translate-y-0 group-hover:opacity-100"
+          className="absolute inset-x-2 bottom-2 rounded-full bg-navy-800 py-2.5 text-xs font-semibold text-white shadow-lg transition-all duration-300 hover:bg-brand sm:inset-x-3 sm:bottom-3 lg:translate-y-4 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100"
         >
           Quick Add
         </button>

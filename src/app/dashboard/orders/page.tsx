@@ -19,6 +19,10 @@ interface Order {
   subtotal: number;
   shipping: number;
   total: number;
+  koombiyoWaybillId: string | null;
+  koombiyoStatus: string | null;
+  koombiyoUpdatedAt: string | null;
+  trackingUrl: string | null;
   items: OrderItem[];
 }
 
@@ -201,6 +205,28 @@ export default function OrdersPage() {
                           </li>
                         ))}
                       </ul>
+                      {o.koombiyoWaybillId && (
+                        <div className="mt-4 rounded-xl bg-navy-50 p-4 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-navy-800">Koombiyo delivery</p>
+                              <p className="mt-0.5 text-xs text-navy-800/60">
+                                Waybill {o.koombiyoWaybillId} · {o.koombiyoStatus || "Awaiting update"}
+                              </p>
+                            </div>
+                            {o.trackingUrl && (
+                              <a
+                                href={o.trackingUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-bold text-brand hover:underline"
+                              >
+                                Track parcel
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <dl className="mt-3 space-y-1 border-t border-navy-800/10 pt-3 text-sm">
                         <div className="flex justify-between text-navy-800/60">
                           <dt>Subtotal</dt>

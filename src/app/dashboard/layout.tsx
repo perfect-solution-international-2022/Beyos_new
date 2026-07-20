@@ -28,12 +28,15 @@ export default function DashboardLayout({
   const wishlistCount = useWishlist().count;
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login?redirect=/dashboard");
+    if (loading) return;
+    if (!user) router.replace("/login?redirect=/dashboard");
+    else if (user.role === "admin") router.replace("/admin");
+    else if (user.role === "reseller") router.replace("/reseller");
   }, [loading, user, router]);
 
   useEffect(() => setSidebarOpen(false), [pathname]);
 
-  if (loading || !user) {
+  if (loading || !user || user.role !== "buyer") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-navy-50 text-navy-800/50">
         Loading your portal…

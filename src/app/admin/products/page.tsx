@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
@@ -44,12 +46,15 @@ type Form = typeof blank;
 
 export default function AdminProductsPage() {
   const { toast, confirm } = useToast();
+  const pathname = usePathname();
+  const router = useRouter();
+  const standaloneNew = pathname === "/admin/products/new";
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ name: string; slug: string }[]>([]);
   const [attributes, setAttributes] = useState<AttrData[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<Form | null>(null);
+  const [editing, setEditing] = useState<Form | null>(standaloneNew ? { ...blank } : null);
 
   const load = () => {
     fetch("/api/admin/products", { cache: "no-store" }).then((r) => r.json()).then((d) => setProducts(d.products ?? [])).finally(() => setLoading(false));
@@ -58,7 +63,6 @@ export default function AdminProductsPage() {
   useEffect(() => {
     fetch("/api/admin/categories", { cache: "no-store" }).then((r) => r.json()).then((d) => setCategories((d.categories ?? []).map((c: any) => ({ name: c.name, slug: c.slug })))).catch(() => {});
     fetch("/api/admin/attributes", { cache: "no-store" }).then((r) => r.json()).then((d) => setAttributes(d.attributes ?? [])).catch(() => {});
-    if (new URLSearchParams(window.location.search).get("new")) setEditing({ ...blank });
   }, []);
 
   const filtered = useMemo(() => products.filter((p) => !search || `${p.sku} ${p.name}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
@@ -91,11 +95,28 @@ export default function AdminProductsPage() {
     });
   };
 
+  if (standaloneNew) {
+    return (
+      <ProductModal
+        data={editing ?? { ...blank }}
+        categories={categories}
+        attributes={attributes}
+        allProducts={products}
+        embedded
+        onClose={() => router.push("/admin/products")}
+        onSaved={() => {
+          toast("Product created");
+          router.push("/admin/products");
+        }}
+      />
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-navy-800">Products</h1>
-        <button onClick={() => setEditing({ ...blank })} className="btn-primary">+ Add Product</button>
+        <Link href="/admin/products/new" className="btn-primary">+ Create Product</Link>
       </div>
 
       <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-5 shadow-sm">
@@ -154,9 +175,9 @@ export default function AdminProductsPage() {
 }
 
 /* ------------------------- Tabbed product form ------------------------- */
-function ProductModal({ data, categories, attributes, allProducts, onClose, onSaved }: {
+function ProductModal({ data, categories, attributes, allProducts, onClose, onSaved, embedded = false }: {
   data: Form; categories: { name: string; slug: string }[]; attributes: AttrData[]; allProducts: Product[];
-  onClose: () => void; onSaved: (edit: boolean) => void;
+  onClose: () => void; onSaved: (edit: boolean) => void; embedded?: boolean;
 }) {
   const [form, setForm] = useState<Form>(data);
   const [tab, setTab] = useState("general");
@@ -214,16 +235,22 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-navy-900/50 p-4" onClick={onClose}>
-      <div className="my-6 w-full max-w-3xl rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={embedded ? "w-full" : "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-navy-900/50 p-4"}
+      onClick={embedded ? undefined : onClose}
+    >
+      <div
+        className={embedded ? "w-full rounded-2xl border border-navy-800/5 bg-white shadow-sm" : "my-6 w-full max-w-3xl rounded-2xl bg-white shadow-2xl"}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-navy-800/10 px-6 py-4">
-          <h2 className="text-lg font-bold text-navy-800">{isEdit ? "Edit Product" : "Add Product"}</h2>
+          <h2 className="text-lg font-bold text-navy-800">{isEdit ? "Edit Product" : "Create Product"}</h2>
           <button onClick={onClose} aria-label="Close" className="text-navy-800/40 hover:text-navy-800">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
-        <div className="max-h-[76vh] overflow-y-auto px-6 py-5">
+        <div className={embedded ? "px-6 py-6" : "max-h-[76vh] overflow-y-auto px-6 py-5"}>
           {/* Top: identity */}
           <div className="space-y-4">
             <F label="Product Name"><input value={form.name} onChange={(e) => set("name")(e.target.value)} className="input" placeholder="e.g. Classic Crew T-Shirt" /></F>

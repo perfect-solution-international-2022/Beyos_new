@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { computeOrderTotals, createPendingOrder, cancelOrder, CheckoutLine, CustomerInfo } from "@/lib/orders";
 import { createOnepayCheckout } from "@/lib/onepay";
 import { query } from "@/lib/db";
+import { sendOrderConfirmationSms } from "@/lib/sms";
 
 interface CheckoutPayload {
   customer: CustomerInfo;
@@ -101,6 +102,13 @@ export async function POST(request: Request) {
     if (transactionId) {
       await query("UPDATE orders SET payment_ref = ? WHERE id = ?", [transactionId, orderId]);
     }
+
+    await sendOrderConfirmationSms({
+      phone: customer.phone,
+      orderRef,
+      total: totals.total,
+      status: "pending payment",
+    });
 
     return NextResponse.json({ success: true, redirectUrl, orderRef });
   } catch (err) {

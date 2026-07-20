@@ -4,8 +4,9 @@ import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { ref: string } }
+  { params }: { params: Promise<{ ref: string }> }
 ) {
+  const { ref } = await params;
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -21,7 +22,7 @@ export async function GET(
   }>(
     `SELECT order_ref, status, payment_method, payment_status, total, created_at
      FROM orders WHERE order_ref = ? AND user_id = ? LIMIT 1`,
-    [params.ref, user.id]
+    [ref, user.id]
   );
 
   if (rows.length === 0) {

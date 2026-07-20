@@ -3,6 +3,7 @@ import { pool, query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { makeReceiptNumber } from "@/lib/pos";
 import type { PoolConnection } from "mysql2/promise";
+import { sendOrderConfirmationSms } from "@/lib/sms";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -62,8 +63,6 @@ export async function POST(request: Request) {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: {
-    shiftId?: number;
-    cashierId?: number;
     items?: SaleLine[];
     customerName?: string;
     customerPhone?: string;
@@ -77,9 +76,6 @@ export async function POST(request: Request) {
   };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
 
-  if (!b.shiftId || !b.cashierId) {
-    return NextResponse.json({ error: "No active shift" }, { status: 400 });
-  }
   if (!Array.isArray(b.items) || b.items.length === 0) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
@@ -94,18 +90,35 @@ export async function POST(request: Request) {
   let conn: PoolConnection | null = null;
   try {
     // Confirm this shift is really open and belongs to this cashier.
-    const shiftRows = await query<{ id: number; cashier_id: number; status: string }>(
-      "SELECT id, cashier_id, status FROM pos_shifts WHERE id = ? LIMIT 1",
-      [b.shiftId]
-    );
-    const shift = shiftRows[0];
-    if (!shift || shift.status !== "open" || shift.cashier_id !== b.cashierId) {
-      return NextResponse.json({ error: "No active shift for this cashier" }, { status: 400 });
-    }
-
     // Recompute every line from the live product catalog — never trust client prices.
     conn = await pool.getConnection();
     await conn.beginTransaction();
+
+    // Keep one internal session for the existing POS foreign keys. Cashiers and
+    // shifts are no longer part of the admin-facing register workflow.
+    const [cashierRows] = await conn.execute(
+      "SELECT id FROM pos_cashiers WHERE name = '__BEYOS_POS__' ORDER BY id ASC LIMIT 1"
+    );
+    let cashierId = Number((cashierRows as any[])[0]?.id ?? 0);
+    if (!cashierId) {
+      const [cashierResult] = await conn.execute(
+        "INSERT INTO pos_cashiers (name, pin_hash, is_active) VALUES ('__BEYOS_POS__', 'disabled', 0)"
+      );
+      cashierId = Number((cashierResult as any).insertId);
+    }
+
+    const [shiftRows] = await conn.execute(
+      "SELECT id FROM pos_shifts WHERE cashier_id = ? AND status = 'open' ORDER BY id ASC LIMIT 1",
+      [cashierId]
+    );
+    let shiftId = Number((shiftRows as any[])[0]?.id ?? 0);
+    if (!shiftId) {
+      const [shiftResult] = await conn.execute(
+        "INSERT INTO pos_shifts (cashier_id, opening_float, status) VALUES (?, 0, 'open')",
+        [cashierId]
+      );
+      shiftId = Number((shiftResult as any).insertId);
+    }
 
     let subtotal = 0;
     const lineItems: {
@@ -160,7 +173,7 @@ export async function POST(request: Request) {
          fulfillment_type, delivery_address, delivery_city, delivery_status)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?)`,
       [
-        receiptNumber, b.shiftId, b.cashierId,
+        receiptNumber, shiftId, cashierId,
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
         fulfillmentType, deliveryAddress || null, deliveryCity || null, deliveryStatus,
@@ -177,6 +190,13 @@ export async function POST(request: Request) {
     }
 
     await conn.commit();
+
+    await sendOrderConfirmationSms({
+      phone: b.customerPhone,
+      orderRef: receiptNumber,
+      total,
+      status: fulfillmentType === "delivery" ? "pending" : "completed",
+    });
 
     return NextResponse.json({
       success: true,

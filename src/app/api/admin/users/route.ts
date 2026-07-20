@@ -25,9 +25,10 @@ export async function GET(request: Request) {
       role: string;
       phone: string;
       city: string | null;
+      reseller_status: string;
       created_at: string;
     }>(
-      `SELECT id, name, email, role, phone, city, created_at FROM users ${where} ORDER BY created_at DESC`,
+      `SELECT id, name, email, role, phone, city, reseller_status, created_at FROM users ${where} ORDER BY created_at DESC`,
       params
     );
     return NextResponse.json({
@@ -38,6 +39,7 @@ export async function GET(request: Request) {
         role: u.role,
         phone: u.phone,
         city: u.city,
+        resellerStatus: u.reseller_status,
         createdAt: u.created_at,
       })),
     });
@@ -77,8 +79,8 @@ export async function POST(request: Request) {
     const hash = await hashPassword(password);
     const name = `${firstName} ${lastName}`.trim();
     await query(
-      "INSERT INTO users (name, first_name, last_name, email, password_hash, role, phone) VALUES (?,?,?,?,?,?,?)",
-      [name, firstName, lastName, email, hash, role, phone]
+      "INSERT INTO users (name, first_name, last_name, email, password_hash, role, reseller_status, phone) VALUES (?,?,?,?,?,?,?,?)",
+      [name, firstName, lastName, email, hash, role, "approved", phone]
     );
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -107,21 +109,37 @@ export async function PATCH(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let body: { id?: number; role?: string };
+  let body: { id?: number; role?: string; resellerStatus?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { id, role } = body;
-  if (!id || !["buyer", "reseller", "admin"].includes(role || "")) {
+  const { id, role, resellerStatus } = body;
+  if (!id || (!role && !resellerStatus)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (id === admin.id) {
     return NextResponse.json({ error: "You cannot change your own role" }, { status: 400 });
   }
   try {
-    await query("UPDATE users SET role = ? WHERE id = ?", [role, id]);
+    if (role) {
+      if (!["buyer", "reseller", "admin"].includes(role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
+      await query(
+        "UPDATE users SET role = ?, reseller_status = ?, session_version = session_version + 1 WHERE id = ?",
+        [role, "approved", id]
+      );
+    } else {
+      if (!["approved", "rejected"].includes(resellerStatus || "")) {
+        return NextResponse.json({ error: "Invalid reseller status" }, { status: 400 });
+      }
+      await query(
+        "UPDATE users SET reseller_status = ?, session_version = session_version + 1 WHERE id = ? AND role = 'reseller'",
+        [resellerStatus, id]
+      );
+    }
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin users PATCH error:", err);

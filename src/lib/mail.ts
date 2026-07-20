@@ -26,7 +26,7 @@ async function deliver(to: string, subject: string, html: string, text: string):
   }
 
   // Development fallback — no email provider configured.
-  console.log(`\n[mail] To: ${to}\n[mail] Subject: ${subject}\n[mail] ${text}\n`);
+  throw new Error("Transactional email is not configured");
 }
 
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {

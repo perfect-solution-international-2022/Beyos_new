@@ -5,8 +5,9 @@ import { cashSalesTotal } from "@/lib/pos";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -14,14 +15,14 @@ export async function GET(
     const rows = await query<any>(
       `SELECT s.*, c.name AS cashier_name FROM pos_shifts s
        JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.id = ? LIMIT 1`,
-      [params.id]
+      [id]
     );
     const shift = rows[0];
     if (!shift) return NextResponse.json({ error: "Shift not found" }, { status: 404 });
 
     const sales = await query<any>(
       "SELECT * FROM pos_sales WHERE shift_id = ? ORDER BY created_at DESC",
-      [params.id]
+      [id]
     );
 
     return NextResponse.json({
@@ -54,8 +55,9 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -68,7 +70,7 @@ export async function PATCH(
   try {
     const rows = await query<{ id: number; opening_float: string; status: string }>(
       "SELECT id, opening_float, status FROM pos_shifts WHERE id = ? LIMIT 1",
-      [params.id]
+      [id]
     );
     const shift = rows[0];
     if (!shift) return NextResponse.json({ error: "Shift not found" }, { status: 404 });

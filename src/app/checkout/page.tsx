@@ -157,7 +157,7 @@ export default function CheckoutPage() {
   if (order) {
     return (
       <div className="container-x py-20">
-        <div className="mx-auto max-w-lg rounded-3xl border border-navy-800/10 bg-white p-10 text-center shadow-sm">
+        <div className="mx-auto max-w-lg rounded-3xl border border-navy-800/10 bg-white p-6 text-center shadow-sm sm:p-10">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-brand">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
@@ -221,7 +221,7 @@ export default function CheckoutPage() {
 
   return (
     <div className="container-x py-10">
-      <h1 className="font-display text-4xl font-bold text-navy-800">Checkout</h1>
+      <h1 className="font-display text-3xl font-bold text-navy-800 sm:text-4xl">Checkout</h1>
 
       <form
         onSubmit={submit}
@@ -373,7 +373,7 @@ export default function CheckoutPage() {
         </div>
 
         {/* Summary */}
-        <aside className="h-fit rounded-2xl border border-navy-800/10 bg-white p-6 lg:sticky lg:top-28">
+        <aside className="h-fit rounded-2xl border border-navy-800/10 bg-white p-4 sm:p-6 lg:sticky lg:top-28">
           <h2 className="text-lg font-bold text-navy-800">Your Order</h2>
           <ul className="mt-4 space-y-4">
             {items.map((item) => (
