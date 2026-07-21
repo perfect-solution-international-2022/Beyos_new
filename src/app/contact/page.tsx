@@ -63,12 +63,12 @@ export default function ContactPage() {
             <div className="overflow-hidden rounded-xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
               <iframe
                 title="Beyos Clothing location"
-                src="https://www.google.com/maps?q=Kendagaha%20junction%2C%20Elpitiya%2080458&output=embed"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d74285.82508060843!2d80.13999031862414!3d6.278309038350375!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae17f43041be07b%3A0x81a76bcb2ff474c5!2sBeyos%20Clothing!5e0!3m2!1sen!2str!4v1784612089527!5m2!1sen!2str"
                 width="100%"
                 height="250"
                 className="border-0"
                 loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
+                referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen
               />
             </div>
