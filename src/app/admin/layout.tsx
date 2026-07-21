@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
@@ -159,7 +160,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {/* Brand */}
         <div className="flex h-[68px] items-center gap-3 px-5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-base font-black text-white shadow-lg shadow-brand/30">B</span>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-lg shadow-brand/20">
+            <Image src="/images/logo.png" alt="Beyos" width={40} height={40} className="h-8 w-8 object-contain" />
+          </span>
           <div className="leading-tight">
             <p className="text-[15px] font-extrabold tracking-tight">BEYOS</p>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">Admin Panel</p>

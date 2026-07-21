@@ -28,6 +28,10 @@ const config: Config = {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "Georgia", "serif"],
       },
+      screens: {
+        "3xl": "1920px",
+        "4xl": "2560px",
+      },
       container: {
         center: true,
         padding: "1rem",

@@ -101,7 +101,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Perfect Solution International"
-                className="rounded bg-white px-2 py-1 transition hover:opacity-90"
+                className="transition hover:opacity-90"
               >
                 <Image
                   src="/images/logo/psi-logo.png"
