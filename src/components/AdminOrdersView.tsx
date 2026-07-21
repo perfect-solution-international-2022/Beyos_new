@@ -46,6 +46,7 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [saving, setSaving] = useState("");
 
   const load = () => {
@@ -56,15 +57,23 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
   };
   useEffect(load, []);
 
+  // Customer orders only pay via OnePay (no COD) — this checkout doesn't confirm payment on
+  // its own, so anything sitting "unpaid" needs an admin to notice and follow up.
+  const unpaidCustomerOrders = useMemo(
+    () => orders.filter((o) => o.type === "customer" && o.paymentStatus !== "paid"),
+    [orders]
+  );
+
   const filtered = useMemo(
     () =>
       orders.filter(
         (o) =>
           (!pendingOnly || o.status.toLowerCase() === "pending") &&
           (typeFilter === "all" || o.type === typeFilter) &&
+          (!unpaidOnly || (o.type === "customer" && o.paymentStatus !== "paid")) &&
           (!search || `${o.orderRef} ${o.customerName}`.toLowerCase().includes(search.toLowerCase()))
       ),
-    [orders, search, typeFilter, pendingOnly]
+    [orders, search, typeFilter, unpaidOnly, pendingOnly]
   );
 
   const updateStatus = async (o: Order, status: string) => {
@@ -133,6 +142,29 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
     <div>
       <h1 className="text-2xl font-bold text-navy-800">{pendingOnly ? "Pending Orders" : "All Orders"}</h1>
 
+      {!loading && unpaidCustomerOrders.length > 0 && (
+        <button
+          onClick={() => setUnpaidOnly(true)}
+          className="mt-4 flex w-full items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3.5 text-left transition hover:border-amber-400"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+              <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </span>
+          <span className="flex-1 text-sm">
+            <span className="font-semibold text-amber-800">
+              {unpaidCustomerOrders.length} customer order{unpaidCustomerOrders.length === 1 ? "" : "s"} awaiting payment confirmation
+            </span>
+            <span className="ml-2 text-amber-700/80">
+              OnePay checkout doesn&apos;t confirm automatically — review and mark paid once verified.
+            </span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-amber-700">View →</span>
+        </button>
+      )}
+
       <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-navy-800/5 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
         <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-xs" placeholder="Search Order ID or Customer…" />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="input sm:max-w-[180px]">
@@ -141,6 +173,19 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
           <option value="reseller">Reseller</option>
           <option value="pos">POS</option>
         </select>
+        <button
+          onClick={() => setUnpaidOnly((v) => !v)}
+          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+            unpaidOnly ? "border-amber-400 bg-amber-50 text-amber-700" : "border-navy-800/15 text-navy-800/60 hover:border-brand hover:text-brand"
+          }`}
+        >
+          Unpaid only
+          {unpaidOnly && (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" onClick={(e) => { e.stopPropagation(); setUnpaidOnly(false); }}>
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          )}
+        </button>
       </div>
 
       <div className="mt-6 overflow-x-auto rounded-2xl border border-navy-800/5 bg-white shadow-sm">
@@ -165,7 +210,12 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
               <tr><td colSpan={9} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
             ) : (
               filtered.map((o) => (
-                <tr key={o.orderRef} className="border-b border-navy-800/5 last:border-0">
+                <tr
+                  key={o.orderRef}
+                  className={`border-b border-navy-800/5 last:border-0 ${
+                    o.type === "customer" && o.paymentStatus !== "paid" ? "bg-amber-50/50" : ""
+                  }`}
+                >
                   <td className="px-6 py-4 font-semibold text-brand">#{o.orderRef}</td>
                   <td className="px-6 py-4 capitalize text-navy-800/60">{o.type === "pos" ? "POS" : o.type}</td>
                   <td className="px-6 py-4 text-navy-800">

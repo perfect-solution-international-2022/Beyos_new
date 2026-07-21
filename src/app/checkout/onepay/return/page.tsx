@@ -113,12 +113,12 @@ function ReturnContent() {
       </div>
 
       <h1 className="mt-6 font-display text-3xl font-bold text-navy-800">
-        {isPaid ? "Payment Received!" : "Confirming Your Payment"}
+        {isPaid ? "Payment Received!" : "Order Placed"}
       </h1>
       <p className="mt-3 text-navy-800/60">
         {isPaid
           ? "Thank you for shopping with Beyos. Your order is confirmed."
-          : "We're verifying your payment with OnePay. This page will update automatically — you can also check back in your order history shortly."}
+          : "If your card payment went through on OnePay, our team will confirm it shortly — you'll see it reflected in your order history."}
       </p>
 
       <div className="mt-6 space-y-2 rounded-2xl bg-navy-50 p-5 text-sm">

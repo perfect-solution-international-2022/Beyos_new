@@ -31,7 +31,7 @@ export async function GET(
         cashierName: sale.cashier_name,
         customerName: sale.customer_name || "Walk-in Customer",
         items: items.map((i: any) => ({
-          name: i.name, size: i.size, color: i.color,
+          name: i.name, sku: i.sku, size: i.size, color: i.color,
           quantity: i.quantity, unitPrice: Number(i.unit_price), lineTotal: Number(i.line_total),
         })),
         subtotal: Number(sale.subtotal),

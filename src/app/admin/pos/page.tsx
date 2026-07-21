@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
 import { useAuth } from "@/context/AuthProvider";
 import { SRI_LANKA_LOCATIONS } from "@/lib/sri-lanka-locations";
+import POSReceiptBill from "@/components/POSReceiptBill";
 
 interface Product {
   slug: string;
@@ -38,7 +39,7 @@ interface Customer {
 
 interface Receipt {
   receiptNumber: string;
-  items: { name: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
+  items: { name: string; sku?: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
   customerName: string;
   subtotal: number;
   discountAmount: number;
@@ -683,51 +684,10 @@ function Row({ label, value, bold, tone }: { label: string; value: string; bold?
 
 function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl print:shadow-none" onClick={(e) => e.stopPropagation()}>
-        <div className="text-center">
-          <p className="text-lg font-black tracking-wide text-navy-800">BEYOS</p>
-          <p className="text-xs text-navy-800/50">Receipt #{receipt.receiptNumber}</p>
-          <p className="text-xs text-navy-800/50">{new Date(receipt.createdAt).toLocaleString("en-GB")}</p>
-          <p className="text-xs text-navy-800/50">{receipt.customerName}</p>
-          {receipt.fulfillmentType === "delivery" && (
-            <p className="mt-1 text-xs font-semibold text-blue-600">FOR DELIVERY</p>
-          )}
-        </div>
-
-        {receipt.fulfillmentType === "delivery" && (
-          <div className="mt-3 rounded-lg bg-navy-50 p-3 text-xs text-navy-800/80">
-            <p className="font-semibold text-navy-800">Deliver to:</p>
-            <p>{receipt.deliveryAddress}</p>
-            {receipt.deliveryCity && <p>{receipt.deliveryCity}</p>}
-          </div>
-        )}
-
-        <div className="mt-4 space-y-2 border-y border-dashed border-navy-800/20 py-3">
-          {receipt.items.map((it, i) => (
-            <div key={i} className="flex justify-between text-sm">
-              <div>
-                <p className="text-navy-800">{it.name}</p>
-                {(it.size || it.color) && (
-                  <p className="text-xs text-navy-800/50">{[it.size, it.color].filter(Boolean).join(" / ")}</p>
-                )}
-                <p className="text-xs text-navy-800/50">{it.quantity} × {formatPrice(it.unitPrice)}</p>
-              </div>
-              <p className="font-semibold text-navy-800">{formatPrice(it.lineTotal)}</p>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-3 space-y-1 text-sm">
-          <Row label="Subtotal" value={formatPrice(receipt.subtotal)} />
-          {receipt.discountAmount > 0 && <Row label="Discount" value={`-${formatPrice(receipt.discountAmount)}`} />}
-          {receipt.taxAmount > 0 && <Row label="Tax" value={formatPrice(receipt.taxAmount)} />}
-          <div className="border-t border-navy-800/10 pt-1.5">
-            <Row label="Total" value={formatPrice(receipt.total)} bold />
-          </div>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3 print:hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
+        <POSReceiptBill receipt={receipt} />
+        <div className="flex justify-end gap-3 px-6 pb-6 print:hidden">
           <button onClick={onClose} className="btn-outline">New Sale</button>
           <button onClick={() => window.print()} className="btn-primary">Print</button>
         </div>
