@@ -135,6 +135,16 @@ async function main() {
     CONSTRAINT fk_variant_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
     INDEX idx_variant_product (product_id)
   ) ENGINE=InnoDB`);
+  await ensureColumns(db, "product_variants", [
+    ["sale_price", "DECIMAL(10,2) NULL"],
+    ["wholesale_min_qty", "INT NOT NULL DEFAULT 0"],
+    ["production_cost", "DECIMAL(10,2) NULL"],
+    ["stock_status", "VARCHAR(30) NOT NULL DEFAULT 'in_stock'"],
+    ["weight_kg", "DECIMAL(10,3) NULL"],
+    ["length_cm", "DECIMAL(10,2) NULL"],
+    ["width_cm", "DECIMAL(10,2) NULL"],
+    ["height_cm", "DECIMAL(10,2) NULL"],
+  ]);
 
   await db.query(`CREATE TABLE IF NOT EXISTS product_links (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -254,6 +264,20 @@ async function main() {
     ["koombiyo_response", "JSON NULL"],
     ["koombiyo_updated_at", "TIMESTAMP NULL"],
   ]);
+
+  await db.query(`CREATE TABLE IF NOT EXISTS pos_customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    city VARCHAR(120) NOT NULL,
+    district VARCHAR(120) NOT NULL,
+    province VARCHAR(120) NOT NULL,
+    postal_code VARCHAR(20) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pos_customer_name (name),
+    INDEX idx_pos_customer_phone (phone)
+  ) ENGINE=InnoDB`);
 
   // Delivery fulfillment columns for POS sales.
   await ensureColumns(db, "pos_sales", [

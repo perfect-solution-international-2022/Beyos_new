@@ -31,6 +31,11 @@ interface CartLine {
   quantity: number;
 }
 
+interface Customer {
+  id: string; name: string; email: string; phone: string; addressLine1: string; addressLine2: string;
+  city: string; district: string; province: string; postalCode: string;
+}
+
 interface Receipt {
   receiptNumber: string;
   items: { name: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
@@ -59,6 +64,14 @@ export default function AdminPosRegisterPage() {
   const [taxRate, setTaxRate] = useState("0");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerResults, setCustomerResults] = useState<Customer[]>([]);
+  const [customerSearching, setCustomerSearching] = useState(false);
+  const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
+  const [addingCustomer, setAddingCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", province: "", district: "", city: "", postalCode: "" });
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">("pickup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
@@ -66,8 +79,6 @@ export default function AdminPosRegisterPage() {
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
-  const [amountTendered, setAmountTendered] = useState("");
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
 
@@ -79,6 +90,58 @@ export default function AdminPosRegisterPage() {
         image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [],
       }))));
   }, []);
+
+  useEffect(() => {
+    const q = customerSearch.trim();
+    if (!customerMenuOpen || selectedCustomerId || !q) {
+      setCustomerResults([]);
+      setCustomerSearching(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setCustomerSearching(true);
+      try {
+        const response = await fetch(`/api/pos/customers?q=${encodeURIComponent(q)}`, { cache: "no-store", signal: controller.signal });
+        const data = await response.json();
+        if (response.ok) setCustomerResults(data.customers ?? []);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setCustomerResults([]);
+      } finally {
+        if (!controller.signal.aborted) setCustomerSearching(false);
+      }
+    }, 200);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [customerSearch, customerMenuOpen, selectedCustomerId]);
+
+  const selectCustomer = (customer: Customer) => {
+    setSelectedCustomerId(customer.id);
+    setCustomerSearch(customer.name);
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    setDeliveryAddress([customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "));
+    setDeliveryCity(customer.city);
+    setDeliveryDistrict(customer.district);
+    setDeliveryProvince(customer.province);
+    setDeliveryPostalCode(customer.postalCode);
+    setCustomerResults([]);
+    setCustomerMenuOpen(false);
+  };
+
+  const saveNewCustomer = async () => {
+    setAddingCustomer(true);
+    try {
+      const response = await fetch("/api/pos/customers", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(newCustomer),
+      });
+      const data = await response.json();
+      if (!response.ok) { toast(data.error || "Could not add customer"); return; }
+      selectCustomer(data.customer);
+      setNewCustomer({ name: "", phone: "", address: "", province: "", district: "", city: "", postalCode: "" });
+      setAddCustomerOpen(false);
+      toast("Customer added");
+    } finally { setAddingCustomer(false); }
+  };
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -92,13 +155,11 @@ export default function AdminPosRegisterPage() {
   const rate = Math.max(0, Number(taxRate) || 0);
   const tax = Math.round(taxable * (rate / 100) * 100) / 100;
   const total = Math.round((taxable + tax) * 100) / 100;
-  const tendered = Number(amountTendered) || 0;
-  const change = paymentMethod === "cash" ? Math.max(0, Math.round((tendered - total) * 100) / 100) : 0;
   const deliveryDetailsComplete = Boolean(
     customerName.trim() && customerPhone.trim() && deliveryProvince && deliveryDistrict && deliveryCity && deliveryAddress.trim()
   );
   const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryProvince, deliveryPostalCode.trim()].filter(Boolean).join(", ");
-  const paymentDisabled = completing || cart.length === 0 || (paymentMethod === "cash" && tendered < total) || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
+  const paymentDisabled = completing || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
 
   const toggleFullscreen = async () => {
     try {
@@ -159,6 +220,10 @@ export default function AdminPosRegisterPage() {
     setTaxRate("0");
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerSearch("");
+    setCustomerResults([]);
+    setCustomerMenuOpen(false);
+    setSelectedCustomerId(null);
     setFulfillmentType("pickup");
     setDeliveryAddress("");
     setDeliveryCity("");
@@ -166,13 +231,10 @@ export default function AdminPosRegisterPage() {
     setDeliveryDistrict("");
     setDeliveryPostalCode("");
     setDeliveryModalOpen(false);
-    setPaymentMethod("cash");
-    setAmountTendered("");
   };
 
   const completeSale = async () => {
     if (cart.length === 0) return;
-    if (paymentMethod === "cash" && tendered < total) { toast("Amount tendered is less than total due"); return; }
     if (fulfillmentType === "delivery" && !deliveryDetailsComplete) { toast("Complete the delivery customer details first"); return; }
     setCompleting(true);
     try {
@@ -181,7 +243,6 @@ export default function AdminPosRegisterPage() {
         body: JSON.stringify({
           items: cart.map((l) => ({ slug: l.slug, size: l.size, color: l.color, quantity: l.quantity })),
           customerName, customerPhone, discountAmount: discount, taxRate: rate,
-          paymentMethod, amountTendered: paymentMethod === "cash" ? tendered : undefined,
           fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryCity,
         }),
       });
@@ -202,14 +263,40 @@ export default function AdminPosRegisterPage() {
   return (
     <div className="h-screen overflow-hidden bg-[#f5f6f8] p-4 pb-24">
       <div className="flex h-[74px] items-center justify-between gap-4 rounded-xl border border-[#e5e7eb] bg-white px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-        <div className="hidden w-[250px] items-center rounded-lg border border-[#d9d9d9] bg-[#f9fafb] px-3 md:flex">
-          <CustomerIcon />
-          <input
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            placeholder="Search / Select Customer"
-            className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm text-[#374151] outline-none placeholder:text-[#9ca3af]"
-          />
+        <div className="relative hidden w-[290px] md:block">
+          <div className={`flex items-center rounded-lg border bg-[#f9fafb] px-3 ${customerMenuOpen ? "border-[#f5851f]" : "border-[#d9d9d9]"}`}>
+            <CustomerIcon />
+            <input
+              value={customerSearch}
+              onFocus={() => setCustomerMenuOpen(true)}
+              onBlur={() => window.setTimeout(() => setCustomerMenuOpen(false), 150)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCustomerSearch(value);
+                setCustomerName(value);
+                setSelectedCustomerId(null);
+                setCustomerMenuOpen(true);
+              }}
+              placeholder="Search / Select Customer"
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm text-[#374151] outline-none placeholder:text-[#9ca3af]"
+            />
+            {selectedCustomerId && <span title="Existing customer selected" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
+          </div>
+          {customerMenuOpen && customerSearch.trim() && !selectedCustomerId && (
+            <div className="absolute left-0 top-[calc(100%+6px)] z-50 max-h-72 w-[360px] overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white p-1.5 shadow-xl">
+              {customerSearching ? (
+                <p className="px-3 py-4 text-center text-xs text-[#6b7280]">Searching customers...</p>
+              ) : customerResults.length ? customerResults.map((customer) => (
+                <button key={customer.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectCustomer(customer)} className="flex w-full items-start justify-between gap-4 rounded-lg px-3 py-2.5 text-left hover:bg-[#fff7ed]">
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#1f2937]">{customer.name}</span><span className="block truncate text-xs text-[#6b7280]">{customer.email}</span></span>
+                  <span className="shrink-0 pt-0.5 text-xs text-[#6b7280]">{customer.phone || "No phone"}</span>
+                </button>
+              )) : (
+                <p className="px-3 py-4 text-center text-xs text-[#6b7280]">No existing customers found</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex max-w-sm flex-1 items-center rounded-lg border border-[#d9d9d9] bg-[#f9fafb] px-3 focus-within:border-[#f5851f]">
@@ -223,10 +310,7 @@ export default function AdminPosRegisterPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button aria-label="View current cart" className="relative flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280]">
-            <CartIcon />
-            {cart.length > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f5851f] px-1 text-[10px] font-bold text-white">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>}
-          </button>
+          <button onClick={() => setAddCustomerOpen(true)} aria-label="Add customer" title="Add customer" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280] hover:bg-[#fff4e8] hover:text-[#f5851f]"><AddCustomerIcon /></button>
           <button onClick={() => router.push("/admin/pos/sales")} aria-label="Sales history" className="hidden h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280] sm:flex"><ReceiptIcon /></button>
           <button onClick={toggleFullscreen} aria-label="Toggle fullscreen" className="hidden h-10 w-10 items-center justify-center rounded-full bg-[#f3f4f6] text-[#6b7280] sm:flex"><FullscreenIcon /></button>
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2937] text-xs font-bold text-white">
@@ -273,8 +357,8 @@ export default function AdminPosRegisterPage() {
           </div>
         </section>
 
-        <aside className="order-1 overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-          <div className="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-4">
+        <aside className="order-1 flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <div className="flex shrink-0 items-center justify-between border-b border-[#e5e7eb] px-5 py-4">
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#fff4e8] text-[#f5851f]"><CartIcon /></span>
               <div>
@@ -284,12 +368,12 @@ export default function AdminPosRegisterPage() {
             </div>
             {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs font-semibold text-red-500 hover:text-red-600">Clear</button>}
           </div>
-          <div className="max-h-72 space-y-3 overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
             {cart.length === 0 ? (
-              <div className="py-8 text-center">
-                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#f9fafb] text-[#9ca3af]"><CartIcon /></span>
-                <p className="mt-3 text-sm font-medium text-[#6b7280]">Your order is empty</p>
-                <p className="mt-1 text-xs text-[#9ca3af]">Select a product to add it here</p>
+              <div className="flex h-full min-h-48 flex-col items-center justify-center text-center">
+                <span className="flex h-16 w-16 items-center justify-center rounded-full bg-[#fff7ed] text-[#f5851f]"><CartIcon /></span>
+                <p className="mt-4 text-sm font-semibold text-[#4b5563]">Your order is empty</p>
+                <p className="mt-1 max-w-52 text-xs leading-5 text-[#9ca3af]">Select a product from Available Products to build the current order</p>
               </div>
             ) : (
               cart.map((l, idx) => (
@@ -338,7 +422,7 @@ export default function AdminPosRegisterPage() {
             )}
           </div>
 
-          <div className="border-t border-[#e5e7eb] px-5 py-4">
+          <div className="shrink-0 border-t border-[#e5e7eb] bg-white px-5 py-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Discount (LKR)</label>
@@ -350,7 +434,7 @@ export default function AdminPosRegisterPage() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Customer name</label>
-              <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="input" placeholder="Optional" />
+              <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); }} className="input" placeholder="Optional" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Phone</label>
@@ -364,21 +448,6 @@ export default function AdminPosRegisterPage() {
             {tax > 0 && <Row label="Tax" value={formatPrice(tax)} />}
             <div className="border-t border-[#e5e7eb] pt-2"><Row label="Total" value={formatPrice(total)} bold /></div>
           </div>
-
-          <div className="mt-4 flex gap-2">
-            <button onClick={() => setPaymentMethod("cash")} className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold ${paymentMethod === "cash" ? "border-[#f5851f] bg-[#fff4e8] text-[#e0720f]" : "border-[#e5e7eb] bg-white text-[#6b7280]"}`}>Cash</button>
-            <button onClick={() => setPaymentMethod("card")} className={`flex-1 rounded-lg border py-2.5 text-sm font-semibold ${paymentMethod === "card" ? "border-[#f5851f] bg-[#fff4e8] text-[#e0720f]" : "border-[#e5e7eb] bg-white text-[#6b7280]"}`}>Card</button>
-          </div>
-
-          {paymentMethod === "cash" && (
-            <div className="mt-3">
-              <label className="mb-1 block text-xs font-medium text-navy-800/60">Amount tendered</label>
-              <input type="number" value={amountTendered} onChange={(e) => setAmountTendered(e.target.value)} className="input" />
-              {tendered > 0 && (
-                <p className="mt-1.5 text-sm text-navy-800/70">Change due: <span className="font-bold text-navy-800">{formatPrice(change)}</span></p>
-              )}
-            </div>
-          )}
 
           </div>
         </aside>
@@ -418,6 +487,52 @@ export default function AdminPosRegisterPage() {
         </div>
       </div>
 
+      {addCustomerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" onClick={() => setAddCustomerOpen(false)}>
+          <div className="w-full max-w-[600px] rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-xl font-bold text-[#252525]">Add Customer</h2>
+            <div className="mt-5 space-y-5">
+              <DeliveryField label="Full Name">
+                <input value={newCustomer.name} onChange={(event) => setNewCustomer((customer) => ({ ...customer, name: event.target.value }))} className="delivery-input" placeholder="Enter Full Name" maxLength={150} />
+              </DeliveryField>
+              <DeliveryField label="Phone Number">
+                <input value={newCustomer.phone} onChange={(event) => setNewCustomer((customer) => ({ ...customer, phone: event.target.value.replace(/[^0-9+]/g, "") }))} className="delivery-input" placeholder="Enter Phone Number" inputMode="tel" />
+              </DeliveryField>
+              <DeliveryField label="Address">
+                <input value={newCustomer.address} onChange={(event) => setNewCustomer((customer) => ({ ...customer, address: event.target.value }))} className="delivery-input" placeholder="Enter Address" maxLength={255} />
+              </DeliveryField>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <DeliveryField label="City">
+                  <select value={newCustomer.city} disabled={!newCustomer.district} onChange={(event) => setNewCustomer((customer) => ({ ...customer, city: event.target.value }))} className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
+                    <option value="">{newCustomer.district ? "Select City" : "Select district first"}</option>
+                    {newCustomer.province && newCustomer.district && SRI_LANKA_LOCATIONS[newCustomer.province][newCustomer.district].map((city) => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                </DeliveryField>
+                <DeliveryField label="Province">
+                  <select value={newCustomer.province} onChange={(event) => setNewCustomer((customer) => ({ ...customer, province: event.target.value, district: "", city: "" }))} className="delivery-input">
+                    <option value="">Select Province</option>
+                    {Object.keys(SRI_LANKA_LOCATIONS).map((province) => <option key={province} value={province}>{province}</option>)}
+                  </select>
+                </DeliveryField>
+                <DeliveryField label="District">
+                  <select value={newCustomer.district} disabled={!newCustomer.province} onChange={(event) => setNewCustomer((customer) => ({ ...customer, district: event.target.value, city: "" }))} className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
+                    <option value="">{newCustomer.province ? "Select District" : "Select province first"}</option>
+                    {newCustomer.province && Object.keys(SRI_LANKA_LOCATIONS[newCustomer.province]).map((district) => <option key={district} value={district}>{district}</option>)}
+                  </select>
+                </DeliveryField>
+                <DeliveryField label="ZIP Code">
+                  <input value={newCustomer.postalCode} onChange={(event) => setNewCustomer((customer) => ({ ...customer, postalCode: event.target.value.replace(/[^0-9]/g, "").slice(0, 5) }))} className="delivery-input" placeholder="Enter ZIP Code" inputMode="numeric" />
+                </DeliveryField>
+              </div>
+            </div>
+            <div className="mt-7 flex justify-end gap-5">
+              <button type="button" onClick={() => setAddCustomerOpen(false)} className="px-2 py-3 text-sm font-semibold text-[#ff7426]">Cancel</button>
+              <button type="button" onClick={saveNewCustomer} disabled={addingCustomer} className="rounded-lg bg-[#ff8746] px-6 py-3 text-sm font-bold text-white hover:bg-[#f5851f] disabled:opacity-50">{addingCustomer ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deliveryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setDeliveryModalOpen(false)}>
           <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -426,7 +541,7 @@ export default function AdminPosRegisterPage() {
             <div className="mt-5 rounded-xl bg-[#f7f8fa] p-6">
               <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
                 <DeliveryField label="Customer Name">
-                  <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="delivery-input" />
+                  <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); }} className="delivery-input" />
                 </DeliveryField>
                 <DeliveryField label="Phone Number">
                   <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/[^0-9+]/g, ""))} className="delivery-input" />
@@ -531,6 +646,15 @@ function CustomerIcon() {
   );
 }
 
+function AddCustomerIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="8" r="4" />
+      <path d="M2.5 21a6.5 6.5 0 0 1 13 0M19 8v6M16 11h6" />
+    </svg>
+  );
+}
+
 function ReceiptIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -601,12 +725,6 @@ function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
           <div className="border-t border-navy-800/10 pt-1.5">
             <Row label="Total" value={formatPrice(receipt.total)} bold />
           </div>
-          {receipt.paymentMethod === "cash" && receipt.amountTendered !== null && (
-            <>
-              <Row label="Tendered" value={formatPrice(receipt.amountTendered)} />
-              <Row label="Change" value={formatPrice(receipt.changeDue ?? 0)} />
-            </>
-          )}
         </div>
 
         <div className="mt-6 flex justify-end gap-3 print:hidden">

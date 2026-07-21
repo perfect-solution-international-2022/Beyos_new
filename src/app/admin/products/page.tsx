@@ -20,12 +20,18 @@ interface Product {
   [k: string]: unknown;
 }
 interface Variant {
-  sku: string; attributeSummary: string; price: string; resellerPrice: string; wholesalePrice: string; stock: string; isDefault: boolean;
+  sku: string; attributeSummary: string; price: string; salePrice: string; resellerPrice: string;
+  wholesalePrice: string; wholesaleMinQty: string; productionCost: string; stockStatus: string;
+  stock: string; lowStockThreshold: string; weightKg: string; lengthCm: string; widthCm: string;
+  heightCm: string; image: string; isDefault: boolean;
 }
 interface LinkItem { linkedProductId: number; linkType: string; }
 interface AttrData { id: number; name: string; values: { id: number; value: string }[]; }
 
-const PAYMENT_METHODS = ["Cash on Delivery", "Card Payment", "Bank Transfer", "PayHere"];
+const PAYMENT_METHODS = [
+  { name: "Cash on Delivery", type: "OFFLINE" },
+  { name: "OnePay", type: "ONLINE" },
+] as const;
 
 const blank = {
   id: 0, name: "", slug: "", sku: "", category: "men", productType: "simple",
@@ -43,6 +49,36 @@ const blank = {
   selectedAttrValues: {} as Record<number, number[]>,
 };
 type Form = typeof blank;
+type TextFieldKey = "name" | "shortDescription" | "description" | "sku";
+type FieldErrors = Partial<Record<TextFieldKey, string>>;
+
+const TEXT_LIMITS: Record<TextFieldKey, number> = {
+  name: 200,
+  shortDescription: 500,
+  description: 10000,
+  sku: 60,
+};
+
+function validateTextFields(form: Form): FieldErrors {
+  const errors: FieldErrors = {};
+  const labels: Record<TextFieldKey, string> = {
+    name: "Product name", shortDescription: "Short description", description: "Description", sku: "SKU",
+  };
+
+  (Object.keys(TEXT_LIMITS) as TextFieldKey[]).forEach((key) => {
+    const value = form[key].trim();
+    if (value.length > TEXT_LIMITS[key]) errors[key] = `${labels[key]} must be ${TEXT_LIMITS[key]} characters or fewer.`;
+    else if (/[<>]/.test(value)) errors[key] = `${labels[key]} cannot contain < or > characters.`;
+  });
+
+  const name = form.name.trim();
+  if (!name) errors.name = "Product name is required.";
+  else if (name.length < 2) errors.name = "Product name must contain at least 2 characters.";
+
+  const sku = form.sku.trim();
+  if (sku && !/^[A-Za-z0-9._-]+$/.test(sku)) errors.sku = "SKU can only contain letters, numbers, dots, underscores, and hyphens.";
+  return errors;
+}
 
 export default function AdminProductsPage() {
   const { toast, confirm } = useToast();
@@ -89,7 +125,13 @@ export default function AdminProductsPage() {
       tags: Array.isArray(p.tags) ? p.tags.join(", ") : "",
       paymentMethods: Array.isArray(p.paymentMethods) ? p.paymentMethods : [],
       weightKg: str(p.weightKg), lengthCm: str(p.lengthCm), widthCm: str(p.widthCm), heightCm: str(p.heightCm),
-      variants: (p.variants ?? []).map((v: any) => ({ sku: v.sku, attributeSummary: v.attributeSummary, price: str(v.price), resellerPrice: str(v.resellerPrice), wholesalePrice: str(v.wholesalePrice), stock: str(v.stock), isDefault: !!v.isDefault })),
+      variants: (p.variants ?? []).map((v: any) => ({
+        sku: v.sku, attributeSummary: v.attributeSummary, price: str(v.price), salePrice: str(v.salePrice),
+        resellerPrice: str(v.resellerPrice), wholesalePrice: str(v.wholesalePrice), wholesaleMinQty: str(v.wholesaleMinQty),
+        productionCost: str(v.productionCost), stockStatus: v.stockStatus || "in_stock", stock: str(v.stock),
+        lowStockThreshold: str(v.lowStockThreshold || 10), weightKg: str(v.weightKg), lengthCm: str(v.lengthCm),
+        widthCm: str(v.widthCm), heightCm: str(v.heightCm), image: v.image || "", isDefault: !!v.isDefault,
+      })),
       links: p.links ?? [],
       selectedAttrValues: {},
     });
@@ -184,8 +226,14 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   const [saving, setSaving] = useState(false);
   const [uploadingImages, setUploadingImages] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [paymentError, setPaymentError] = useState("");
   const isEdit = form.id > 0;
-  const set = (k: keyof Form) => (v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof Form) => (v: any) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    if (k in TEXT_LIMITS) setFieldErrors((current) => ({ ...current, [k]: undefined }));
+    if (k === "paymentMethods") setPaymentError("");
+  };
 
   const uploadImages = async (files: File[]): Promise<string[]> => {
     if (!files.length) return [];
@@ -247,8 +295,11 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
         const summary = c.join(" / ");
         return existing.get(summary) ?? {
           sku: `${f.sku || "VAR"}-${i + 1}`, attributeSummary: summary,
-          price: f.regularPrice, resellerPrice: f.resellerPrice, wholesalePrice: f.wholesalePrice,
-          stock: "0", isDefault: i === 0,
+          price: f.regularPrice, salePrice: f.salePrice, resellerPrice: f.resellerPrice,
+          wholesalePrice: f.wholesalePrice, wholesaleMinQty: f.wholesaleMinQty, productionCost: f.productionCost,
+          stockStatus: "in_stock", stock: "0", lowStockThreshold: f.lowStockThreshold,
+          weightKg: f.weightKg, lengthCm: f.lengthCm, widthCm: f.widthCm, heightCm: f.heightCm,
+          image: "", isDefault: i === 0,
         };
       });
       return { ...f, variants };
@@ -257,12 +308,39 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
   const save = async () => {
     if (uploadingImages) { setError("Wait for the images to finish uploading."); return; }
+    const validationErrors = validateTextFields(form);
+    if (Object.keys(validationErrors).length) {
+      setFieldErrors(validationErrors);
+      const firstField = Object.keys(validationErrors)[0] as TextFieldKey;
+      if (firstField === "sku") setTab("inventory");
+      setError("Please correct the text-field errors before saving.");
+      return;
+    }
+    if (form.paymentMethods.length === 0) {
+      setTab("payments");
+      setPaymentError("Please select at least one payment method.");
+      setError("Please select at least one payment method before saving.");
+      return;
+    }
     setError(""); setSaving(true);
     try {
+      const payload = {
+        ...form,
+        name: form.name.trim(),
+        sku: form.sku.trim(),
+        shortDescription: form.shortDescription.trim(),
+        description: form.description.trim(),
+        sizes: form.sizes.trim(),
+        colors: form.colors.trim(),
+        tags: form.tags.trim(),
+        metaTitle: form.metaTitle.trim(),
+        metaDescription: form.metaDescription.trim(),
+        metaKeywords: form.metaKeywords.trim(),
+      };
       const res = await fetch("/api/admin/products", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || "Save failed");
@@ -290,7 +368,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
         <div className={embedded ? "px-6 py-6" : "max-h-[76vh] overflow-y-auto px-6 py-5"}>
           {/* Top: identity */}
           <div className="space-y-4">
-            <F label="Product Name"><input value={form.name} onChange={(e) => set("name")(e.target.value)} className="input" placeholder="e.g. Classic Crew T-Shirt" /></F>
+            <F label="Product Name" error={fieldErrors.name}><input value={form.name} onChange={(e) => set("name")(e.target.value)} className="input" placeholder="e.g. Classic Crew T-Shirt" required maxLength={TEXT_LIMITS.name} aria-invalid={Boolean(fieldErrors.name)} /></F>
             <div className="grid grid-cols-2 gap-4">
               <F label="Category">
                 <select value={form.category} onChange={(e) => set("category")(e.target.value)} className="input">
@@ -305,8 +383,8 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                 </select>
               </F>
             </div>
-            <F label="Product Short Description"><input value={form.shortDescription} onChange={(e) => set("shortDescription")(e.target.value)} className="input" placeholder="One-line summary" /></F>
-            <F label="Product Description"><textarea rows={3} value={form.description} onChange={(e) => set("description")(e.target.value)} className="input resize-none" /></F>
+            <F label="Product Short Description" error={fieldErrors.shortDescription}><input value={form.shortDescription} onChange={(e) => set("shortDescription")(e.target.value)} className="input" placeholder="One-line summary" maxLength={TEXT_LIMITS.shortDescription} aria-invalid={Boolean(fieldErrors.shortDescription)} /></F>
+            <F label="Product Description" error={fieldErrors.description}><textarea rows={3} value={form.description} onChange={(e) => set("description")(e.target.value)} className="input resize-none" maxLength={TEXT_LIMITS.description} aria-invalid={Boolean(fieldErrors.description)} /></F>
             <div className="grid gap-5 lg:grid-cols-2">
               <div>
                 <p className="mb-1.5 text-sm font-medium text-navy-800">Featured Image</p>
@@ -375,7 +453,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
             {tab === "inventory" && (
               <>
                 <div className="grid grid-cols-2 gap-4">
-                  <F label="SKU"><input value={form.sku} onChange={(e) => set("sku")(e.target.value)} className="input" placeholder="Auto if blank" /></F>
+                  <F label="SKU" error={fieldErrors.sku}><input value={form.sku} onChange={(e) => set("sku")(e.target.value)} className="input" placeholder="Auto if blank" maxLength={TEXT_LIMITS.sku} aria-invalid={Boolean(fieldErrors.sku)} /></F>
                   <F label="Stock Quantity"><NumIn v={form.stock} on={set("stock")} int /></F>
                   <F label="Stock Status">
                     <select value={form.stockStatus} onChange={(e) => set("stockStatus")(e.target.value)} className="input">
@@ -386,10 +464,6 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                 </div>
                 <Check label="Allow backorder when out of stock" checked={form.allowBackorder} on={set("allowBackorder")} />
                 <Check label="Sold individually (limit one per order)" checked={form.soldIndividually} on={set("soldIndividually")} />
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <F label="Sizes (comma-separated)"><input value={form.sizes} onChange={(e) => set("sizes")(e.target.value)} className="input" placeholder="S, M, L, XL" /></F>
-                  <F label="Colors (comma-separated)"><input value={form.colors} onChange={(e) => set("colors")(e.target.value)} className="input" placeholder="Black, White" /></F>
-                </div>
               </>
             )}
 
@@ -418,33 +492,97 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                     </div>
                   </div>
                 ))}
-                <button type="button" onClick={generateVariations} className="btn-dark">Generate Variations →</button>
               </div>
             )}
 
             {/* VARIATIONS (variable) */}
             {tab === "variations" && (
-              <div className="space-y-3">
+              <div>
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-[#374151]">Product Variations</h3>
+                  <button type="button" onClick={() => {
+                    const hasSelection = Object.values(form.selectedAttrValues).some((ids) => ids.length > 0);
+                    if (!hasSelection) {
+                      setError("Please select attributes first in the Attributes tab.");
+                      return;
+                    }
+                    setError("");
+                    generateVariations();
+                  }} className="btn-primary px-5 py-2 text-sm">Generate Variations</button>
+                </div>
                 {form.variants.length === 0 ? (
-                  <p className="text-sm text-navy-800/50">No variations yet. Pick attribute values in the Attributes tab and click “Generate Variations”.</p>
+                  <div className="rounded-lg border border-dashed border-[#d1d5db] bg-[#f9fafb] px-5 py-10 text-center text-sm text-[#6b7280]">
+                    No variations yet. Select attributes and click &quot;Generate Variations&quot; to create them.
+                  </div>
                 ) : (
-                  form.variants.map((v, i) => (
-                    <div key={i} className="rounded-xl border border-navy-800/10 p-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-bold text-navy-800">{v.attributeSummary || `Variant ${i + 1}`}</p>
-                        <label className="flex items-center gap-1.5 text-xs text-navy-800/60">
-                          <input type="radio" checked={v.isDefault} onChange={() => setForm((f) => ({ ...f, variants: f.variants.map((x, j) => ({ ...x, isDefault: j === i })) }))} />
-                          Default
-                        </label>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <VarField label="SKU"><input value={v.sku} onChange={(e) => updateVariant(setForm, i, "sku", e.target.value)} className="input" /></VarField>
-                        <VarField label="Price"><input value={v.price} onChange={(e) => updateVariant(setForm, i, "price", e.target.value.replace(/[^0-9.]/g, ""))} className="input" /></VarField>
-                        <VarField label="Reseller"><input value={v.resellerPrice} onChange={(e) => updateVariant(setForm, i, "resellerPrice", e.target.value.replace(/[^0-9.]/g, ""))} className="input" /></VarField>
-                        <VarField label="Stock"><input value={v.stock} onChange={(e) => updateVariant(setForm, i, "stock", e.target.value.replace(/[^0-9]/g, ""))} className="input" /></VarField>
-                      </div>
-                    </div>
-                  ))
+                  <div className="space-y-2">
+                    {form.variants.map((v, i) => (
+                      <details key={`${v.attributeSummary}-${i}`} className="group rounded-lg border border-[#e5e7eb] bg-[#fafafa]" open={i === 0}>
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-[#374151]">Variation #{i + 1}:</span>
+                            {(v.attributeSummary || `Variant ${i + 1}`).split(" / ").map((value) => (
+                              <span key={value} className="rounded-full bg-sky-100 px-2.5 py-1 text-xs text-sky-700">{value}</span>
+                            ))}
+                            {v.isDefault && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Default</span>}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3">
+                            <button type="button" onClick={(event) => {
+                              event.preventDefault(); event.stopPropagation();
+                              setForm((f) => {
+                                const variants = f.variants.filter((_, index) => index !== i);
+                                if (variants.length && !variants.some((item) => item.isDefault)) variants[0] = { ...variants[0], isDefault: true };
+                                return { ...f, variants };
+                              });
+                            }} className="text-xl leading-none text-red-500" aria-label={`Remove variation ${i + 1}`}>×</button>
+                            <span className="text-[#6b7280] transition group-open:rotate-180">⌄</span>
+                          </div>
+                        </summary>
+                        <div className="border-t border-[#e5e7eb] bg-white p-4">
+                          <label className="mb-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-[#374151]">
+                            <input type="checkbox" checked={v.isDefault} onChange={(event) => {
+                              if (!event.target.checked) return;
+                              setForm((f) => ({ ...f, variants: f.variants.map((item, index) => ({ ...item, isDefault: index === i })) }));
+                            }} className="h-4 w-4 rounded border-[#d1d5db] text-emerald-600 focus:ring-emerald-500" />
+                            Is Default?
+                          </label>
+                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            <VarField label="SKU"><input value={v.sku} onChange={(e) => updateVariant(setForm, i, "sku", e.target.value)} className="input" maxLength={60} /></VarField>
+                            <VarMoney label="Regular Price" value={v.price} onChange={(value) => updateVariant(setForm, i, "price", value)} />
+                            <VarMoney label="Sale Price" value={v.salePrice} onChange={(value) => updateVariant(setForm, i, "salePrice", value)} />
+                            <VarMoney label="Reseller Price" value={v.resellerPrice} onChange={(value) => updateVariant(setForm, i, "resellerPrice", value)} />
+                            <VarMoney label="Wholesale Price" value={v.wholesalePrice} onChange={(value) => updateVariant(setForm, i, "wholesalePrice", value)} />
+                            <VarInt label="Wholesale Min Qty" value={v.wholesaleMinQty} onChange={(value) => updateVariant(setForm, i, "wholesaleMinQty", value)} />
+                            <VarMoney label="Product Cost" value={v.productionCost} onChange={(value) => updateVariant(setForm, i, "productionCost", value)} />
+                            <VarField label="Stock Status"><select value={v.stockStatus} onChange={(e) => updateVariant(setForm, i, "stockStatus", e.target.value)} className="input"><option value="in_stock">In Stock</option><option value="out_of_stock">Out of Stock</option><option value="on_backorder">On Backorder</option></select></VarField>
+                            <VarInt label="Stock Quantity" value={v.stock} onChange={(value) => updateVariant(setForm, i, "stock", value)} />
+                            <VarMoney label="Weight (kg)" value={v.weightKg} onChange={(value) => updateVariant(setForm, i, "weightKg", value)} />
+                            <VarMoney label="Length (cm)" value={v.lengthCm} onChange={(value) => updateVariant(setForm, i, "lengthCm", value)} />
+                            <VarMoney label="Width (cm)" value={v.widthCm} onChange={(value) => updateVariant(setForm, i, "widthCm", value)} />
+                            <VarMoney label="Height (cm)" value={v.heightCm} onChange={(value) => updateVariant(setForm, i, "heightCm", value)} />
+                          </div>
+                          <div className="mt-5">
+                            <p className="mb-2 text-xs font-medium text-[#374151]">Variation Image</p>
+                            <div className="flex items-center gap-3">
+                              <label className={`cursor-pointer rounded-lg border border-[#d1d5db] px-3 py-2 text-xs font-medium text-[#374151] hover:border-brand hover:bg-brand-50 ${uploadingImages ? "pointer-events-none opacity-50" : ""}`}>
+                                {uploadingImages ? "Uploading..." : "Upload Image"}
+                                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={async (event) => {
+                                  const file = event.target.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    const [url] = await uploadImages([file]);
+                                    if (url) updateVariant(setForm, i, "image", url);
+                                  } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "Image upload failed"); }
+                                  event.target.value = "";
+                                }} />
+                              </label>
+                              {v.image && <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#f9fafb]"><Image src={v.image} alt={`Variation ${i + 1}`} fill className="object-cover" /><button type="button" onClick={() => updateVariant(setForm, i, "image", "")} className="absolute right-0 top-0 grid h-5 w-5 place-items-center bg-red-500 text-xs text-white" aria-label="Remove variation image">×</button></div>}
+                            </div>
+                          </div>
+                        </div>
+                      </details>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -460,45 +598,48 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
             {/* PAYMENTS AND OTHERS */}
             {tab === "payments" && (
-              <>
-                <div>
-                  <p className="mb-2 text-sm font-semibold text-navy-800">Payment Methods</p>
-                  <div className="flex flex-wrap gap-2">
-                    {PAYMENT_METHODS.map((pm) => {
-                      const on = form.paymentMethods.includes(pm);
+              <div>
+                <section className="pb-8">
+                  <h3 className="mb-5 text-[15px] font-semibold text-[#374151]">Payment Methods</h3>
+                  <div className="flex flex-wrap gap-x-10 gap-y-4">
+                    {PAYMENT_METHODS.map((method) => {
+                      const on = form.paymentMethods.includes(method.name);
                       return (
-                        <button key={pm} type="button"
-                          onClick={() => set("paymentMethods")(on ? form.paymentMethods.filter((x) => x !== pm) : [...form.paymentMethods, pm])}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition ${on ? "border-brand bg-brand-50 text-brand-700" : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"}`}>
-                          {pm}
-                        </button>
+                        <label key={method.name} className="flex cursor-pointer items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={(event) => set("paymentMethods")(
+                              event.target.checked
+                                ? [...form.paymentMethods, method.name]
+                                : form.paymentMethods.filter((name) => name !== method.name)
+                            )}
+                            className="h-5 w-5 rounded border-[#d1d5db] text-brand focus:ring-brand"
+                          />
+                          <span>
+                            <span className="block text-sm text-[#374151]">{method.name}</span>
+                            <span className="block text-xs text-[#9ca3af]">{method.type}</span>
+                          </span>
+                        </label>
                       );
                     })}
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <F label="Badge">
-                    <select value={form.badge} onChange={(e) => set("badge")(e.target.value)} className="input">
-                      <option value="">None</option><option value="New">New</option><option value="Sale">Sale</option><option value="Bestseller">Bestseller</option>
-                    </select>
-                  </F>
-                  <F label="Visibility">
-                    <select value={form.visibility} onChange={(e) => set("visibility")(e.target.value)} className="input">
-                      <option value="public">Public</option><option value="private">Private</option><option value="hidden">Hidden</option>
-                    </select>
-                  </F>
-                </div>
-                <F label="Tags (comma-separated)"><input value={form.tags} onChange={(e) => set("tags")(e.target.value)} className="input" placeholder="summer, cotton, casual" /></F>
-                <div className="space-y-2">
-                  <Check label="Featured on homepage" checked={form.featured} on={set("featured")} />
-                  <Check label="Published (visible in store)" checked={form.isPublish} on={set("isPublish")} />
-                  <Check label="Available to resellers" checked={form.isResellerProduct} on={set("isResellerProduct")} />
-                </div>
-                <h3 className="pt-2 text-sm font-bold text-navy-800">SEO</h3>
-                <F label="Meta Title"><input value={form.metaTitle} onChange={(e) => set("metaTitle")(e.target.value)} className="input" /></F>
-                <F label="Meta Description"><textarea rows={2} value={form.metaDescription} onChange={(e) => set("metaDescription")(e.target.value)} className="input resize-none" /></F>
-                <F label="Meta Keywords"><input value={form.metaKeywords} onChange={(e) => set("metaKeywords")(e.target.value)} className="input" placeholder="comma, separated" /></F>
-              </>
+                  {paymentError && <p className="mt-3 text-xs font-medium text-red-600">{paymentError}</p>}
+                </section>
+
+                <section className="border-t border-[#e5e7eb] pt-8">
+                  <h3 className="mb-5 text-[15px] font-semibold text-[#374151]">Others</h3>
+                  <label className="flex cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={form.isResellerProduct}
+                      onChange={(event) => set("isResellerProduct")(event.target.checked)}
+                      className="h-5 w-5 rounded border-[#d1d5db] text-brand focus:ring-brand"
+                    />
+                    <span className="text-sm text-[#374151]">Reseller Order</span>
+                  </label>
+                </section>
+              </div>
             )}
           </div>
 
@@ -541,11 +682,17 @@ function LinkPicker({ label, type, form, setForm, allProducts }: {
   );
 }
 
-function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="mb-1.5 block text-sm font-medium text-navy-800">{label}</label>{children}</div>;
+function F({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+  return <div><label className="mb-1.5 block text-sm font-medium text-navy-800">{label}</label>{children}{error && <p className="mt-1 text-xs font-medium text-red-600">{error}</p>}</div>;
 }
 function VarField({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="mb-1 block text-xs font-medium text-navy-800/60">{label}</label>{children}</div>;
+}
+function VarMoney({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <VarField label={label}><input value={value} onChange={(event) => onChange(event.target.value.replace(/[^0-9.]/g, ""))} inputMode="decimal" className="input" /></VarField>;
+}
+function VarInt({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <VarField label={label}><input value={value} onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" className="input" /></VarField>;
 }
 function NumIn({ v, on, int, placeholder }: { v: string; on: (val: string) => void; int?: boolean; placeholder?: string }) {
   return <input value={v} onChange={(e) => on(e.target.value.replace(int ? /[^0-9]/g : /[^0-9.]/g, ""))} className="input" inputMode={int ? "numeric" : "decimal"} placeholder={placeholder ?? "0"} />;

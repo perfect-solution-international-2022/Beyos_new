@@ -11,6 +11,8 @@
     "db:migrate:categories": "node --env-file=.env.local scripts/migrate-home-categories.mjs",
     "db:migrate:reseller": "node --env-file=.env.local scripts/migrate-reseller-parity.mjs",
     "db:migrate:product-images": "node --env-file=.env.local scripts/migrate-product-images.mjs",
+    "db:migrate:product-variants": "node --env-file=.env.local scripts/migrate-product-variants.mjs",
+    "db:migrate:pos-customers": "node --env-file=.env.local scripts/migrate-pos-customers.mjs",
     "db:seed:gen": "node --experimental-strip-types -e \"import('./src/lib/products.ts').then(m=>require('fs').writeFileSync('db/products.seed.json',JSON.stringify(m.products,null,2)))\""
   },
   "dependencies": {

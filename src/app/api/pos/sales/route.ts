@@ -157,10 +157,8 @@ export async function POST(request: Request) {
     let amountTendered: number | null = null;
     let changeDue: number | null = null;
     if (paymentMethod === "cash") {
-      amountTendered = Number(b.amountTendered) || 0;
-      if (amountTendered < total) {
-        throw new Error("Amount tendered is less than the total due");
-      }
+      amountTendered = b.amountTendered == null ? total : Number(b.amountTendered) || 0;
+      if (amountTendered < total) throw new Error("Amount tendered is less than the total due");
       changeDue = Math.round((amountTendered - total) * 100) / 100;
     }
 

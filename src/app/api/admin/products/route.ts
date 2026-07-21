@@ -43,12 +43,14 @@ async function saveVariants(productId: number, variants: any[]) {
   for (const v of variants ?? []) {
     await query(
       `INSERT INTO product_variants
-        (product_id, sku, attribute_summary, price, reseller_price, wholesale_price, stock, low_stock_threshold, is_default, image)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        (product_id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price, wholesale_min_qty,
+         production_cost, stock_status, stock, low_stock_threshold, weight_kg, length_cm, width_cm, height_cm, is_default, image)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         productId, (v.sku ?? "").trim(), (v.attributeSummary ?? "").trim(),
-        Number(v.price) || 0, num(v.resellerPrice), num(v.wholesalePrice),
-        Number(v.stock) || 0, Number(v.lowStockThreshold) || 10, v.isDefault ? 1 : 0, (v.image ?? "").trim() || null,
+        Number(v.price) || 0, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice), Number(v.wholesaleMinQty) || 0,
+        num(v.productionCost), v.stockStatus || "in_stock", Number(v.stock) || 0, Number(v.lowStockThreshold) || 10,
+        num(v.weightKg), num(v.lengthCm), num(v.widthCm), num(v.heightCm), v.isDefault ? 1 : 0, (v.image ?? "").trim() || null,
       ]
     );
   }
@@ -105,8 +107,10 @@ export async function GET() {
           metaTitle: r.meta_title ?? "", metaDescription: r.meta_description ?? "", metaKeywords: r.meta_keywords ?? "",
           variants: (vByP.get(r.id) ?? []).map((v) => ({
             id: v.id, sku: v.sku, attributeSummary: v.attribute_summary, price: Number(v.price),
-            resellerPrice: num(v.reseller_price), wholesalePrice: num(v.wholesale_price),
-            stock: v.stock, lowStockThreshold: v.low_stock_threshold, isDefault: !!v.is_default, image: v.image,
+            salePrice: num(v.sale_price), resellerPrice: num(v.reseller_price), wholesalePrice: num(v.wholesale_price),
+            wholesaleMinQty: v.wholesale_min_qty, productionCost: num(v.production_cost), stockStatus: v.stock_status,
+            stock: v.stock, lowStockThreshold: v.low_stock_threshold, weightKg: num(v.weight_kg), lengthCm: num(v.length_cm),
+            widthCm: num(v.width_cm), heightCm: num(v.height_cm), isDefault: !!v.is_default, image: v.image,
           })),
           links: (lByP.get(r.id) ?? []).map((l) => ({ linkedProductId: l.linked_product_id, linkType: l.link_type })),
         };
@@ -126,12 +130,39 @@ function pricePair(b: any): { price: number; compare: number | null } {
   return { price: regular, compare: null };
 }
 
+const productTextLimits: Record<string, [string, number]> = {
+  name: ["Product name", 200], shortDescription: ["Short description", 500], description: ["Description", 10000],
+  sku: ["SKU", 60], sizes: ["Sizes", 500], colors: ["Colors", 500], tags: ["Tags", 500],
+  metaTitle: ["Meta title", 255], metaDescription: ["Meta description", 500], metaKeywords: ["Meta keywords", 255],
+};
+
+function productTextError(b: any, requireName: boolean): string | null {
+  for (const [key, [label, max]] of Object.entries(productTextLimits)) {
+    if (b[key] === undefined || Array.isArray(b[key])) continue;
+    const value = String(b[key]).trim();
+    if (value.length > max) return `${label} must be ${max} characters or fewer`;
+    if (/[<>]/.test(value)) return `${label} cannot contain < or > characters`;
+  }
+  const name = String(b.name ?? "").trim();
+  if (requireName && !name) return "Product name is required";
+  if (name && name.length < 2) return "Product name must contain at least 2 characters";
+  const sku = String(b.sku ?? "").trim();
+  if (sku && !/^[A-Za-z0-9._-]+$/.test(sku)) return "SKU can only contain letters, numbers, dots, underscores, and hyphens";
+  return null;
+}
+
 export async function POST(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
+
+  const textError = productTextError(b, true);
+  if (textError) return NextResponse.json({ error: textError }, { status: 400 });
+  if (csv(b.paymentMethods).length === 0) {
+    return NextResponse.json({ error: "Please select at least one payment method" }, { status: 400 });
+  }
 
   const name = (b.name ?? "").trim();
   const category = (b.category ?? "").trim() || "men";
@@ -188,6 +219,11 @@ export async function PATCH(request: Request) {
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
   if (!b.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const textError = productTextError(b, false);
+  if (textError) return NextResponse.json({ error: textError }, { status: 400 });
+  if (b.paymentMethods !== undefined && csv(b.paymentMethods).length === 0) {
+    return NextResponse.json({ error: "Please select at least one payment method" }, { status: 400 });
+  }
 
   const scalar: Record<string, string> = {
     name: "name", category: "category", sku: "sku", productType: "product_type",
