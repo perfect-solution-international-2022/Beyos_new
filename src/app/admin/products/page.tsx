@@ -360,8 +360,6 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                   <F label="Wholesale Price (Rs)"><NumIn v={form.wholesalePrice} on={set("wholesalePrice")} placeholder="Auto 72% if blank" /></F>
                   <F label="Wholesale Min Quantity"><NumIn v={form.wholesaleMinQty} on={set("wholesaleMinQty")} int /></F>
                   <F label="Product Cost"><NumIn v={form.productionCost} on={set("productionCost")} /></F>
-                  <F label="Sale Start Date (Optional)"><input type="date" value={form.saleStart} onChange={(e) => set("saleStart")(e.target.value)} className="input" /></F>
-                  <F label="Sale End Date (Optional)"><input type="date" value={form.saleEnd} onChange={(e) => set("saleEnd")(e.target.value)} className="input" /></F>
                 </div>
                 <h3 className="pt-2 text-sm font-bold text-navy-800">Shipping &amp; Dimensions</h3>
                 <div className="grid grid-cols-2 gap-4">

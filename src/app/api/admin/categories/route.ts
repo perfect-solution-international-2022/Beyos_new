@@ -5,13 +5,6 @@ import { requireAdmin } from "@/lib/admin";
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 200);
 
-const homepageHref = (value: unknown) => {
-  const href = String(value ?? "").trim();
-  if (!href) return null;
-  if (!href.startsWith("/") || href.startsWith("//")) return undefined;
-  return href.slice(0, 500);
-};
-
 const homepageOrder = (value: unknown) =>
   Math.max(0, Math.min(9999, Math.trunc(Number(value) || 0)));
 
@@ -63,16 +56,19 @@ export async function POST(request: Request) {
   const name = (b.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Category name is required" }, { status: 400 });
   const slug = (b.slug ?? "").trim() ? slugify(b.slug) : slugify(name);
-  const href = homepageHref(b.homepageHref);
-  if (href === undefined) return NextResponse.json({ error: "Homepage link must be an internal path beginning with /" }, { status: 400 });
+  const href = `/shop?category=${encodeURIComponent(slug)}`;
   try {
     const dup = await query("SELECT id FROM categories WHERE slug = ?", [slug]);
     if (dup.length) return NextResponse.json({ error: "A category with this slug already exists" }, { status: 409 });
+    const orderRows = await query<{ next_order: number }>(
+      "SELECT COALESCE(MAX(homepage_order), 0) + 10 AS next_order FROM categories"
+    );
+    const nextOrder = homepageOrder(orderRows[0]?.next_order || 10);
     await query(
       `INSERT INTO categories
          (name, slug, parent_id, homepage_visible, shop_visible, homepage_order, homepage_href)
        VALUES (?,?,?,?,?,?,?)`,
-      [name, slug, b.parentId || null, Boolean(b.homepageVisible), Boolean(b.shopVisible), homepageOrder(b.homepageOrder), href]
+      [name, slug, b.parentId || null, Boolean(b.homepageVisible), Boolean(b.shopVisible), nextOrder, href]
     );
     const created = await query<{ id: number }>("SELECT id FROM categories WHERE slug = ? LIMIT 1", [slug]);
     return NextResponse.json({ ok: true, id: created[0]?.id });
@@ -91,8 +87,7 @@ export async function PATCH(request: Request) {
   const name = (b.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Category name is required" }, { status: 400 });
   const slug = (b.slug ?? "").trim() ? slugify(b.slug) : slugify(name);
-  const href = homepageHref(b.homepageHref);
-  if (href === undefined) return NextResponse.json({ error: "Homepage link must be an internal path beginning with /" }, { status: 400 });
+  const href = `/shop?category=${encodeURIComponent(slug)}`;
   if (b.parentId && Number(b.parentId) === Number(b.id))
     return NextResponse.json({ error: "A category cannot be its own parent" }, { status: 400 });
   try {
@@ -100,9 +95,13 @@ export async function PATCH(request: Request) {
     if (dup.length) return NextResponse.json({ error: "A category with this slug already exists" }, { status: 409 });
     await query(
       `UPDATE categories
-       SET name = ?, slug = ?, parent_id = ?, homepage_visible = ?, shop_visible = ?, homepage_order = ?, homepage_href = ?
+       SET name = ?, slug = ?, parent_id = ?, homepage_visible = ?, shop_visible = ?,
+           homepage_href = CASE
+             WHEN homepage_href IS NULL OR homepage_href = '' OR homepage_href LIKE '/shop?category=%' THEN ?
+             ELSE homepage_href
+           END
        WHERE id = ?`,
-      [name, slug, b.parentId || null, Boolean(b.homepageVisible), Boolean(b.shopVisible), homepageOrder(b.homepageOrder), href, b.id]
+      [name, slug, b.parentId || null, Boolean(b.homepageVisible), Boolean(b.shopVisible), href, b.id]
     );
     return NextResponse.json({ ok: true, id: Number(b.id) });
   } catch (err) {

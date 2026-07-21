@@ -246,18 +246,18 @@ export default function AdminPosRegisterPage() {
                 key={p.slug}
                 onClick={() => addToCart(p)}
                 disabled={p.stock <= 0}
-                className="group flex flex-col overflow-hidden rounded-xl bg-white text-left shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
+                className="group flex h-[396px] flex-col overflow-hidden rounded-xl bg-white text-left shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <div className="h-60 w-full overflow-hidden bg-[#19192b]">
+                <div className="h-60 w-full shrink-0 overflow-hidden bg-[#f3f4f6] p-2">
                   {p.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.image} alt={p.name} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" />
+                    <img src={p.image} alt={p.name} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]" />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs text-white/40">No image</div>
+                    <div className="flex h-full w-full items-center justify-center text-xs text-[#9ca3af]">No image</div>
                   )}
                 </div>
-                <div className="flex min-h-32 flex-1 flex-col p-3">
-                  <p className="truncate text-sm font-semibold text-[#374151]">{p.name}</p>
+                <div className="flex min-h-[156px] flex-1 flex-col p-3">
+                  <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-[#374151]">{p.name}</p>
                   <p className="mt-2 text-xs text-[#9ca3af]">SKU : {p.sku || "—"}</p>
                   <p className="mt-2 text-xs text-[#6b7280]">{p.stock} Pcs</p>
                   <div className="mt-auto flex items-center justify-between gap-2 pt-3">

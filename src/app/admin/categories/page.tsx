@@ -28,8 +28,6 @@ interface CategoryForm {
   hasUploadedImage: boolean;
   homepageVisible: boolean;
   shopVisible: boolean;
-  homepageOrder: string;
-  homepageHref: string;
 }
 
 const blank: CategoryForm = {
@@ -41,8 +39,6 @@ const blank: CategoryForm = {
   hasUploadedImage: false,
   homepageVisible: false,
   shopVisible: false,
-  homepageOrder: "0",
-  homepageHref: "",
 };
 
 export default function AdminCategoriesPage() {
@@ -74,8 +70,6 @@ export default function AdminCategoriesPage() {
       hasUploadedImage: category.hasUploadedImage,
       homepageVisible: category.homepageVisible,
       shopVisible: category.shopVisible,
-      homepageOrder: String(category.homepageOrder),
-      homepageHref: category.homepageHref,
     });
 
   const del = async (category: Category) => {
@@ -249,7 +243,6 @@ function CategoryModal({
         body: JSON.stringify({
           ...form,
           parentId: form.parentId || null,
-          homepageOrder: Number(form.homepageOrder) || 0,
         }),
       });
       const result = await response.json();
@@ -375,29 +368,6 @@ function CategoryModal({
               </button>
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-[120px_1fr]">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-navy-800">Display order</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="9999"
-                  value={form.homepageOrder}
-                  onChange={(event) => setForm((current) => ({ ...current, homepageOrder: event.target.value }))}
-                  className="input"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-navy-800">Destination path</label>
-                <input
-                  value={form.homepageHref}
-                  onChange={(event) => setForm((current) => ({ ...current, homepageHref: event.target.value }))}
-                  className="input"
-                  placeholder={`/shop?category=${form.slug || "category"}`}
-                />
-                <p className="mt-1 text-xs text-navy-800/45">Optional internal path beginning with /</p>
-              </div>
-            </div>
           </div>
 
           <div>
