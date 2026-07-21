@@ -55,6 +55,18 @@ CREATE TABLE IF NOT EXISTS products (
   INDEX idx_featured (featured)
 ) ENGINE=InnoDB;
 
+-- Product image uploads -------------------------------------------------
+CREATE TABLE IF NOT EXISTS product_images (
+  id          INT AUTO_INCREMENT PRIMARY KEY,
+  product_id  INT NULL,
+  image_data  LONGBLOB NOT NULL,
+  image_mime  VARCHAR(100) NOT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_product_image_product FOREIGN KEY (product_id)
+    REFERENCES products(id) ON DELETE CASCADE,
+  INDEX idx_product_image_product (product_id)
+) ENGINE=InnoDB;
+
 -- Orders ----------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS orders (
   id                 INT AUTO_INCREMENT PRIMARY KEY,

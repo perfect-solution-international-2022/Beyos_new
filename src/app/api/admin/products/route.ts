@@ -14,6 +14,30 @@ const asArray = (v: unknown): string[] => {
 const csv = (v: unknown): string[] =>
   typeof v === "string" ? v.split(",").map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? (v as string[]) : [];
 
+function uploadedImageIds(values: unknown[]): number[] {
+  const ids = values.flatMap((value) => {
+    const match = String(value || "").match(/^\/api\/products\/images\/(\d+)$/);
+    return match ? [Number(match[1])] : [];
+  });
+  return [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+async function associateImages(productId: number, featured: unknown, gallery: unknown) {
+  const ids = uploadedImageIds([featured, ...csv(gallery)]);
+  if (ids.length) {
+    await query(
+      `UPDATE product_images SET product_id = ? WHERE id IN (${ids.map(() => "?").join(",")})`,
+      [productId, ...ids]
+    );
+    await query(
+      `DELETE FROM product_images WHERE product_id = ? AND id NOT IN (${ids.map(() => "?").join(",")})`,
+      [productId, ...ids]
+    );
+  } else {
+    await query("DELETE FROM product_images WHERE product_id = ?", [productId]);
+  }
+}
+
 async function saveVariants(productId: number, variants: any[]) {
   await query("DELETE FROM product_variants WHERE product_id = ?", [productId]);
   for (const v of variants ?? []) {
@@ -116,9 +140,9 @@ export async function POST(request: Request) {
 
   const slug = ((b.slug ?? "").trim() ? slugify(b.slug) : slugify(name)) + "-" + Math.random().toString(36).slice(2, 5);
   const sku = (b.sku ?? "").trim() || "BEY-" + Math.floor(1000 + Math.random() * 8999);
-  const image = (b.image ?? "").trim() || "/images/products/tshirt-aqua.webp";
+  const image = (b.image ?? "").trim() || "/images/placeholder.svg";
   const gallery = csv(b.images);
-  const images = JSON.stringify(gallery.length ? gallery : [image, "/images/products/tshirt-teal.webp", "/images/products/tshirt-coral.webp"]);
+  const images = JSON.stringify(gallery.length ? gallery : [image]);
   const sizes = JSON.stringify(csv(b.sizes).length ? csv(b.sizes) : ["S", "M", "L", "XL"]);
   const colors = JSON.stringify(csv(b.colors).length ? csv(b.colors) : ["Black", "White"]);
 
@@ -149,6 +173,7 @@ export async function POST(request: Request) {
     const productId = (res as any).insertId;
     await saveVariants(productId, b.variants);
     await saveLinks(productId, b.links);
+    await associateImages(productId, image, gallery);
     return NextResponse.json({ ok: true, slug });
   } catch (err) {
     console.error("admin products POST error:", err);
@@ -205,6 +230,7 @@ export async function PATCH(request: Request) {
     }
     if (b.variants !== undefined) await saveVariants(b.id, b.variants);
     if (b.links !== undefined) await saveLinks(b.id, b.links);
+    if (b.image !== undefined || b.images !== undefined) await associateImages(b.id, b.image, b.images);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin products PATCH error:", err);

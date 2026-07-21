@@ -182,9 +182,45 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   const [form, setForm] = useState<Form>(data);
   const [tab, setTab] = useState("general");
   const [saving, setSaving] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [error, setError] = useState("");
   const isEdit = form.id > 0;
   const set = (k: keyof Form) => (v: any) => setForm((f) => ({ ...f, [k]: v }));
+
+  const uploadImages = async (files: File[]): Promise<string[]> => {
+    if (!files.length) return [];
+    const body = new FormData();
+    files.forEach((file) => body.append("files", file));
+    const response = await fetch("/api/admin/products/images", { method: "POST", body });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Image upload failed");
+    return (data.images ?? []).map((image: { url: string }) => image.url);
+  };
+
+  const selectFeaturedImage = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    setError(""); setUploadingImages(true);
+    try {
+      const [url] = await uploadImages([file]);
+      if (url) set("image")(url);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Image upload failed"); }
+    finally { setUploadingImages(false); }
+  };
+
+  const selectGalleryImages = async (files: FileList | null) => {
+    const selected = Array.from(files ?? []);
+    if (!selected.length) return;
+    setError(""); setUploadingImages(true);
+    try {
+      const urls = await uploadImages(selected);
+      setForm((current) => {
+        const existing = current.images.split(",").map((value) => value.trim()).filter(Boolean);
+        return { ...current, images: [...existing, ...urls].join(", ") };
+      });
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Image upload failed"); }
+    finally { setUploadingImages(false); }
+  };
 
   const isVariable = form.productType === "variable";
   const tabs = isVariable
@@ -220,6 +256,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   };
 
   const save = async () => {
+    if (uploadingImages) { setError("Wait for the images to finish uploading."); return; }
     setError(""); setSaving(true);
     try {
       const res = await fetch("/api/admin/products", {
@@ -270,10 +307,36 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
             </div>
             <F label="Product Short Description"><input value={form.shortDescription} onChange={(e) => set("shortDescription")(e.target.value)} className="input" placeholder="One-line summary" /></F>
             <F label="Product Description"><textarea rows={3} value={form.description} onChange={(e) => set("description")(e.target.value)} className="input resize-none" /></F>
-            <div className="grid grid-cols-2 gap-4">
-              <F label="Featured Image Path"><input value={form.image} onChange={(e) => set("image")(e.target.value)} className="input" placeholder="/images/products/…" /></F>
-              <F label="Gallery Images (comma-separated)"><input value={form.images} onChange={(e) => set("images")(e.target.value)} className="input" placeholder="/images/…, /images/…" /></F>
+            <div className="grid gap-5 lg:grid-cols-2">
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-navy-800">Featured Image</p>
+                <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-navy-800/15 bg-navy-50/60 p-3 text-center transition hover:border-brand/60 hover:bg-brand-50/40">
+                  {form.image ? (
+                    <Image src={form.image} alt="Featured product preview" width={360} height={240} className="h-36 w-full rounded-lg object-contain" />
+                  ) : (
+                    <><span className="text-3xl text-brand">＋</span><span className="mt-2 text-sm font-semibold text-navy-800">Upload featured image</span><span className="mt-1 text-xs text-navy-800/45">JPG, PNG, WebP or GIF · max 6 MB</span></>
+                  )}
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" disabled={uploadingImages} onChange={(event) => { void selectFeaturedImage(event.target.files); event.target.value = ""; }} />
+                </label>
+                {form.image && <div className="mt-2 flex gap-2"><label className="cursor-pointer rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100">Replace<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" disabled={uploadingImages} onChange={(event) => { void selectFeaturedImage(event.target.files); event.target.value = ""; }} /></label><button type="button" onClick={() => set("image")("")} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600">Remove</button></div>}
+              </div>
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-navy-800">Gallery Images</p>
+                <label className="flex min-h-24 cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-navy-800/15 bg-navy-50/60 p-4 text-center transition hover:border-brand/60 hover:bg-brand-50/40">
+                  <span className="text-sm font-semibold text-navy-800">＋ Add gallery images</span>
+                  <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" disabled={uploadingImages} onChange={(event) => { void selectGalleryImages(event.target.files); event.target.value = ""; }} />
+                </label>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {form.images.split(",").map((value) => value.trim()).filter(Boolean).map((url, index, gallery) => (
+                    <div key={`${url}-${index}`} className="group relative overflow-hidden rounded-lg border border-navy-800/10 bg-navy-50">
+                      <Image src={url} alt={`Gallery preview ${index + 1}`} width={120} height={100} className="h-20 w-full object-contain" />
+                      <button type="button" aria-label={`Remove gallery image ${index + 1}`} onClick={() => set("images")(gallery.filter((_, itemIndex) => itemIndex !== index).join(", "))} className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-sm font-bold text-red-600 shadow">×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
+            {uploadingImages && <p className="text-sm font-medium text-brand">Uploading images…</p>}
           </div>
 
           {/* Tabs */}
@@ -446,7 +509,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
         <div className="flex justify-end gap-3 border-t border-navy-800/10 px-6 py-4">
           <button onClick={onClose} className="btn-outline">Cancel</button>
-          <button onClick={save} disabled={saving} className="btn-primary">{saving ? "Saving…" : isEdit ? "Save Changes" : "Create Product"}</button>
+          <button onClick={save} disabled={saving || uploadingImages} className="btn-primary">{uploadingImages ? "Uploading images…" : saving ? "Saving…" : isEdit ? "Save Changes" : "Create Product"}</button>
         </div>
       </div>
     </div>
