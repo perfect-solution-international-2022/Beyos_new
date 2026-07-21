@@ -7,15 +7,24 @@ import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/store/cart";
 
 export default function ProductDetail({ product }: { product: Product }) {
+  const defaultVariant = product.variants?.find((variant) => variant.isDefault) || product.variants?.[0];
+  const [variantId, setVariantId] = useState<number | null>(defaultVariant?.id ?? null);
   const [size, setSize] = useState(product.sizes[0]);
   const [color, setColor] = useState(product.colors[0]);
   const [quantity, setQuantity] = useState(1);
-  const [activeImage, setActiveImage] = useState(product.images[0]);
+  const [activeImage, setActiveImage] = useState(defaultVariant?.image || product.images[0] || product.image);
   const [added, setAdded] = useState(false);
 
   const addItem = useCart((s) => s.addItem);
-  const discount = product.compareAtPrice
-    ? Math.round((1 - product.price / product.compareAtPrice) * 100)
+  const selectedVariant = product.variants?.find((variant) => variant.id === variantId);
+  const regularPrice = selectedVariant?.price ?? product.compareAtPrice ?? product.price;
+  const currentPrice = selectedVariant?.salePrice && selectedVariant.salePrice < regularPrice
+    ? selectedVariant.salePrice : selectedVariant?.price ?? product.price;
+  const comparePrice = selectedVariant?.salePrice && selectedVariant.salePrice < regularPrice
+    ? regularPrice : product.compareAtPrice;
+  const currentStock = selectedVariant?.stock ?? product.stock;
+  const discount = comparePrice
+    ? Math.round((1 - currentPrice / comparePrice) * 100)
     : 0;
 
   const handleAdd = () => {
@@ -23,11 +32,13 @@ export default function ProductDetail({ product }: { product: Product }) {
       productId: product.id,
       slug: product.slug,
       name: product.name,
-      price: product.price,
-      image: product.image,
-      size,
-      color,
+      price: currentPrice,
+      image: selectedVariant?.image || product.image,
+      size: selectedVariant?.attributeSummary || size,
+      color: selectedVariant ? "" : color,
       quantity,
+      variantId: selectedVariant?.id,
+      variantSummary: selectedVariant?.attributeSummary,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
@@ -109,12 +120,12 @@ export default function ProductDetail({ product }: { product: Product }) {
 
         <div className="mt-5 flex items-center gap-3">
           <span className="text-3xl font-bold text-navy-800">
-            {formatPrice(product.price)}
+            {formatPrice(currentPrice)}
           </span>
-          {product.compareAtPrice && (
+          {comparePrice && comparePrice > currentPrice && (
             <>
               <span className="text-lg text-navy-800/40 line-through">
-                {formatPrice(product.compareAtPrice)}
+                {formatPrice(comparePrice)}
               </span>
               <span className="badge bg-brand-50 text-brand-700">
                 -{discount}%
@@ -127,49 +138,39 @@ export default function ProductDetail({ product }: { product: Product }) {
           {product.description}
         </p>
 
-        {/* Color */}
-        <div className="mt-7">
-          <p className="text-sm font-semibold text-navy-800">
-            Color: <span className="font-normal text-navy-800/60">{color}</span>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {product.colors.map((c) => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                  color === c
-                    ? "border-brand bg-brand-50 text-brand-700"
-                    : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"
-                }`}
-              >
-                {c}
-              </button>
-            ))}
+        {product.productType === "variable" && product.variants?.length ? (
+          <div className="mt-7">
+            <label htmlFor="product-variation" className="text-sm font-semibold text-navy-800">Choose variation</label>
+            <select id="product-variation" value={variantId ?? ""} onChange={(event) => {
+              const next = product.variants?.find((variant) => variant.id === Number(event.target.value));
+              setVariantId(next?.id ?? null);
+              setQuantity(1);
+              if (next?.image) setActiveImage(next.image);
+            }} className="input mt-3">
+              {product.variants.map((variant) => (
+                <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>
+                  {variant.attributeSummary || variant.sku} — {variant.stock} available
+                </option>
+              ))}
+            </select>
+            {selectedVariant && <p className="mt-2 text-xs text-navy-800/50">SKU: {selectedVariant.sku || product.sku}</p>}
           </div>
-        </div>
-
-        {/* Size */}
-        <div className="mt-6">
-          <p className="text-sm font-semibold text-navy-800">
-            Size: <span className="font-normal text-navy-800/60">{size}</span>
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {product.sizes.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSize(s)}
-                className={`min-w-[3rem] rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                  size === s
-                    ? "border-navy-800 bg-navy-800 text-white"
-                    : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="mt-7">
+              <p className="text-sm font-semibold text-navy-800">Color: <span className="font-normal text-navy-800/60">{color}</span></p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {product.colors.map((item) => <button key={item} onClick={() => setColor(item)} className={`rounded-full border px-4 py-2 text-sm font-medium transition ${color === item ? "border-brand bg-brand-50 text-brand-700" : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"}`}>{item}</button>)}
+              </div>
+            </div>
+            <div className="mt-6">
+              <p className="text-sm font-semibold text-navy-800">Size: <span className="font-normal text-navy-800/60">{size}</span></p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {product.sizes.map((item) => <button key={item} onClick={() => setSize(item)} className={`min-w-[3rem] rounded-lg border px-3 py-2 text-sm font-semibold transition ${size === item ? "border-navy-800 bg-navy-800 text-white" : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"}`}>{item}</button>)}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Quantity + Add */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -183,15 +184,15 @@ export default function ProductDetail({ product }: { product: Product }) {
             </button>
             <span className="w-10 text-center font-semibold">{quantity}</span>
             <button
-              onClick={() => setQuantity((q) => q + 1)}
+              onClick={() => setQuantity((q) => Math.min(Math.max(1, currentStock), q + 1))}
               className="flex h-11 w-11 items-center justify-center text-lg text-navy-800 hover:text-brand"
               aria-label="Increase quantity"
             >
               +
             </button>
           </div>
-          <button onClick={handleAdd} className="btn-primary flex-1">
-            {added ? "✓ Added to Cart" : "Add to Cart"}
+          <button onClick={handleAdd} disabled={currentStock < 1 || (product.productType === "variable" && !selectedVariant)} className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-50">
+            {currentStock < 1 ? "Out of Stock" : added ? "✓ Added to Cart" : "Add to Cart"}
           </button>
         </div>
 

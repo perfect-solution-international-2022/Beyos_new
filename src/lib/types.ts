@@ -3,6 +3,7 @@ export type Category = "men" | "women" | "accessories";
 export interface Product {
   id: string;
   slug: string;
+  sku?: string;
   name: string;
   category: string;
   price: number;
@@ -17,6 +18,19 @@ export interface Product {
   badge?: "New" | "Sale" | "Bestseller";
   featured?: boolean;
   stock: number;
+  productType?: "simple" | "variable";
+  variants?: ProductVariant[];
+}
+
+export interface ProductVariant {
+  id: number;
+  sku: string;
+  attributeSummary: string;
+  price: number;
+  salePrice?: number;
+  stock: number;
+  image?: string;
+  isDefault: boolean;
 }
 
 export interface CartItem {
@@ -28,4 +42,6 @@ export interface CartItem {
   size: string;
   color: string;
   quantity: number;
+  variantId?: number;
+  variantSummary?: string;
 }

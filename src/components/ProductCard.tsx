@@ -31,6 +31,10 @@ export default function ProductCard({ product }: { product: Product }) {
   };
 
   const quickAdd = () => {
+    if (product.productType === "variable") {
+      router.push(`/product/${product.slug}`);
+      return;
+    }
     addItem({
       productId: product.id,
       slug: product.slug,

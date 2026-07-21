@@ -104,7 +104,7 @@ export default function ShopClient({
     const query = search.trim().toLowerCase();
     if (query) {
       list = list.filter((product) =>
-        `${product.name} ${product.description} ${product.category}`.toLowerCase().includes(query)
+        `${product.name} ${product.sku || ""} ${product.description} ${product.category}`.toLowerCase().includes(query)
       );
     }
     if (selectedColors.length)

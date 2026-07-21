@@ -41,18 +41,26 @@ async function associateImages(productId: number, featured: unknown, gallery: un
 async function saveVariants(productId: number, variants: any[]) {
   await query("DELETE FROM product_variants WHERE product_id = ?", [productId]);
   for (const v of variants ?? []) {
-    await query(
-      `INSERT INTO product_variants
+    const extendedSql = `INSERT INTO product_variants
         (product_id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price, wholesale_min_qty,
          production_cost, stock_status, stock, low_stock_threshold, weight_kg, length_cm, width_cm, height_cm, is_default, image)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        productId, (v.sku ?? "").trim(), (v.attributeSummary ?? "").trim(),
-        Number(v.price) || 0, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice), Number(v.wholesaleMinQty) || 0,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+    const common = [productId, (v.sku ?? "").trim(), (v.attributeSummary ?? "").trim(), Number(v.price) || 0];
+    try {
+      await query(extendedSql, [...common, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice), Number(v.wholesaleMinQty) || 0,
         num(v.productionCost), v.stockStatus || "in_stock", Number(v.stock) || 0, Number(v.lowStockThreshold) || 10,
-        num(v.weightKg), num(v.lengthCm), num(v.widthCm), num(v.heightCm), v.isDefault ? 1 : 0, (v.image ?? "").trim() || null,
-      ]
-    );
+        num(v.weightKg), num(v.lengthCm), num(v.widthCm), num(v.heightCm), v.isDefault ? 1 : 0, (v.image ?? "").trim() || null]);
+    } catch (error: any) {
+      if (error?.code !== "ER_BAD_FIELD_ERROR") throw error;
+      // Keep deployments on the original schema functional until the additive migration runs.
+      await query(
+        `INSERT INTO product_variants
+          (product_id, sku, attribute_summary, price, reseller_price, wholesale_price, stock, low_stock_threshold, is_default, image)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [...common, num(v.resellerPrice), num(v.wholesalePrice), Number(v.stock) || 0,
+          Number(v.lowStockThreshold) || 10, v.isDefault ? 1 : 0, (v.image ?? "").trim() || null]
+      );
+    }
   }
 }
 
@@ -166,7 +174,18 @@ export async function POST(request: Request) {
 
   const name = (b.name ?? "").trim();
   const category = (b.category ?? "").trim() || "men";
-  const { price, compare } = pricePair(b);
+  const variants = Array.isArray(b.variants) ? b.variants : [];
+  if (b.productType === "variable" && variants.length === 0) {
+    return NextResponse.json({ error: "Generate at least one variation before creating a variable product" }, { status: 400 });
+  }
+  if (b.productType === "variable" && variants.some((variant: any) => !(Number(variant.price) > 0))) {
+    return NextResponse.json({ error: "Every variation needs a valid regular price" }, { status: 400 });
+  }
+  const defaultVariant = variants.find((variant: any) => variant.isDefault) || variants[0];
+  const pricingSource = b.productType === "variable" && defaultVariant
+    ? { ...b, regularPrice: defaultVariant.price, salePrice: defaultVariant.salePrice }
+    : b;
+  const { price, compare } = pricePair(pricingSource);
   if (!name || price <= 0) return NextResponse.json({ error: "Name and a valid regular price are required" }, { status: 400 });
 
   const slug = ((b.slug ?? "").trim() ? slugify(b.slug) : slugify(name)) + "-" + Math.random().toString(36).slice(2, 5);
@@ -178,6 +197,8 @@ export async function POST(request: Request) {
   const colors = JSON.stringify(csv(b.colors).length ? csv(b.colors) : ["Black", "White"]);
 
   try {
+    let productId = 0;
+    try {
     const res = await query<any>(
       `INSERT INTO products
         (slug, sku, name, category, product_type, short_description, description, price, compare_at_price,
@@ -194,18 +215,24 @@ export async function POST(request: Request) {
         Number(b.wholesaleMinQty) || 50, b.saleStart || null, b.saleEnd || null,
         image, images, sizes, colors,
         b.badge || null, b.featured ? 1 : 0, b.isPublish === false ? 0 : 1, b.visibility || "public",
-        b.isResellerProduct === false ? 0 : 1, Number(b.stock) || 0, Number(b.lowStockThreshold) || 10,
+        b.isResellerProduct === false ? 0 : 1,
+        b.productType === "variable" ? variants.reduce((sum: number, variant: any) => sum + (Number(variant.stock) || 0), 0) : Number(b.stock) || 0,
+        Number(b.lowStockThreshold) || 10,
         b.stockStatus || "in_stock", b.allowBackorder ? 1 : 0, b.soldIndividually ? 1 : 0,
         csv(b.paymentMethods).join(",") || null, csv(b.tags).join(",") || null,
         num(b.weightKg), num(b.lengthCm), num(b.widthCm), num(b.heightCm),
         (b.metaTitle ?? "").trim() || null, (b.metaDescription ?? "").trim() || null, (b.metaKeywords ?? "").trim() || null,
       ]
     );
-    const productId = (res as any).insertId;
-    await saveVariants(productId, b.variants);
+    productId = (res as any).insertId;
+    await saveVariants(productId, variants);
     await saveLinks(productId, b.links);
     await associateImages(productId, image, gallery);
     return NextResponse.json({ ok: true, slug });
+    } catch (error) {
+      if (productId) await query("DELETE FROM products WHERE id = ?", [productId]).catch(() => {});
+      throw error;
+    }
   } catch (err) {
     console.error("admin products POST error:", err);
     return NextResponse.json({ error: "Could not create product" }, { status: 500 });

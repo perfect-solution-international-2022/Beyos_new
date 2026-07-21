@@ -106,6 +106,7 @@ export default function CheckoutPage() {
           size: i.size,
           color: i.color,
           quantity: i.quantity,
+          variantId: i.variantId,
         })),
         promoCode: promoCode || undefined,
       });

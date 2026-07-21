@@ -8,6 +8,7 @@ export interface CheckoutLine {
   size: string;
   color: string;
   quantity: number;
+  variantId?: number;
 }
 
 export interface CustomerInfo {
@@ -47,16 +48,21 @@ export async function computeOrderTotals(
   for (const line of items) {
     const product = await getProductBySlug(line.slug);
     if (!product) throw new Error(`Unknown product: ${line.slug}`);
+    const variant = line.variantId ? product.variants?.find((item) => item.id === Number(line.variantId)) : undefined;
+    if (line.variantId && !variant) throw new Error(`Unknown product variation for ${product.name}`);
     const qty = Math.max(1, Number(line.quantity) || 1);
-    const lineTotal = product.price * qty;
+    if (variant && variant.stock < qty) throw new Error(`Only ${variant.stock} available for ${variant.attributeSummary}`);
+    const regularPrice = variant?.price ?? product.price;
+    const unitPrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
+    const lineTotal = unitPrice * qty;
     subtotal += lineTotal;
     lineItems.push({
       slug: product.slug,
       name: product.name,
-      size: line.size,
-      color: line.color,
+      size: variant?.attributeSummary || line.size,
+      color: variant ? "" : line.color,
       quantity: qty,
-      unitPrice: product.price,
+      unitPrice,
       lineTotal,
     });
   }

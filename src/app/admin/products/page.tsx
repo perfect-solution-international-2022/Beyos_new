@@ -316,6 +316,16 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
       setError("Please correct the text-field errors before saving.");
       return;
     }
+    if (form.productType === "variable" && form.variants.length === 0) {
+      setTab("variations");
+      setError("Generate at least one variation before saving a variable product.");
+      return;
+    }
+    if (form.productType === "variable" && form.variants.some((variant) => !(Number(variant.price) > 0))) {
+      setTab("variations");
+      setError("Every variation needs a valid regular price.");
+      return;
+    }
     if (form.paymentMethods.length === 0) {
       setTab("payments");
       setPaymentError("Please select at least one payment method.");

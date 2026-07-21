@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import type { Product } from "./types";
+import type { Product, ProductVariant } from "./types";
 
 // mysql2 returns JSON columns already parsed as arrays; be defensive if a
 // driver/version ever hands back a raw string instead.
@@ -19,6 +19,7 @@ function asArray(v: unknown): string[] {
 interface ProductRow {
   id: number;
   slug: string;
+  sku: string;
   name: string;
   category: string;
   price: string;
@@ -33,12 +34,14 @@ interface ProductRow {
   badge: Product["badge"] | null;
   featured: number;
   stock: number;
+  product_type: "simple" | "variable";
 }
 
 function mapRow(r: ProductRow): Product {
   return {
     id: String(r.id),
     slug: r.slug,
+    sku: r.sku,
     name: r.name,
     category: r.category,
     price: Number(r.price),
@@ -53,19 +56,34 @@ function mapRow(r: ProductRow): Product {
     badge: r.badge ?? undefined,
     featured: !!r.featured,
     stock: r.stock,
+    productType: r.product_type,
   };
 }
 
+interface VariantRow {
+  id: number; product_id: number; sku: string; attribute_summary: string; price: string;
+  sale_price: string | null; stock: number; image: string | null; is_default: number;
+}
+
+const mapVariant = (row: VariantRow): ProductVariant => ({
+  id: row.id, sku: row.sku, attributeSummary: row.attribute_summary, price: Number(row.price),
+  salePrice: row.sale_price == null ? undefined : Number(row.sale_price), stock: row.stock,
+  image: row.image || undefined, isDefault: !!row.is_default,
+});
+
 // Only products the admin has published and made public are visible to buyers.
 const STOREFRONT_WHERE = "visibility = 'public' AND is_publish = 1";
-const SELECT_FIELDS = `id, slug, name, category, price, compare_at_price, image, images,
-       description, sizes, colors, rating, reviews, badge, featured, stock`;
+const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, images,
+       description, sizes, colors, rating, reviews, badge, featured, stock, product_type`;
 
 export async function getAllProducts(): Promise<Product[]> {
-  const rows = await query<ProductRow>(
-    `SELECT ${SELECT_FIELDS} FROM products WHERE ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`
-  );
-  return rows.map(mapRow);
+  const [rows, variants] = await Promise.all([
+    query<ProductRow>(`SELECT ${SELECT_FIELDS} FROM products WHERE ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`),
+    query<VariantRow>(`SELECT id, product_id, sku, attribute_summary, price, stock, image, is_default FROM product_variants ORDER BY is_default DESC, id ASC`),
+  ]);
+  const variantsByProduct = new Map<number, ProductVariant[]>();
+  for (const variant of variants) variantsByProduct.set(variant.product_id, [...(variantsByProduct.get(variant.product_id) || []), mapVariant(variant)]);
+  return rows.map((row) => ({ ...mapRow(row), variants: variantsByProduct.get(row.id) || [] }));
 }
 
 export async function getProductBySlug(slug: string): Promise<Product | undefined> {
@@ -73,7 +91,12 @@ export async function getProductBySlug(slug: string): Promise<Product | undefine
     `SELECT ${SELECT_FIELDS} FROM products WHERE slug = ? AND ${STOREFRONT_WHERE} LIMIT 1`,
     [slug]
   );
-  return rows[0] ? mapRow(rows[0]) : undefined;
+  if (!rows[0]) return undefined;
+  const variants = await query<VariantRow>(
+    "SELECT id, product_id, sku, attribute_summary, price, stock, image, is_default FROM product_variants WHERE product_id = ? ORDER BY is_default DESC, id ASC",
+    [rows[0].id]
+  );
+  return { ...mapRow(rows[0]), variants: variants.map(mapVariant) };
 }
 
 export async function getProductsByCategory(category: string): Promise<Product[]> {
