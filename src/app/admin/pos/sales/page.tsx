@@ -185,7 +185,7 @@ function ReceiptModal({ receipt, onClose, onStatusChange }: { receipt: Receipt; 
           </div>
         )}
 
-        <div className="flex justify-end gap-3 px-6 pb-6 print:hidden">
+        <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
           <button onClick={onClose} className="btn-outline">Close</button>
           <button onClick={() => window.print()} className="btn-primary">Print</button>
         </div>

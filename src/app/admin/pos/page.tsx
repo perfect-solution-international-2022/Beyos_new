@@ -687,7 +687,7 @@ function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => v
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
         <POSReceiptBill receipt={receipt} />
-        <div className="flex justify-end gap-3 px-6 pb-6 print:hidden">
+        <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
           <button onClick={onClose} className="btn-outline">New Sale</button>
           <button onClick={() => window.print()} className="btn-primary">Print</button>
         </div>
