@@ -25,7 +25,7 @@ const columns = [
       { href: "/contact", label: "Help Center" },
       { href: "/contact", label: "Shipping & Returns" },
       { href: "/contact", label: "Size Guide" },
-      { href: "/contact", label: "Track Order" },
+      { href: "https://koombiyodelivery.lk/track", label: "Track Order", external: true },
     ],
   },
 ];
@@ -78,12 +78,23 @@ export default function Footer() {
               <ul className="mt-4 space-y-3">
                 {col.links.map((link) => (
                   <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-white/60 transition hover:text-brand"
-                    >
-                      {link.label}
-                    </Link>
+                    {"external" in link && link.external ? (
+                      <a
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-white/60 transition hover:text-brand"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        href={link.href}
+                        className="text-sm text-white/60 transition hover:text-brand"
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

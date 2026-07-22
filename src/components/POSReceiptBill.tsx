@@ -38,7 +38,7 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
   const date = new Date(receipt.createdAt);
 
   return (
-    <div className="mx-auto w-full max-w-[420px] bg-white px-6 py-8 font-mono text-[#1a1a1a] print:max-w-none">
+    <div className="receipt-print mx-auto w-full max-w-[420px] bg-white px-6 py-8 font-mono text-[#1a1a1a] print:max-w-none">
       <div className="flex flex-col items-center text-center">
         <Image src="/images/logo.png" alt="Beyos Clothing" width={120} height={60} className="h-auto w-28 object-contain" />
         <p className="mt-3 text-xs leading-relaxed">Kendagaha junction, Elpitiya 80458</p>

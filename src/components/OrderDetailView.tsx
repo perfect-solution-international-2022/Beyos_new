@@ -373,7 +373,7 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
 
   const isPos = order.type === "pos";
   if (!isPos && (order.status === "cancelled" || order.status === "rejected")) return null;
-  if (isPos && (order.deliveryStatus === "cancelled" || order.deliveryStatus === "pending")) return null;
+  if (isPos && order.deliveryStatus === "cancelled") return null;
 
   const requestWaybill = async () => {
     setBusy("waybill");
@@ -425,7 +425,9 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
     }
   };
 
-  const isPending = isPos ? order.deliveryStatus === "accepted" : order.status === "pending";
+  const isPending = isPos
+    ? order.deliveryStatus === "pending" || order.deliveryStatus === "accepted"
+    : order.status === "pending";
 
   return (
     <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">

@@ -17,6 +17,7 @@ interface VariantRow {
 interface SaleDetailRow {
   slug: string;
   productName: string;
+  sku: string;
   image: string | null;
   category: string | null;
   type: string;
@@ -26,6 +27,20 @@ interface SaleDetailRow {
   date: string;
   time: string;
   variantBreakdown: VariantRow[];
+}
+interface FlatRow {
+  key: string;
+  slug: string;
+  productName: string;
+  image: string | null;
+  category: string | null;
+  type: string;
+  sku: string;
+  attribute: string;
+  unitPrice: string | number;
+  stock: number | null;
+  unitsSold: number;
+  totalRevenue: number;
 }
 interface ChartPoint { date: string; label: string; revenue: number; itemsSold: number; }
 interface ReportData {
@@ -47,6 +62,43 @@ function priceLabel(v: string | number) {
   return parts.length === 2 ? `${formatPrice(Number(parts[0]))} - ${formatPrice(Number(parts[1]))}` : formatPrice(Number(v));
 }
 
+// One row per variant for variable products (with their own SKU/attribute), one
+// row per product for simple products (using the product's own SKU).
+function flattenRows(details: SaleDetailRow[]): FlatRow[] {
+  return details.flatMap((r) => {
+    if (r.type === "variable" && r.variantBreakdown.length > 0) {
+      return r.variantBreakdown.map((v, i) => ({
+        key: `${r.slug}:${i}`,
+        slug: r.slug,
+        productName: r.productName,
+        image: r.image,
+        category: r.category,
+        type: r.type,
+        sku: v.sku,
+        attribute: v.label || "Standard",
+        unitPrice: v.unitPrice,
+        stock: v.stock,
+        unitsSold: v.sold,
+        totalRevenue: v.totalRevenue,
+      }));
+    }
+    return [{
+      key: r.slug,
+      slug: r.slug,
+      productName: r.productName,
+      image: r.image,
+      category: r.category,
+      type: r.type,
+      sku: r.sku,
+      attribute: "—",
+      unitPrice: r.unitPrice,
+      stock: null,
+      unitsSold: r.unitsSold,
+      totalRevenue: r.totalRevenue,
+    }];
+  });
+}
+
 export default function ItemReportPage() {
   const today = useMemo(() => todayStr(), []);
   const [startDate, setStartDate] = useState(today);
@@ -63,7 +115,6 @@ export default function ItemReportPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedVariable, setSelectedVariable] = useState<SaleDetailRow | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/categories", { cache: "no-store" })
@@ -95,12 +146,14 @@ export default function ItemReportPage() {
 
   const isDefaultRange = startDate === today && endDate === today && startTime === "00:00" && endTime === "23:59";
 
+  const flatRows = useMemo(() => (data ? flattenRows(data.salesDetails) : []), [data]);
+
   const exportCsv = () => {
     if (!data) return;
     const rows = [
-      ["Product", "Type", "Category", "Unit Price", "Units Sold", "Total Revenue", "Date", "Time"],
-      ...data.salesDetails.map((r) => [
-        r.productName, r.type, r.category ?? "", String(r.unitPrice), String(r.unitsSold), r.totalRevenue.toFixed(2), r.date, r.time,
+      ["Product", "SKU", "Attribute", "Type", "Category", "Unit Price", "Units Sold", "Total Revenue"],
+      ...flatRows.map((r) => [
+        r.productName, r.sku, r.attribute, r.type, r.category ?? "", String(r.unitPrice), String(r.unitsSold), r.totalRevenue.toFixed(2),
       ]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -233,6 +286,8 @@ export default function ItemReportPage() {
             <thead>
               <tr className="border-b border-navy-800/10 text-xs font-semibold uppercase tracking-wide text-navy-800/50">
                 <th className="px-6 py-3">Product</th>
+                <th className="px-6 py-3">SKU</th>
+                <th className="px-6 py-3">Attribute</th>
                 <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3">Category</th>
                 <th className="px-6 py-3">Unit Price</th>
@@ -242,12 +297,12 @@ export default function ItemReportPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
-              ) : !data || data.salesDetails.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">No sales details found.</td></tr>
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              ) : flatRows.length === 0 ? (
+                <tr><td colSpan={8} className="px-6 py-10 text-center text-navy-800/50">No sales details found.</td></tr>
               ) : (
-                data.salesDetails.map((r) => (
-                  <tr key={r.slug} className="border-b border-navy-800/5 last:border-0 hover:bg-navy-50/50">
+                flatRows.map((r) => (
+                  <tr key={r.key} className="border-b border-navy-800/5 last:border-0 hover:bg-navy-50/50">
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-3">
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-navy-50">
@@ -261,28 +316,15 @@ export default function ItemReportPage() {
                         <span className="font-medium text-navy-800">{r.productName}</span>
                       </div>
                     </td>
+                    <td className="px-6 py-3 font-mono text-xs text-navy-800/70">{r.sku || "—"}</td>
+                    <td className="px-6 py-3 text-navy-800/70">{r.attribute}</td>
                     <td className="px-6 py-3">
                       <span className={`badge ${r.type === "variable" ? "bg-brand/10 text-brand" : "bg-navy-50 text-navy-800/60"}`}>
                         {r.type === "variable" ? "Variable" : "Simple"}
                       </span>
                     </td>
                     <td className="px-6 py-3 capitalize text-navy-800/70">{r.category ?? "—"}</td>
-                    <td className="px-6 py-3 text-navy-800/70">
-                      <div className="flex items-center gap-1.5">
-                        {priceLabel(r.unitPrice)}
-                        {r.type === "variable" && r.variantBreakdown.length > 0 && (
-                          <button
-                            onClick={() => setSelectedVariable(r)}
-                            className="flex h-6 w-6 items-center justify-center rounded-md border border-brand/30 text-brand hover:bg-brand/10"
-                            aria-label={`View ${r.productName} variant details`}
-                          >
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    <td className="px-6 py-3 text-navy-800/70">{priceLabel(r.unitPrice)}</td>
                     <td className="px-6 py-3 font-semibold text-navy-800">{r.unitsSold}</td>
                     <td className="px-6 py-3 font-semibold text-navy-800">{formatPrice(r.totalRevenue)}</td>
                   </tr>
@@ -327,46 +369,6 @@ export default function ItemReportPage() {
         )}
       </div>
 
-      {selectedVariable && <VariantModal row={selectedVariable} onClose={() => setSelectedVariable(null)} />}
-    </div>
-  );
-}
-
-function VariantModal({ row, onClose }: { row: SaleDetailRow; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-lg font-bold text-navy-800">{row.productName} — Variant Details</h2>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-navy-800/10">
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-navy-800/10 bg-navy-50 text-xs font-semibold uppercase tracking-wide text-navy-800/50">
-                <th className="px-4 py-3">SKU</th>
-                <th className="px-4 py-3">Variant</th>
-                <th className="px-4 py-3">Unit Price</th>
-                <th className="px-4 py-3">Stock</th>
-                <th className="px-4 py-3">Sold</th>
-                <th className="px-4 py-3">Total Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {row.variantBreakdown.map((v, i) => (
-                <tr key={i} className="border-b border-navy-800/5 last:border-0">
-                  <td className="px-4 py-2.5 text-navy-800/70">{v.sku || "—"}</td>
-                  <td className="px-4 py-2.5 text-navy-800/70">{v.label || "Standard"}</td>
-                  <td className="px-4 py-2.5 text-navy-800/70">{priceLabel(v.unitPrice)}</td>
-                  <td className="px-4 py-2.5 text-navy-800/70">{v.stock ?? "—"}</td>
-                  <td className="px-4 py-2.5 font-semibold text-navy-800">{v.sold}</td>
-                  <td className="px-4 py-2.5 font-semibold text-navy-800">{formatPrice(v.totalRevenue)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-6 flex justify-end">
-          <button onClick={onClose} className="btn-outline">Close</button>
-        </div>
-      </div>
     </div>
   );
 }

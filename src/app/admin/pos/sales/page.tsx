@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import POSReceiptBill from "@/components/POSReceiptBill";
+
+function canEditSale(s: { fulfillmentType?: string; deliveryStatus?: string | null }, koombiyoWaybillId?: string | null) {
+  if (koombiyoWaybillId) return false;
+  if (s.fulfillmentType === "delivery" && s.deliveryStatus && s.deliveryStatus !== "pending") return false;
+  return true;
+}
 
 const DELIVERY_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
@@ -55,6 +62,7 @@ interface Receipt {
 }
 
 export default function AdminPosSalesPage() {
+  const router = useRouter();
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -201,6 +209,7 @@ export default function AdminPosSalesPage() {
           receipt={receipt}
           onClose={() => { setReceipt(null); setKoombiyoError(""); setSpecialNote(""); }}
           onStatusChange={(status) => updateDeliveryStatus(receipt.receiptNumber, status)}
+          onEdit={() => router.push(`/admin/pos?edit=${encodeURIComponent(receipt.receiptNumber)}`)}
           koombiyoBusy={koombiyoBusy}
           koombiyoError={koombiyoError}
           specialNote={specialNote}
@@ -217,6 +226,7 @@ function ReceiptModal({
   receipt,
   onClose,
   onStatusChange,
+  onEdit,
   koombiyoBusy,
   koombiyoError,
   specialNote,
@@ -227,6 +237,7 @@ function ReceiptModal({
   receipt: Receipt;
   onClose: () => void;
   onStatusChange: (status: string) => void;
+  onEdit: () => void;
   koombiyoBusy: "waybill" | "place" | null;
   koombiyoError: string;
   specialNote: string;
@@ -234,6 +245,7 @@ function ReceiptModal({
   onRequestWaybill: () => void;
   onPlaceOrder: () => void;
 }) {
+  const editable = canEditSale(receipt, receipt.koombiyoWaybillId);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
@@ -245,30 +257,32 @@ function ReceiptModal({
               <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{koombiyoError}</p>
             )}
 
-            {(receipt.deliveryStatus ?? "pending") === "pending" ? (
-              <div>
-                <p className="mb-1.5 text-xs font-semibold text-navy-800">
-                  This delivery order needs approval before it can be dispatched.
-                </p>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => onStatusChange("accepted")}
-                    className="flex-1 rounded-lg bg-emerald-100 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
-                  >
-                    Accept
-                  </button>
-                  <button
-                    onClick={() => onStatusChange("cancelled")}
-                    className="flex-1 rounded-lg bg-red-100 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
-                  >
-                    Reject
-                  </button>
-                </div>
-              </div>
-            ) : receipt.deliveryStatus === "cancelled" ? (
+            {receipt.deliveryStatus === "cancelled" ? (
               <p className="text-xs font-semibold text-red-600">This delivery order was rejected.</p>
             ) : (
               <>
+                {(receipt.deliveryStatus ?? "pending") === "pending" && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-navy-800">
+                      This delivery order needs approval before it can be dispatched.
+                    </p>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => onStatusChange("accepted")}
+                        className="flex-1 rounded-lg bg-emerald-100 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => onStatusChange("cancelled")}
+                        className="flex-1 rounded-lg bg-red-100 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <p className="mb-1.5 text-xs font-semibold text-navy-800">Waybill ID</p>
                   <div className="flex items-center gap-2">
@@ -306,25 +320,6 @@ function ReceiptModal({
                     </button>
                   </div>
                 )}
-
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold text-navy-800">Delivery status</p>
-                  <div className="flex gap-1.5">
-                    {(["accepted", "out_for_delivery", "delivered"] as const).map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => onStatusChange(s)}
-                        className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
-                          (receipt.deliveryStatus ?? "pending") === s
-                            ? DELIVERY_STATUS_STYLES[s]
-                            : "bg-white text-navy-800/50 hover:bg-navy-100"
-                        }`}
-                      >
-                        {DELIVERY_STATUS_LABELS[s]}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </>
             )}
           </div>
@@ -332,6 +327,9 @@ function ReceiptModal({
 
         <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
           <button onClick={onClose} className="btn-outline">Close</button>
+          {editable && (
+            <button onClick={onEdit} className="btn-outline">Edit</button>
+          )}
           <button onClick={() => window.print()} className="btn-primary">Print</button>
         </div>
       </div>

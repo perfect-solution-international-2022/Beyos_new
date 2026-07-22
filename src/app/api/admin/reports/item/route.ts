@@ -136,7 +136,7 @@ export async function GET(request: Request) {
     const slugs = Array.from(new Set(lines.map((l) => l.productSlug)));
     const products = slugs.length
       ? await query<any>(
-          `SELECT id, slug, name, image, category, product_type FROM products WHERE slug IN (${slugs.map(() => "?").join(",")})`,
+          `SELECT id, slug, name, image, category, product_type, sku FROM products WHERE slug IN (${slugs.map(() => "?").join(",")})`,
           slugs
         )
       : [];
@@ -214,6 +214,7 @@ export async function GET(request: Request) {
       return {
         slug,
         productName: product?.name ?? agg.name,
+        sku: product?.sku ?? "",
         image: product?.image ?? null,
         category: product?.category ?? null,
         type,

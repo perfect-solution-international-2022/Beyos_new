@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
 import { useAuth } from "@/context/AuthProvider";
@@ -58,9 +58,19 @@ interface Receipt {
 }
 
 export default function AdminPosRegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminPosRegister />
+    </Suspense>
+  );
+}
+
+function AdminPosRegister() {
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editReceipt = searchParams.get("edit");
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -86,6 +96,7 @@ export default function AdminPosRegisterPage() {
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [loadingEdit, setLoadingEdit] = useState(Boolean(editReceipt));
 
   useEffect(() => {
     fetch("/api/admin/products", { cache: "no-store" })
@@ -95,6 +106,51 @@ export default function AdminPosRegisterPage() {
         image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [], weightKg: Number(p.weightKg) || 0,
       }))));
   }, []);
+
+  // Load an existing sale for editing (e.g. a cashier fixing a mistake) once
+  // the live product catalog is available, so cart lines get real stock/sizes/colors.
+  useEffect(() => {
+    if (!editReceipt || products.length === 0) return;
+    setLoadingEdit(true);
+    fetch(`/api/pos/sales/${encodeURIComponent(editReceipt)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const r = d.receipt;
+        if (!r) { toast("Could not load that sale for editing", "error"); return; }
+        setCart(
+          (r.items as { slug?: string; sku?: string; name: string; size: string; color: string; quantity: number; unitPrice: number }[])
+            .map((item) => {
+              const product = products.find((p) => p.slug === item.slug);
+              return {
+                slug: item.slug || "",
+                sku: item.sku || product?.sku || "",
+                name: item.name,
+                price: item.unitPrice,
+                stock: (product?.stock ?? 0) + item.quantity,
+                sizes: product?.sizes ?? [],
+                colors: product?.colors ?? [],
+                size: item.size || "",
+                color: item.color || "",
+                quantity: item.quantity,
+                weightKg: product?.weightKg ?? 0,
+              };
+            })
+        );
+        setCustomerName(r.customerName === "Walk-in Customer" ? "" : r.customerName || "");
+        setCustomerPhone(r.customerPhone || "");
+        setDiscountAmount(String(r.discountAmount || 0));
+        const rate = r.subtotal - r.discountAmount > 0 ? (r.taxAmount / (r.subtotal - r.discountAmount)) * 100 : 0;
+        setTaxRate(rate ? String(Math.round(rate * 100) / 100) : "0");
+        if (r.fulfillmentType === "delivery") {
+          setFulfillmentType("delivery");
+          setDeliveryAddress(r.deliveryAddress || "");
+          setDeliveryCity(r.deliveryCity || "");
+        }
+      })
+      .catch(() => toast("Could not load that sale for editing", "error"))
+      .finally(() => setLoadingEdit(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editReceipt, products.length]);
 
   useEffect(() => {
     const q = customerSearch.trim();
@@ -261,8 +317,8 @@ export default function AdminPosRegisterPage() {
     if (fulfillmentType === "delivery" && !deliveryDetailsComplete) { toast("Complete the delivery customer details first"); return; }
     setCompleting(true);
     try {
-      const res = await fetch("/api/pos/sales", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await fetch(editReceipt ? `/api/pos/sales/${encodeURIComponent(editReceipt)}` : "/api/pos/sales", {
+        method: editReceipt ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart.map((l) => ({ slug: l.slug, size: l.size, color: l.color, quantity: l.quantity })),
           customerName, customerPhone, discountAmount: discount, taxRate: rate,
@@ -270,7 +326,12 @@ export default function AdminPosRegisterPage() {
         }),
       });
       const d = await res.json();
-      if (!res.ok) { toast(d.error || "Could not complete sale"); return; }
+      if (!res.ok) { toast(d.error || (editReceipt ? "Could not update sale" : "Could not complete sale"), "error"); return; }
+      if (editReceipt) {
+        toast("Sale updated");
+        router.push("/admin/pos/sales");
+        return;
+      }
       setReceipt(d.receipt);
       resetSale();
       fetch("/api/admin/products", { cache: "no-store" }).then((r) => r.json())
@@ -285,6 +346,19 @@ export default function AdminPosRegisterPage() {
 
   return (
     <div className="h-screen overflow-hidden bg-[#f5f6f8] p-4 pb-24">
+      {editReceipt && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-[#f5851f]/30 bg-[#fff4e8] px-4 py-2.5 text-sm">
+          <span className="font-semibold text-[#9a4a0c]">
+            Editing sale #{editReceipt}{loadingEdit ? " — loading…" : ""}
+          </span>
+          <button
+            onClick={() => router.push("/admin/pos/sales")}
+            className="text-xs font-semibold text-[#9a4a0c] hover:underline"
+          >
+            Cancel edit
+          </button>
+        </div>
+      )}
       <div className="flex h-[74px] items-center justify-between gap-4 rounded-xl border border-[#e5e7eb] bg-white px-4 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
         <div className="relative hidden w-[290px] md:block">
           <div className={`flex items-center rounded-lg border bg-[#f9fafb] px-3 ${customerMenuOpen ? "border-[#f5851f]" : "border-[#d9d9d9]"}`}>
@@ -506,7 +580,11 @@ export default function AdminPosRegisterPage() {
             disabled={paymentDisabled}
             className="min-w-36 rounded-lg bg-[#ff8746] px-8 py-3 text-sm font-bold text-white transition hover:bg-[#f5851f] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {completing ? "Processing…" : fulfillmentType === "delivery" ? "Delivery Now" : "Pay Now"}
+            {completing
+              ? (editReceipt ? "Saving…" : "Processing…")
+              : editReceipt
+                ? "Save Changes"
+                : fulfillmentType === "delivery" ? "Delivery Now" : "Pay Now"}
           </button>
         </div>
       </div>
