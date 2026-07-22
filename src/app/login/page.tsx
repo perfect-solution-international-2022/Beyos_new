@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/AuthShell";
+import PasswordInput from "@/components/PasswordInput";
 import { useAuth } from "@/context/AuthProvider";
 import { safeInternalRedirect } from "@/lib/safeRedirect";
 
@@ -74,13 +75,12 @@ function LoginForm() {
               Forgot password?
             </Link>
           </div>
-          <input
+          <PasswordInput
             required
-            type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input"
+            onChange={setPassword}
             placeholder="••••••••"
+            autoComplete="current-password"
           />
         </div>
 

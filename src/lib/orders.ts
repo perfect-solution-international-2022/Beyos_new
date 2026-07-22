@@ -1,6 +1,7 @@
 import { pool } from "@/lib/db";
 import { getProductBySlug } from "@/lib/products-db";
 import { validatePromoCode, recordPromotionUsage, Promotion } from "@/lib/promotions";
+import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 import type { PoolConnection } from "mysql2/promise";
 
 export interface CheckoutLine {
@@ -31,7 +32,6 @@ export interface OrderLineItem {
 }
 
 const FREE_SHIPPING_THRESHOLD = 10000;
-const SHIPPING_FEE = 500;
 
 /**
  * Recomputes totals server-side from the live catalog — never trust
@@ -44,6 +44,7 @@ export async function computeOrderTotals(
   userId?: number
 ) {
   let subtotal = 0;
+  let totalWeightKg = 0;
   const lineItems: OrderLineItem[] = [];
   for (const line of items) {
     const product = await getProductBySlug(line.slug);
@@ -56,6 +57,7 @@ export async function computeOrderTotals(
     const unitPrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
     const lineTotal = unitPrice * qty;
     subtotal += lineTotal;
+    totalWeightKg += (variant?.weightKg ?? product.weightKg ?? 0) * qty;
     lineItems.push({
       slug: product.slug,
       name: product.name,
@@ -79,7 +81,10 @@ export async function computeOrderTotals(
   }
 
   const discountedSubtotal = Math.max(0, subtotal - discount);
-  const shipping = freeShipping || discountedSubtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  const pricing = await getDeliveryPricing();
+  const shipping = freeShipping || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
+    ? 0
+    : computeDeliveryFee(totalWeightKg, pricing);
   const total = discountedSubtotal + shipping;
 
   return { subtotal, discount, shipping, total, lineItems, appliedPromotion };

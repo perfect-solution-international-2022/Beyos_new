@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/context/ToastProvider";
 
@@ -117,14 +118,15 @@ export default function AdminUsersTable({
               <th className="px-6 py-4">Phone</th>
               <th className="px-6 py-4">Joined</th>
               <th className="px-6 py-4">Role</th>
+              {role === "reseller" && <th className="px-6 py-4"></th>}
               {manage && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={manage ? 6 : role === "reseller" ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
+              <tr><td colSpan={manage ? 6 : role === "reseller" ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
             ) : (
               filtered.map((u) => (
                 <tr key={u.id} className="border-b border-navy-800/5 last:border-0">
@@ -171,6 +173,16 @@ export default function AdminUsersTable({
                       </div>
                     )}
                   </td>
+                  {role === "reseller" && (
+                    <td className="px-6 py-4">
+                      <Link
+                        href={`/admin/resellers/${u.id}`}
+                        className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100"
+                      >
+                        View
+                      </Link>
+                    </td>
+                  )}
                   {manage && (
                     <td className="px-6 py-4">
                       <div className="flex justify-end">

@@ -261,6 +261,8 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   delivery_address VARCHAR(255) NULL,
   delivery_city    VARCHAR(120) NULL,
   delivery_status  VARCHAR(20) NULL,
+  delivery_fee     DECIMAL(10,2) NOT NULL DEFAULT 0,
+  inventory_reverted_at TIMESTAMP NULL,
   koombiyo_waybill_id VARCHAR(100) NULL,
   koombiyo_status     VARCHAR(100) NULL,
   koombiyo_response   JSON NULL,
@@ -314,6 +316,13 @@ CREATE TABLE IF NOT EXISTS promotion_usages (
   CONSTRAINT fk_promo_usage_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_promo_usage_promo (promotion_id),
   INDEX idx_promo_usage_user (user_id)
+) ENGINE=InnoDB;
+
+-- Site-wide key/value settings (e.g. delivery pricing) --------------------
+CREATE TABLE IF NOT EXISTS site_settings (
+  setting_key   VARCHAR(100) NOT NULL PRIMARY KEY,
+  setting_value VARCHAR(255) NOT NULL,
+  updated_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- Password reset tokens --------------------------------------------------

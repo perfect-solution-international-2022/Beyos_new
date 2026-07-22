@@ -17,6 +17,7 @@ interface Product {
   image: string | null;
   sizes: string[];
   colors: string[];
+  weightKg: number;
 }
 
 interface CartLine {
@@ -30,6 +31,7 @@ interface CartLine {
   size: string;
   color: string;
   quantity: number;
+  weightKg: number;
 }
 
 interface Customer {
@@ -44,6 +46,7 @@ interface Receipt {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  deliveryFee?: number;
   total: number;
   paymentMethod: string;
   amountTendered: number | null;
@@ -82,13 +85,14 @@ export default function AdminPosRegisterPage() {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState(0);
 
   useEffect(() => {
     fetch("/api/admin/products", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setProducts((d.products ?? []).map((p: any) => ({
         slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
-        image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [],
+        image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [], weightKg: Number(p.weightKg) || 0,
       }))));
   }, []);
 
@@ -155,7 +159,25 @@ export default function AdminPosRegisterPage() {
   const taxable = subtotal - discount;
   const rate = Math.max(0, Number(taxRate) || 0);
   const tax = Math.round(taxable * (rate / 100) * 100) / 100;
-  const total = Math.round((taxable + tax) * 100) / 100;
+  const total = Math.round((taxable + tax + (fulfillmentType === "delivery" ? deliveryFee : 0)) * 100) / 100;
+
+  // Weight-based delivery fee is computed server-side (admin-configured pricing).
+  useEffect(() => {
+    if (fulfillmentType !== "delivery" || cart.length === 0) {
+      setDeliveryFee(0);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/shipping/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: cart.map((l) => ({ slug: l.slug, quantity: l.quantity })) }),
+    })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setDeliveryFee(Number(d.shipping) || 0); })
+      .catch(() => { if (!cancelled) setDeliveryFee(0); });
+    return () => { cancelled = true; };
+  }, [cart, fulfillmentType]);
   const deliveryDetailsComplete = Boolean(
     customerName.trim() && customerPhone.trim() && deliveryProvince && deliveryDistrict && deliveryCity && deliveryAddress.trim()
   );
@@ -192,7 +214,7 @@ export default function AdminPosRegisterPage() {
       }
       return [...prev, {
         slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
-        sizes: p.sizes, colors: p.colors, size, color, quantity: 1,
+        sizes: p.sizes, colors: p.colors, size, color, quantity: 1, weightKg: p.weightKg,
       }];
     });
   };
@@ -447,6 +469,7 @@ export default function AdminPosRegisterPage() {
             <Row label="Subtotal" value={formatPrice(subtotal)} />
             {discount > 0 && <Row label="Discount" value={`-${formatPrice(discount)}`} />}
             {tax > 0 && <Row label="Tax" value={formatPrice(tax)} />}
+            {fulfillmentType === "delivery" && <Row label="Delivery" value={formatPrice(deliveryFee)} />}
             <div className="border-t border-[#e5e7eb] pt-2"><Row label="Total" value={formatPrice(total)} bold /></div>
           </div>
 

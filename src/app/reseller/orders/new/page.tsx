@@ -6,24 +6,26 @@ import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 
 interface Variant {
-  id: number; sku: string; summary: string; price: number; resellerPrice: number;
-  wholesalePrice: number; stock: number; image: string; isDefault: boolean;
+  id: number; sku: string; summary: string; price: number; salePrice: number | null; resellerPrice: number;
+  wholesalePrice: number | null; stock: number; image: string; isDefault: boolean; weightKg: number;
 }
 interface RProduct {
   slug: string; sku: string; name: string; category: string; price: number; resellerPrice: number;
-  wholesalePrice: number; wholesaleMinQty: number; compareAtPrice: number | null; image: string;
+  wholesalePrice: number | null; compareAtPrice: number | null; image: string;
   description: string; rating: number; reviews: number; stock: number; productType: string; variants: Variant[];
+  weightKg: number;
 }
 interface PricingRules { allowPriceOverride: boolean; minMarkupPct: number; maxMarkupPct: number | null }
 interface CartLine {
   key: string; slug: string; variantId: number | null; variantSummary: string; sku: string; name: string;
-  image: string; resellerPrice: number; wholesalePrice: number; wholesaleMinQty: number;
-  sellingPrice: number; quantity: number; stock: number;
+  image: string; resellerPrice: number; wholesalePrice: number | null;
+  sellingPrice: number; quantity: number; stock: number; weightKg: number;
 }
 interface CourierOption { id: number; name: string }
 type LocationMap = Record<string, Record<string, string[]>>;
 
-const DELIVERY_FEE = 300;
+// Mirrors WHOLESALE_MIN_QTY in src/lib/reseller.ts — wholesale pricing applies at 12+ units.
+const WHOLESALE_MIN_QTY = 12;
 
 export default function NewOrderPage() {
   const router = useRouter();
@@ -51,7 +53,7 @@ export default function NewOrderPage() {
       const existing = current.find((item) => item.key === line.key);
       if (!existing) return [...current, line];
       const quantity = Math.min(line.stock, existing.quantity + line.quantity);
-      const resellerPrice = quantity >= line.wholesaleMinQty ? line.wholesalePrice : line.resellerPrice;
+      const resellerPrice = quantity >= WHOLESALE_MIN_QTY && line.wholesalePrice != null ? line.wholesalePrice : line.resellerPrice;
       return current.map((item) => item.key === line.key ? { ...item, quantity, resellerPrice, sellingPrice: line.sellingPrice } : item);
     });
     setSelected(null);
@@ -96,8 +98,11 @@ function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; r
   const stock = variant?.stock ?? product.stock;
   const normalCost = variant?.resellerPrice ?? product.resellerPrice;
   const wholesaleCost = variant?.wholesalePrice ?? product.wholesalePrice;
-  const cost = quantity >= product.wholesaleMinQty ? wholesaleCost : normalCost;
-  const retailPrice = variant?.price ?? product.price;
+  const cost = quantity >= WHOLESALE_MIN_QTY && wholesaleCost != null ? wholesaleCost : normalCost;
+  const regularRetail = variant?.price ?? product.price;
+  const retailPrice = variant?.salePrice != null && variant.salePrice > 0 && variant.salePrice < regularRetail
+    ? variant.salePrice
+    : regularRetail;
   const minPrice = Math.max(cost, cost * (1 + rules.minMarkupPct / 100));
   const maxPrice = rules.maxMarkupPct == null ? null : cost * (1 + rules.maxMarkupPct / 100);
   const [sellingPrice, setSellingPrice] = useState(String(Math.max(retailPrice, minPrice)));
@@ -112,11 +117,11 @@ function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; r
       <div className="border-navy-800/10 p-6 md:border-l"><div className="flex justify-between gap-4"><div><h2 className="text-xl font-bold text-navy-800">{product.name}</h2><p className="mt-1 text-sm text-brand">SKU: {variant?.sku || product.sku}</p></div><button onClick={onClose} aria-label="Close" className="text-2xl text-navy-800/40">×</button></div>
         <p className="mt-3 text-sm text-navy-800/60">{product.description}</p>
         {product.variants.length > 0 && <div className="mt-5"><label className="text-sm font-semibold text-navy-800" htmlFor="variant">Size / colour / option</label><select id="variant" className="input mt-2" value={variantId ?? ""} onChange={(e) => setVariantId(Number(e.target.value))}>{product.variants.map((item) => <option key={item.id} value={item.id} disabled={item.stock < 1}>{item.summary || item.sku} — {item.stock} available</option>)}</select></div>}
-        <div className="mt-5 rounded-xl border-2 border-brand/25 bg-brand/5 p-5"><p className="text-xs font-bold uppercase tracking-[.12em] text-navy-800/55">Your reseller price</p><p className="mt-1 text-3xl font-extrabold text-brand">{formatPrice(cost)}</p><p className="mt-1 text-xs text-navy-800/60">{quantity >= product.wholesaleMinQty ? "Wholesale price active" : `Wholesale ${formatPrice(wholesaleCost)} from ${product.wholesaleMinQty} units`}</p></div>
+        <div className="mt-5 rounded-xl border-2 border-brand/25 bg-brand/5 p-5"><p className="text-xs font-bold uppercase tracking-[.12em] text-navy-800/55">Your reseller price</p><p className="mt-1 text-3xl font-extrabold text-brand">{formatPrice(cost)}</p>{wholesaleCost != null && <p className="mt-1 text-xs text-navy-800/60">{quantity >= WHOLESALE_MIN_QTY ? "Wholesale price active" : `Wholesale ${formatPrice(wholesaleCost)} from ${WHOLESALE_MIN_QTY} units`}</p>}</div>
         <div className="mt-5"><label className="text-sm font-semibold text-navy-800" htmlFor="selling-price">Customer selling price</label><input id="selling-price" disabled={!rules.allowPriceOverride} value={rules.allowPriceOverride ? sellingPrice : String(retailPrice)} onChange={(e) => setSellingPrice(e.target.value.replace(/[^0-9.]/g, ""))} className="input mt-2 disabled:bg-navy-50" inputMode="decimal" />
           <p className={`mt-1 text-xs ${invalidPrice ? "text-red-600" : "text-navy-800/50"}`}>{!rules.allowPriceOverride ? "The admin has fixed the customer price." : `Allowed: from ${formatPrice(minPrice)}${maxPrice == null ? "" : ` to ${formatPrice(maxPrice)}`}`}</p></div>
         <div className="mt-4"><p className="text-sm font-semibold text-navy-800">Quantity</p><div className="mt-2 inline-flex items-center rounded-full border border-navy-800/15"><button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="h-10 w-10">−</button><span className="w-12 text-center font-semibold">{quantity}</span><button onClick={() => setQuantity((q) => Math.min(stock, q + 1))} className="h-10 w-10">+</button></div><span className="ml-3 text-xs text-navy-800/50">{stock} available</span></div>
-        <button disabled={invalidPrice || stock < 1 || quantity > stock} onClick={() => onAdd({ key: `${product.slug}:${variantId ?? "base"}`, slug: product.slug, variantId, variantSummary: variant?.summary || "", sku: variant?.sku || product.sku, name: product.name, image: variant?.image || product.image, resellerPrice: cost, wholesalePrice: wholesaleCost, wholesaleMinQty: product.wholesaleMinQty, sellingPrice: rules.allowPriceOverride ? price : retailPrice, quantity, stock })} className="btn-primary mt-6 w-full disabled:opacity-50">Add to order</button>
+        <button disabled={invalidPrice || stock < 1 || quantity > stock} onClick={() => onAdd({ key: `${product.slug}:${variantId ?? "base"}`, slug: product.slug, variantId, variantSummary: variant?.summary || "", sku: variant?.sku || product.sku, name: product.name, image: variant?.image || product.image, resellerPrice: cost, wholesalePrice: wholesaleCost, sellingPrice: rules.allowPriceOverride ? price : retailPrice, quantity, stock, weightKg: variant?.weightKg || product.weightKg || 0 })} className="btn-primary mt-6 w-full disabled:opacity-50">Add to order</button>
       </div>
     </div>
   </div>;
@@ -129,11 +134,24 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
   const [courierCities, setCourierCities] = useState<CourierOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState(0);
   useEffect(() => { fetch("/api/reseller/locations").then((r) => r.json()).then((data) => { setLocations(data.provinces ?? {}); setCourierDistricts(data.districts ?? []); }); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/shipping/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: cart.map((line) => ({ slug: line.slug, quantity: line.quantity, variantId: line.variantId })) }),
+    })
+      .then((r) => r.json())
+      .then((d) => { if (!cancelled) setDeliveryFee(Number(d.shipping) || 0); })
+      .catch(() => { if (!cancelled) setDeliveryFee(0); });
+    return () => { cancelled = true; };
+  }, [cart]);
   const districtNames = customer.province ? Object.keys(locations[customer.province] ?? {}) : [];
   const localCities = customer.province && customer.district ? locations[customer.province]?.[customer.district] ?? [] : [];
   const profit = cart.reduce((sum, line) => sum + (line.sellingPrice - line.resellerPrice) * line.quantity, 0);
-  const total = merchandiseTotal + DELIVERY_FEE;
+  const total = merchandiseTotal + deliveryFee;
   const update = (key: keyof typeof customer, value: string | number | null) => setCustomer((current) => ({ ...current, [key]: value }));
 
   const selectDistrict = async (name: string) => {
@@ -161,7 +179,7 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-3" onClick={onClose}><div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7" onClick={(e) => e.stopPropagation()}>
     <div className="flex justify-between"><div><h2 className="text-xl font-bold text-navy-800">Confirm delivery order</h2><p className="text-sm text-navy-800/50">Koombiyo delivery details</p></div><button onClick={onClose} aria-label="Close" className="text-2xl text-navy-800/40">×</button></div>
     <ul className="mt-4 divide-y divide-navy-800/10">{cart.map((line) => <li key={line.key} className="flex items-center gap-3 py-3"><Image src={line.image} alt={line.name} width={48} height={48} className="h-12 w-12 rounded-lg object-contain" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-navy-800">{line.name}</p><p className="text-xs text-navy-800/50">{line.variantSummary || line.sku} · {formatPrice(line.sellingPrice)} × {line.quantity}</p></div><span className="text-sm font-bold">{formatPrice(line.sellingPrice * line.quantity)}</span><button aria-label={`Remove ${line.name}`} onClick={() => onUpdate(cart.filter((item) => item.key !== line.key))} className="text-red-500">×</button></li>)}</ul>
-    <div className="mt-3 space-y-1 border-t border-navy-800/10 pt-3 text-sm"><div className="flex justify-between"><span>Merchandise</span><span>{formatPrice(merchandiseTotal)}</span></div><div className="flex justify-between"><span>Delivery</span><span>{formatPrice(DELIVERY_FEE)}</span></div><div className="flex justify-between text-emerald-700"><span>Your profit</span><span>{formatPrice(profit)}</span></div><div className="flex justify-between text-lg font-bold text-navy-800"><span>Customer pays</span><span>{formatPrice(total)}</span></div></div>
+    <div className="mt-3 space-y-1 border-t border-navy-800/10 pt-3 text-sm"><div className="flex justify-between"><span>Merchandise</span><span>{formatPrice(merchandiseTotal)}</span></div><div className="flex justify-between"><span>Delivery</span><span>{formatPrice(deliveryFee)}</span></div><div className="flex justify-between text-emerald-700"><span>Your profit</span><span>{formatPrice(profit)}</span></div><div className="flex justify-between text-lg font-bold text-navy-800"><span>Customer pays</span><span>{formatPrice(total)}</span></div></div>
     <div className="mt-6 grid gap-3 sm:grid-cols-2">
       <input aria-label="Customer name" value={customer.name} onChange={(e) => update("name", e.target.value)} className="input" placeholder="Customer name *" />
       <input aria-label="Customer phone" value={customer.phone} onChange={(e) => update("phone", e.target.value)} className="input" placeholder="Mobile number *" />

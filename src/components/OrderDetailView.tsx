@@ -323,7 +323,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
         </div>
       </div>
 
-      {(order.type === "customer" || order.type === "reseller") && (
+      {(order.type === "customer" || order.type === "reseller" || (order.type === "pos" && order.fulfillmentType === "delivery")) && (
         <KoombiyoWizard order={order} onUpdated={load} />
       )}
     </div>
@@ -371,17 +371,23 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
 
   useEffect(() => setWaybillId(order.koombiyoWaybillId ?? ""), [order.koombiyoWaybillId]);
 
-  if (order.status === "cancelled" || order.status === "rejected") return null;
+  const isPos = order.type === "pos";
+  if (!isPos && (order.status === "cancelled" || order.status === "rejected")) return null;
+  if (isPos && (order.deliveryStatus === "cancelled" || order.deliveryStatus === "pending")) return null;
 
   const requestWaybill = async () => {
     setBusy("waybill");
     setError("");
     setSuccess("");
     try {
-      const res = await fetch("/api/admin/orders/koombiyo", {
+      const res = await fetch(isPos ? "/api/admin/pos/sales/koombiyo" : "/api/admin/orders/koombiyo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderRef: order.orderRef, action: "request-waybill", type: order.type }),
+        body: JSON.stringify(
+          isPos
+            ? { receiptNumber: order.orderRef, action: "request-waybill" }
+            : { orderRef: order.orderRef, action: "request-waybill", type: order.type }
+        ),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not request a waybill ID");
@@ -399,10 +405,14 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
     setError("");
     setSuccess("");
     try {
-      const res = await fetch("/api/admin/orders/koombiyo", {
+      const res = await fetch(isPos ? "/api/admin/pos/sales/koombiyo" : "/api/admin/orders/koombiyo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderRef: order.orderRef, action: "place-order", type: order.type, specialNote }),
+        body: JSON.stringify(
+          isPos
+            ? { receiptNumber: order.orderRef, action: "place-order", specialNote }
+            : { orderRef: order.orderRef, action: "place-order", type: order.type, specialNote }
+        ),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not place the order with Koombiyo");
@@ -415,7 +425,7 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
     }
   };
 
-  const isPending = order.status === "pending";
+  const isPending = isPos ? order.deliveryStatus === "accepted" : order.status === "pending";
 
   return (
     <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">

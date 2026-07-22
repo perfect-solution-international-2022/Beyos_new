@@ -35,6 +35,7 @@ interface ProductRow {
   featured: number;
   stock: number;
   product_type: "simple" | "variable";
+  weight_kg: string | null;
 }
 
 function mapRow(r: ProductRow): Product {
@@ -57,29 +58,33 @@ function mapRow(r: ProductRow): Product {
     featured: !!r.featured,
     stock: r.stock,
     productType: r.product_type,
+    weightKg: r.weight_kg ? Number(r.weight_kg) : undefined,
   };
 }
 
 interface VariantRow {
   id: number; product_id: number; sku: string; attribute_summary: string; price: string;
   sale_price: string | null; stock: number; image: string | null; is_default: number;
+  weight_kg: string | null;
 }
 
 const mapVariant = (row: VariantRow): ProductVariant => ({
   id: row.id, sku: row.sku, attributeSummary: row.attribute_summary, price: Number(row.price),
   salePrice: row.sale_price == null ? undefined : Number(row.sale_price), stock: row.stock,
   image: row.image || undefined, isDefault: !!row.is_default,
+  weightKg: row.weight_kg ? Number(row.weight_kg) : undefined,
 });
 
 // Only products the admin has published and made public are visible to buyers.
 const STOREFRONT_WHERE = "visibility = 'public' AND is_publish = 1";
 const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, images,
-       description, sizes, colors, rating, reviews, badge, featured, stock, product_type`;
+       description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg`;
+const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, stock, image, is_default, weight_kg";
 
 export async function getAllProducts(): Promise<Product[]> {
   const [rows, variants] = await Promise.all([
     query<ProductRow>(`SELECT ${SELECT_FIELDS} FROM products WHERE ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`),
-    query<VariantRow>(`SELECT id, product_id, sku, attribute_summary, price, stock, image, is_default FROM product_variants ORDER BY is_default DESC, id ASC`),
+    query<VariantRow>(`SELECT ${VARIANT_FIELDS} FROM product_variants ORDER BY is_default DESC, id ASC`),
   ]);
   const variantsByProduct = new Map<number, ProductVariant[]>();
   for (const variant of variants) variantsByProduct.set(variant.product_id, [...(variantsByProduct.get(variant.product_id) || []), mapVariant(variant)]);
@@ -93,7 +98,7 @@ export async function getProductBySlug(slug: string): Promise<Product | undefine
   );
   if (!rows[0]) return undefined;
   const variants = await query<VariantRow>(
-    "SELECT id, product_id, sku, attribute_summary, price, stock, image, is_default FROM product_variants WHERE product_id = ? ORDER BY is_default DESC, id ASC",
+    `SELECT ${VARIANT_FIELDS} FROM product_variants WHERE product_id = ? ORDER BY is_default DESC, id ASC`,
     [rows[0].id]
   );
   return { ...mapRow(rows[0]), variants: variants.map(mapVariant) };

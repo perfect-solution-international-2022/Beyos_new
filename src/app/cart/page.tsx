@@ -8,7 +8,6 @@ import { formatPrice } from "@/lib/utils";
 import CheckoutButton from "@/components/CheckoutButton";
 
 const FREE_SHIPPING_THRESHOLD = 10000;
-const SHIPPING_FEE = 500;
 
 export default function CartPage() {
   const [mounted, setMounted] = useState(false);
@@ -20,6 +19,7 @@ export default function CartPage() {
   const [promoError, setPromoError] = useState("");
   const [discount, setDiscount] = useState(0);
   const [freeShippingPromo, setFreeShippingPromo] = useState(false);
+  const [shipping, setShipping] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
@@ -90,10 +90,35 @@ export default function CartPage() {
   };
 
   const discountedSubtotal = Math.max(0, subtotal - discount);
-  const shipping =
-    subtotal === 0 || freeShippingPromo || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
-      ? 0
-      : SHIPPING_FEE;
+
+  // Weight-based shipping is computed server-side (admin-configured pricing).
+  useEffect(() => {
+    if (subtotal === 0) {
+      setShipping(0);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/shipping/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: items.map((i) => ({ slug: i.slug, quantity: i.quantity, variantId: i.variantId })),
+        discountedSubtotal,
+        freeShipping: freeShippingPromo,
+      }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setShipping(Number(d.shipping) || 0);
+      })
+      .catch(() => {
+        if (!cancelled) setShipping(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [items, subtotal, discountedSubtotal, freeShippingPromo]);
+
   const total = discountedSubtotal + shipping;
 
   if (!mounted) {

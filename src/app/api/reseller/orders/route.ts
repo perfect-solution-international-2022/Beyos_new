@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import { pool, query } from "@/lib/db";
-import { requireReseller, makeRef } from "@/lib/reseller";
+import { requireReseller, makeRef, WHOLESALE_MIN_QTY } from "@/lib/reseller";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { sendOrderEmail } from "@/lib/mail";
 import { requestWaybill, submitOrder } from "@/lib/koombiyo";
+import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 
 interface OrderRow {
   id: number; order_ref: string; customer_name: string; customer_phone: string;
@@ -94,22 +95,24 @@ export async function POST(request: Request) {
     }> = [];
     let subtotal = 0;
     let merchandiseCost = 0;
+    let totalWeightKg = 0;
 
     for (const item of items) {
       const qty = Math.floor(Number(item.quantity));
       if (!Number.isFinite(qty) || qty < 1 || qty > 10000) throw new OrderValidationError("Enter a valid quantity");
       const [productRows] = await conn.execute(
-        `SELECT id, slug, sku, name, price, reseller_price, wholesale_price, wholesale_min_qty,
-                stock, product_type, allow_backorder FROM products
+        `SELECT id, slug, sku, name, price, reseller_price, wholesale_price,
+                stock, product_type, allow_backorder, weight_kg FROM products
          WHERE slug = ? AND is_reseller_product = 1 AND is_publish = 1 LIMIT 1 FOR UPDATE`, [item.slug]
       );
       const product = (productRows as any[])[0];
       if (!product) throw new OrderValidationError(`Unknown product: ${item.slug}`);
+      if (product.reseller_price == null) throw new OrderValidationError(`${product.name} is not available for resellers`);
 
       let variant: any = null;
       if (item.variantId) {
         const [variantRows] = await conn.execute(
-          `SELECT id, sku, attribute_summary, price, reseller_price, wholesale_price, stock
+          `SELECT id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price, stock, weight_kg
            FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE`, [item.variantId, product.id]
         );
         variant = (variantRows as any[])[0];
@@ -117,20 +120,26 @@ export async function POST(request: Request) {
       } else if (product.product_type === "variable") {
         throw new OrderValidationError(`Choose a size/colour option for ${product.name}`);
       }
+      totalWeightKg += Number(variant?.weight_kg ?? product.weight_kg ?? 0) * qty;
 
       const availableStock = Number(variant ? variant.stock : product.stock);
       if (!product.allow_backorder && availableStock < qty) {
         throw new OrderValidationError(`Not enough stock for ${product.name}${variant?.attribute_summary ? ` (${variant.attribute_summary})` : ""}. Only ${availableStock} left.`);
       }
-      const standardCost = Number(variant?.reseller_price ?? product.reseller_price ?? variant?.price ?? product.price);
-      const wholesale = Number(variant?.wholesale_price ?? product.wholesale_price ?? standardCost);
-      const wholesaleMin = Math.max(1, Number(product.wholesale_min_qty) || 1);
-      const unitCost = qty >= wholesaleMin && wholesale > 0 ? wholesale : standardCost;
+      const standardCost = Number(variant?.reseller_price ?? product.reseller_price);
+      const wholesaleRaw = variant?.wholesale_price ?? product.wholesale_price;
+      const wholesale = wholesaleRaw == null ? null : Number(wholesaleRaw);
+      const unitCost = qty >= WHOLESALE_MIN_QTY && wholesale != null && wholesale > 0 ? wholesale : standardCost;
       const minPrice = Math.max(unitCost, unitCost * (1 + Number(settings.min_markup_pct || 0) / 100));
       const maxMarkup = settings.max_markup_pct == null ? null : Number(settings.max_markup_pct);
       const maxPrice = maxMarkup == null ? null : unitCost * (1 + maxMarkup / 100);
+      const regularRetail = Number(variant?.price ?? product.price);
+      const variantSalePrice = variant?.sale_price != null ? Number(variant.sale_price) : null;
+      const effectiveRetail = variantSalePrice != null && variantSalePrice > 0 && variantSalePrice < regularRetail
+        ? variantSalePrice
+        : regularRetail;
       let sellingPrice = Number(item.sellingPrice);
-      if (!settings.allow_price_override) sellingPrice = Number(variant?.price ?? product.price);
+      if (!settings.allow_price_override) sellingPrice = effectiveRetail;
       if (!Number.isFinite(sellingPrice) || sellingPrice < minPrice - 0.005) {
         throw new OrderValidationError(`Selling price for ${product.name} must be at least LKR ${minPrice.toFixed(2)}`);
       }
@@ -148,7 +157,7 @@ export async function POST(request: Request) {
       else await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
     }
 
-    const deliveryFee = Number(process.env.RESELLER_DELIVERY_FEE || 300);
+    const deliveryFee = computeDeliveryFee(totalWeightKg, await getDeliveryPricing());
     const creditLimit = Number(settings.credit_limit || 0);
     if (creditLimit > 0 && merchandiseCost > creditLimit) {
       throw new OrderValidationError(`This order exceeds your reseller credit limit of LKR ${creditLimit.toFixed(2)}`);

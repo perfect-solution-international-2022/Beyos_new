@@ -8,9 +8,10 @@ const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "del
 const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled", "rejected"];
 const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"];
 
-export async function GET() {
+export async function GET(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const view = new URL(request.url).searchParams.get("view");
 
   try {
     const buyer = await query<{
@@ -56,11 +57,14 @@ export async function GET() {
       status: string;
       fulfillment_type: string | null;
       delivery_status: string | null;
+      koombiyo_waybill_id: string | null;
+      koombiyo_status: string | null;
       cashier_name: string;
       created_at: string;
     }>(
       `SELECT s.receipt_number, s.customer_name, s.customer_phone, s.total,
               s.payment_method, s.status, s.fulfillment_type, s.delivery_status,
+              s.koombiyo_waybill_id, s.koombiyo_status,
               c.name AS cashier_name, s.created_at
        FROM pos_sales s
        JOIN pos_cashiers c ON c.id = s.cashier_id
@@ -108,15 +112,24 @@ export async function GET() {
         paymentStatus: "paid",
         paymentRef: null as string | null,
         customerPhone: o.customer_phone || "",
-        koombiyoWaybillId: null as string | null,
-        koombiyoStatus: null as string | null,
+        koombiyoWaybillId: o.koombiyo_waybill_id,
+        koombiyoStatus: o.koombiyo_status,
         koombiyoUpdatedAt: null as string | null,
         fulfillmentType: o.fulfillment_type || "pickup",
         deliveryStatus: o.fulfillment_type === "delivery" ? (o.delivery_status || "pending") : null,
         cashierName: o.cashier_name,
         createdAt: o.created_at,
       })),
-    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    ]
+      // Reseller orders and POS delivery orders need explicit admin approval —
+      // they stay out of "All Orders" until accepted/rejected from Pending Orders.
+      .filter((o) => {
+        if (view === "pending") return true;
+        if (o.type === "reseller" && o.status === "pending") return false;
+        if (o.type === "pos" && "deliveryStatus" in o && o.deliveryStatus === "pending") return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json({ orders });
   } catch (err) {

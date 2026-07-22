@@ -116,6 +116,8 @@ export async function GET(
         deliveryAddress: o.delivery_address,
         deliveryCity: o.delivery_city,
         deliveryStatus: o.delivery_status,
+        koombiyoWaybillId: o.koombiyo_waybill_id,
+        koombiyoStatus: o.koombiyo_status,
         cashierName: o.cashier_name,
         createdAt: o.created_at,
         items: items.map((i) => ({

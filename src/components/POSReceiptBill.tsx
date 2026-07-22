@@ -19,6 +19,7 @@ export interface ReceiptBillData {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  deliveryFee?: number;
   total: number;
   paymentMethod: string;
   amountTendered: number | null;
@@ -117,6 +118,12 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
           <div className="flex justify-between">
             <span>Tax</span>
             <span>{billPrice(receipt.taxAmount)}</span>
+          </div>
+        )}
+        {!!receipt.deliveryFee && (
+          <div className="flex justify-between">
+            <span>Delivery</span>
+            <span>{billPrice(receipt.deliveryFee)}</span>
           </div>
         )}
         <div className="flex justify-between pt-2 text-base font-bold">

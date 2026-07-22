@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { pool, query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { sendOrderStatusSms } from "@/lib/sms";
 
@@ -37,6 +37,7 @@ export async function GET(
         subtotal: Number(sale.subtotal),
         discountAmount: Number(sale.discount_amount),
         taxAmount: Number(sale.tax_amount),
+        deliveryFee: Number(sale.delivery_fee || 0),
         total: Number(sale.total),
         paymentMethod: sale.payment_method,
         amountTendered: sale.amount_tendered !== null ? Number(sale.amount_tendered) : null,
@@ -56,7 +57,7 @@ export async function GET(
   }
 }
 
-const DELIVERY_STATUSES = ["pending", "out_for_delivery", "delivered"];
+const DELIVERY_STATUSES = ["pending", "accepted", "out_for_delivery", "delivered", "cancelled"];
 
 export async function PATCH(
   request: Request,
@@ -73,8 +74,8 @@ export async function PATCH(
   }
 
   try {
-    const rows = await query<{ id: number; fulfillment_type: string; customer_phone: string | null; delivery_status: string | null }>(
-      "SELECT id, fulfillment_type, customer_phone, delivery_status FROM pos_sales WHERE receipt_number = ? LIMIT 1",
+    const rows = await query<{ id: number; fulfillment_type: string; customer_phone: string | null; delivery_status: string | null; inventory_reverted_at: string | null }>(
+      "SELECT id, fulfillment_type, customer_phone, delivery_status, inventory_reverted_at FROM pos_sales WHERE receipt_number = ? LIMIT 1",
       [receiptNumber]
     );
     const sale = rows[0];
@@ -82,8 +83,36 @@ export async function PATCH(
     if (sale.fulfillment_type !== "delivery") {
       return NextResponse.json({ error: "This sale is not a delivery order" }, { status: 400 });
     }
+    if (sale.delivery_status === "cancelled" && sale.delivery_status !== b.deliveryStatus) {
+      return NextResponse.json({ error: "A cancelled delivery order cannot be reopened" }, { status: 400 });
+    }
 
-    await query("UPDATE pos_sales SET delivery_status = ? WHERE id = ?", [b.deliveryStatus, sale.id]);
+    if (b.deliveryStatus === "cancelled" && !sale.inventory_reverted_at) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [items] = await conn.execute(
+          "SELECT product_slug, quantity FROM pos_sale_items WHERE sale_id = ?",
+          [sale.id]
+        );
+        for (const item of items as { product_slug: string; quantity: number }[]) {
+          await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+        }
+        await conn.execute(
+          "UPDATE pos_sales SET delivery_status = ?, inventory_reverted_at = NOW() WHERE id = ?",
+          [b.deliveryStatus, sale.id]
+        );
+        await conn.commit();
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+    } else {
+      await query("UPDATE pos_sales SET delivery_status = ? WHERE id = ?", [b.deliveryStatus, sale.id]);
+    }
+
     if (sale.delivery_status !== b.deliveryStatus) {
       await sendOrderStatusSms(sale.customer_phone, receiptNumber, b.deliveryStatus);
     }

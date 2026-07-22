@@ -67,7 +67,10 @@ const sections: Section[] = [
   },
   {
     title: "System",
-    items: [{ label: "Settings", icon: "gear", href: "/admin/settings" }],
+    items: [
+      { label: "Delivery Pricing", icon: "gear", href: "/admin/delivery-pricing" },
+      { label: "Settings", icon: "gear", href: "/admin/settings" },
+    ],
   },
 ];
 

@@ -36,6 +36,8 @@ const paymentBadge: Record<string, string> = {
 
 const deliveryBadge: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
+  accepted: "bg-blue-100 text-blue-700",
+  out_for_delivery: "bg-blue-100 text-blue-700",
   shipped: "bg-blue-100 text-blue-700",
   delivered: "bg-emerald-100 text-emerald-700",
   cancelled: "bg-red-100 text-red-700",
@@ -59,12 +61,13 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
   const [saving, setSaving] = useState("");
 
   const load = () => {
-    fetch("/api/admin/orders", { cache: "no-store" })
+    const qs = pendingOnly ? "?view=pending" : "";
+    fetch(`/api/admin/orders${qs}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setOrders(d.orders ?? []))
       .finally(() => setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(load, [pendingOnly]);
 
   // Customer orders only pay via OnePay (no COD) — this checkout doesn't confirm payment on
   // its own, so anything sitting "unpaid" needs an admin to notice and follow up.
@@ -73,11 +76,14 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
     [orders]
   );
 
+  const isPendingApproval = (o: Order) =>
+    o.type === "pos" ? o.deliveryStatus === "pending" : o.status.toLowerCase() === "pending";
+
   const filtered = useMemo(
     () =>
       orders.filter(
         (o) =>
-          (!pendingOnly || o.status.toLowerCase() === "pending") &&
+          (!pendingOnly || isPendingApproval(o)) &&
           (typeFilter === "all" || o.type === typeFilter) &&
           (!unpaidOnly || (o.type === "customer" && o.paymentStatus !== "paid")) &&
           (!search || `${o.orderRef} ${o.customerName}`.toLowerCase().includes(search.toLowerCase()))
@@ -98,6 +104,26 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
       setSaving("");
     }
   };
+
+  const acceptReseller = (o: Order) => updateStatus(o, "confirmed");
+  const rejectReseller = (o: Order) => updateStatus(o, "rejected");
+
+  const setPosDeliveryStatus = async (o: Order, deliveryStatus: string) => {
+    setSaving(o.orderRef);
+    setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, deliveryStatus } : x)));
+    try {
+      await fetch(`/api/pos/sales/${encodeURIComponent(o.orderRef)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryStatus }),
+      });
+      toast(deliveryStatus === "cancelled" ? `Rejected ${o.orderRef}` : `Accepted ${o.orderRef}`);
+    } finally {
+      setSaving("");
+    }
+  };
+  const acceptPos = (o: Order) => setPosDeliveryStatus(o, "accepted");
+  const rejectPos = (o: Order) => setPosDeliveryStatus(o, "cancelled");
 
   const markPaid = async (o: Order) => {
     setSaving(o.orderRef + ":pay");
@@ -232,13 +258,50 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                   </td>
                   <td className="px-6 py-4">
                     {o.type === "pos" ? (
-                      <div className="flex flex-col gap-1 text-xs text-navy-800/45">
+                      <div className="flex flex-col gap-1.5 text-xs text-navy-800/45">
                         <span>{o.fulfillmentType === "delivery" ? "POS delivery" : "Store pickup"}</span>
                         {o.fulfillmentType === "delivery" && (
-                          <span className={`badge w-fit capitalize ${deliveryBadge[o.deliveryStatus ?? "pending"] ?? "bg-navy-50 text-navy-800"}`}>
-                            {o.deliveryStatus ?? "pending"}
-                          </span>
+                          <>
+                            <span className={`badge w-fit capitalize ${deliveryBadge[o.deliveryStatus ?? "pending"] ?? "bg-navy-50 text-navy-800"}`}>
+                              {o.deliveryStatus ?? "pending"}
+                            </span>
+                            {o.deliveryStatus === "pending" && (
+                              <div className="flex gap-1.5">
+                                <button
+                                  disabled={saving === o.orderRef}
+                                  onClick={() => acceptPos(o)}
+                                  className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  disabled={saving === o.orderRef}
+                                  onClick={() => rejectPos(o)}
+                                  className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </>
                         )}
+                      </div>
+                    ) : o.type === "reseller" && o.status === "pending" ? (
+                      <div className="flex gap-1.5">
+                        <button
+                          disabled={saving === o.orderRef}
+                          onClick={() => acceptReseller(o)}
+                          className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          disabled={saving === o.orderRef}
+                          onClick={() => rejectReseller(o)}
+                          className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
+                        >
+                          Reject
+                        </button>
                       </div>
                     ) : (
                       <select

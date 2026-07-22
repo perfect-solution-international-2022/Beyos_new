@@ -43,12 +43,12 @@ async function saveVariants(productId: number, variants: any[]) {
   await query("DELETE FROM product_variants WHERE product_id = ?", [productId]);
   for (const v of variants ?? []) {
     const extendedSql = `INSERT INTO product_variants
-        (product_id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price, wholesale_min_qty,
+        (product_id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price,
          production_cost, stock_status, stock, low_stock_threshold, weight_kg, length_cm, width_cm, height_cm, is_default, image)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
     const common = [productId, (v.sku ?? "").trim(), (v.attributeSummary ?? "").trim(), Number(v.price) || 0];
     try {
-      await query(extendedSql, [...common, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice), Number(v.wholesaleMinQty) || 0,
+      await query(extendedSql, [...common, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice),
         num(v.productionCost), v.stockStatus || "in_stock", Number(v.stock) || 0, Number(v.lowStockThreshold) || 10,
         num(v.weightKg), num(v.lengthCm), num(v.widthCm), num(v.heightCm), v.isDefault ? 1 : 0, (v.image ?? "").trim() || null]);
     } catch (error: any) {
@@ -101,7 +101,7 @@ export async function GET() {
           salePrice: compare ? price : "",
           price, compareAtPrice: compare,
           productionCost: num(r.production_cost), resellerPrice: num(r.reseller_price),
-          wholesalePrice: num(r.wholesale_price), wholesaleMinQty: r.wholesale_min_qty,
+          wholesalePrice: num(r.wholesale_price),
           saleStart: r.sale_start ? String(r.sale_start).slice(0, 10) : "",
           saleEnd: r.sale_end ? String(r.sale_end).slice(0, 10) : "",
           stock: r.stock, lowStockThreshold: r.low_stock_threshold,
@@ -117,7 +117,7 @@ export async function GET() {
           variants: (vByP.get(r.id) ?? []).map((v) => ({
             id: v.id, sku: v.sku, attributeSummary: v.attribute_summary, price: Number(v.price),
             salePrice: num(v.sale_price), resellerPrice: num(v.reseller_price), wholesalePrice: num(v.wholesale_price),
-            wholesaleMinQty: v.wholesale_min_qty, productionCost: num(v.production_cost), stockStatus: v.stock_status,
+            productionCost: num(v.production_cost), stockStatus: v.stock_status,
             stock: v.stock, lowStockThreshold: v.low_stock_threshold, weightKg: num(v.weight_kg), lengthCm: num(v.length_cm),
             widthCm: num(v.width_cm), heightCm: num(v.height_cm), isDefault: !!v.is_default, image: v.image,
           })),
@@ -203,17 +203,17 @@ export async function POST(request: Request) {
     const res = await query<any>(
       `INSERT INTO products
         (slug, sku, name, category, product_type, short_description, description, price, compare_at_price,
-         production_cost, reseller_price, wholesale_price, wholesale_min_qty, sale_start, sale_end,
+         production_cost, reseller_price, wholesale_price, sale_start, sale_end,
          image, images, sizes, colors, rating, reviews, badge, featured, is_publish, visibility,
          is_reseller_product, stock, low_stock_threshold, stock_status, allow_backorder, sold_individually,
          payment_methods, tags, weight_kg, length_cm, width_cm, height_cm, meta_title, meta_description, meta_keywords)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         slug, sku, name, category, b.productType === "variable" ? "variable" : "simple",
         (b.shortDescription ?? "").trim() || null, (b.description ?? "").trim() || "A quality Beyos garment.",
         price, compare, num(b.productionCost),
-        num(b.resellerPrice) ?? Math.round(price * 0.8), num(b.wholesalePrice) ?? Math.round(price * 0.72),
-        Number(b.wholesaleMinQty) || 50, b.saleStart || null, b.saleEnd || null,
+        num(b.resellerPrice), num(b.wholesalePrice),
+        b.saleStart || null, b.saleEnd || null,
         image, images, sizes, colors,
         b.badge || null, b.featured ? 1 : 0, b.isPublish === false ? 0 : 1, b.visibility || "public",
         b.isResellerProduct === false ? 0 : 1,
@@ -259,7 +259,7 @@ export async function PATCH(request: Request) {
     name: "name", category: "category", sku: "sku", productType: "product_type",
     shortDescription: "short_description", description: "description",
     productionCost: "production_cost", resellerPrice: "reseller_price", wholesalePrice: "wholesale_price",
-    wholesaleMinQty: "wholesale_min_qty", saleStart: "sale_start", saleEnd: "sale_end",
+    saleStart: "sale_start", saleEnd: "sale_end",
     stock: "stock", lowStockThreshold: "low_stock_threshold", stockStatus: "stock_status",
     badge: "badge", image: "image", visibility: "visibility",
     weightKg: "weight_kg", lengthCm: "length_cm", widthCm: "width_cm", heightCm: "height_cm",

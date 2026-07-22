@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 import { makeReceiptNumber } from "@/lib/pos";
 import type { PoolConnection } from "mysql2/promise";
 import { sendOrderConfirmationSms } from "@/lib/sms";
+import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
         subtotal: Number(r.subtotal),
         discountAmount: Number(r.discount_amount),
         taxAmount: Number(r.tax_amount),
+        deliveryFee: Number(r.delivery_fee || 0),
         total: Number(r.total),
         paymentMethod: r.payment_method,
         status: r.status,
@@ -121,6 +123,7 @@ export async function POST(request: Request) {
     }
 
     let subtotal = 0;
+    let totalWeightKg = 0;
     const lineItems: {
       slug: string; sku: string; name: string; size: string; color: string;
       quantity: number; unitPrice: number; lineTotal: number;
@@ -128,7 +131,7 @@ export async function POST(request: Request) {
 
     for (const line of b.items) {
       const [rows] = await conn.execute(
-        "SELECT id, slug, sku, name, price, stock FROM products WHERE slug = ? LIMIT 1 FOR UPDATE",
+        "SELECT id, slug, sku, name, price, stock, weight_kg FROM products WHERE slug = ? LIMIT 1 FOR UPDATE",
         [line.slug]
       );
       const product = (rows as any[])[0];
@@ -140,6 +143,7 @@ export async function POST(request: Request) {
       const unitPrice = Number(product.price);
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
+      totalWeightKg += Number(product.weight_kg || 0) * qty;
       lineItems.push({
         slug: product.slug, sku: product.sku, name: product.name,
         size: line.size || "", color: line.color || "",
@@ -152,7 +156,8 @@ export async function POST(request: Request) {
     const taxableAmount = subtotal - discountAmount;
     const taxRate = Math.max(0, Number(b.taxRate) || 0);
     const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
-    const total = Math.round((taxableAmount + taxAmount) * 100) / 100;
+    const deliveryFee = fulfillmentType === "delivery" ? computeDeliveryFee(totalWeightKg, await getDeliveryPricing()) : 0;
+    const total = Math.round((taxableAmount + taxAmount + deliveryFee) * 100) / 100;
 
     let amountTendered: number | null = null;
     let changeDue: number | null = null;
@@ -168,13 +173,13 @@ export async function POST(request: Request) {
       `INSERT INTO pos_sales
         (receipt_number, shift_id, cashier_id, customer_name, customer_phone,
          subtotal, discount_amount, tax_amount, total, payment_method, amount_tendered, change_due, status,
-         fulfillment_type, delivery_address, delivery_city, delivery_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?)`,
+         fulfillment_type, delivery_address, delivery_city, delivery_status, delivery_fee)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?)`,
       [
         receiptNumber, shiftId, cashierId,
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
-        fulfillmentType, deliveryAddress || null, deliveryCity || null, deliveryStatus,
+        fulfillmentType, deliveryAddress || null, deliveryCity || null, deliveryStatus, deliveryFee,
       ]
     );
     const saleId = (saleResult as any).insertId;
@@ -202,7 +207,7 @@ export async function POST(request: Request) {
         receiptNumber,
         items: lineItems,
         customerName: b.customerName || "Walk-in Customer",
-        subtotal, discountAmount, taxAmount, total,
+        subtotal, discountAmount, taxAmount, deliveryFee, total,
         paymentMethod, amountTendered, changeDue,
         fulfillmentType, deliveryAddress: deliveryAddress || null, deliveryCity: deliveryCity || null,
         createdAt: new Date().toISOString(),

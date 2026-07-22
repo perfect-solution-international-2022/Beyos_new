@@ -6,13 +6,17 @@ import POSReceiptBill from "@/components/POSReceiptBill";
 
 const DELIVERY_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
+  accepted: "Accepted",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
+  cancelled: "Cancelled",
 };
 const DELIVERY_STATUS_STYLES: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
+  accepted: "bg-blue-100 text-blue-700",
   out_for_delivery: "bg-blue-100 text-blue-700",
   delivered: "bg-emerald-100 text-emerald-700",
+  cancelled: "bg-red-100 text-red-700",
 };
 
 interface SaleRow {
@@ -36,6 +40,7 @@ interface Receipt {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  deliveryFee?: number;
   total: number;
   paymentMethod: string;
   amountTendered: number | null;
@@ -240,62 +245,88 @@ function ReceiptModal({
               <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{koombiyoError}</p>
             )}
 
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-navy-800">Waybill ID</p>
-              <div className="flex items-center gap-2">
-                <input
-                  readOnly
-                  value={receipt.koombiyoWaybillId ?? ""}
-                  placeholder="Click &quot;Request Waybill ID&quot; to get a waybill"
-                  className="input flex-1 bg-white text-xs disabled:text-navy-800/40"
-                />
-                <button
-                  onClick={onRequestWaybill}
-                  disabled={koombiyoBusy !== null}
-                  className="shrink-0 rounded-lg bg-navy-800 px-3 py-2 text-xs font-semibold text-white hover:bg-navy-900 disabled:opacity-50"
-                >
-                  {koombiyoBusy === "waybill" ? "Requesting…" : "Request Waybill ID"}
-                </button>
-              </div>
-            </div>
-
-            {receipt.koombiyoWaybillId && (
+            {(receipt.deliveryStatus ?? "pending") === "pending" ? (
               <div>
-                <p className="mb-1.5 text-xs font-semibold text-navy-800">Special notes</p>
-                <textarea
-                  value={specialNote}
-                  onChange={(e) => onSpecialNoteChange(e.target.value)}
-                  rows={2}
-                  className="input w-full resize-none bg-white text-xs"
-                />
-                <button
-                  onClick={onPlaceOrder}
-                  disabled={koombiyoBusy !== null}
-                  className="btn-primary mt-2 w-full disabled:opacity-50"
-                >
-                  {koombiyoBusy === "place" ? "Processing…" : "Place Order"}
-                </button>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-navy-800">Delivery status</p>
-              <div className="flex gap-1.5">
-                {(["pending", "out_for_delivery", "delivered"] as const).map((s) => (
+                <p className="mb-1.5 text-xs font-semibold text-navy-800">
+                  This delivery order needs approval before it can be dispatched.
+                </p>
+                <div className="flex gap-1.5">
                   <button
-                    key={s}
-                    onClick={() => onStatusChange(s)}
-                    className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
-                      (receipt.deliveryStatus ?? "pending") === s
-                        ? DELIVERY_STATUS_STYLES[s]
-                        : "bg-white text-navy-800/50 hover:bg-navy-100"
-                    }`}
+                    onClick={() => onStatusChange("accepted")}
+                    className="flex-1 rounded-lg bg-emerald-100 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
                   >
-                    {DELIVERY_STATUS_LABELS[s]}
+                    Accept
                   </button>
-                ))}
+                  <button
+                    onClick={() => onStatusChange("cancelled")}
+                    className="flex-1 rounded-lg bg-red-100 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
+                  >
+                    Reject
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : receipt.deliveryStatus === "cancelled" ? (
+              <p className="text-xs font-semibold text-red-600">This delivery order was rejected.</p>
+            ) : (
+              <>
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-navy-800">Waybill ID</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={receipt.koombiyoWaybillId ?? ""}
+                      placeholder="Click &quot;Request Waybill ID&quot; to get a waybill"
+                      className="input flex-1 bg-white text-xs disabled:text-navy-800/40"
+                    />
+                    <button
+                      onClick={onRequestWaybill}
+                      disabled={koombiyoBusy !== null}
+                      className="shrink-0 rounded-lg bg-navy-800 px-3 py-2 text-xs font-semibold text-white hover:bg-navy-900 disabled:opacity-50"
+                    >
+                      {koombiyoBusy === "waybill" ? "Requesting…" : "Request Waybill ID"}
+                    </button>
+                  </div>
+                </div>
+
+                {receipt.koombiyoWaybillId && (
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold text-navy-800">Special notes</p>
+                    <textarea
+                      value={specialNote}
+                      onChange={(e) => onSpecialNoteChange(e.target.value)}
+                      rows={2}
+                      className="input w-full resize-none bg-white text-xs"
+                    />
+                    <button
+                      onClick={onPlaceOrder}
+                      disabled={koombiyoBusy !== null}
+                      className="btn-primary mt-2 w-full disabled:opacity-50"
+                    >
+                      {koombiyoBusy === "place" ? "Processing…" : "Place Order"}
+                    </button>
+                  </div>
+                )}
+
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-navy-800">Delivery status</p>
+                  <div className="flex gap-1.5">
+                    {(["accepted", "out_for_delivery", "delivered"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => onStatusChange(s)}
+                        className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
+                          (receipt.deliveryStatus ?? "pending") === s
+                            ? DELIVERY_STATUS_STYLES[s]
+                            : "bg-white text-navy-800/50 hover:bg-navy-100"
+                        }`}
+                      >
+                        {DELIVERY_STATUS_LABELS[s]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 

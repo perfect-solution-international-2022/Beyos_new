@@ -11,7 +11,6 @@ interface Row {
   price: string;
   reseller_price: string | null;
   wholesale_price: string | null;
-  wholesale_min_qty: number;
   compare_at_price: string | null;
   image: string;
   description: string;
@@ -19,6 +18,7 @@ interface Row {
   reviews: number;
   stock: number;
   product_type: string;
+  weight_kg: string | null;
 }
 
 export async function GET() {
@@ -30,12 +30,14 @@ export async function GET() {
     const [rows, variantRows, settings] = await Promise.all([
       query<Row>(
       `SELECT id, slug, sku, name, category, price, reseller_price, wholesale_price,
-              wholesale_min_qty, compare_at_price, image, description, rating, reviews, stock, product_type
-       FROM products WHERE is_reseller_product = 1 AND is_publish = 1 ORDER BY name ASC`
+              compare_at_price, image, description, rating, reviews, stock, product_type, weight_kg
+       FROM products
+       WHERE is_reseller_product = 1 AND is_publish = 1 AND reseller_price IS NOT NULL
+       ORDER BY name ASC`
       ),
-      query<{ id: number; product_id: number; sku: string; attribute_summary: string; price: string; reseller_price: string | null; wholesale_price: string | null; stock: number; image: string | null; is_default: number }>(
-        `SELECT id, product_id, sku, attribute_summary, price, reseller_price, wholesale_price,
-                stock, image, is_default FROM product_variants ORDER BY is_default DESC, id ASC`
+      query<{ id: number; product_id: number; sku: string; attribute_summary: string; price: string; sale_price: string | null; reseller_price: string | null; wholesale_price: string | null; stock: number; image: string | null; is_default: number; weight_kg: string | null }>(
+        `SELECT id, product_id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price,
+                stock, image, is_default, weight_kg FROM product_variants ORDER BY is_default DESC, id ASC`
       ),
       query<{ allow_price_override: number; min_markup_pct: string; max_markup_pct: string | null }>(
         "SELECT allow_price_override, min_markup_pct, max_markup_pct FROM users WHERE id = ? LIMIT 1",
@@ -54,11 +56,8 @@ export async function GET() {
       name: r.name,
       category: r.category,
       price: Number(r.price),
-      resellerPrice: r.reseller_price ? Number(r.reseller_price) : Number(r.price),
-      wholesalePrice: r.wholesale_price
-        ? Number(r.wholesale_price)
-        : Number(r.price),
-      wholesaleMinQty: r.wholesale_min_qty,
+      resellerPrice: Number(r.reseller_price),
+      wholesalePrice: r.wholesale_price ? Number(r.wholesale_price) : null,
       compareAtPrice: r.compare_at_price ? Number(r.compare_at_price) : null,
       image: r.image,
       description: r.description,
@@ -66,16 +65,19 @@ export async function GET() {
       reviews: r.reviews,
       stock: r.stock,
       productType: r.product_type,
+      weightKg: r.weight_kg ? Number(r.weight_kg) : 0,
       variants: (variantsByProduct.get(r.id) ?? []).map((v) => ({
         id: v.id,
         sku: v.sku,
         summary: v.attribute_summary,
         price: Number(v.price),
-        resellerPrice: v.reseller_price ? Number(v.reseller_price) : (r.reseller_price ? Number(r.reseller_price) : Number(v.price)),
-        wholesalePrice: v.wholesale_price ? Number(v.wholesale_price) : (r.wholesale_price ? Number(r.wholesale_price) : Number(v.price)),
+        salePrice: v.sale_price ? Number(v.sale_price) : null,
+        resellerPrice: v.reseller_price ? Number(v.reseller_price) : Number(r.reseller_price),
+        wholesalePrice: v.wholesale_price ? Number(v.wholesale_price) : (r.wholesale_price ? Number(r.wholesale_price) : null),
         stock: v.stock,
         image: v.image || r.image,
         isDefault: !!v.is_default,
+        weightKg: v.weight_kg ? Number(v.weight_kg) : 0,
       })),
     }));
     const rule = settings[0];

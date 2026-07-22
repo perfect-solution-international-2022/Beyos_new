@@ -21,7 +21,7 @@ interface Product {
 }
 interface Variant {
   sku: string; attributeSummary: string; price: string; salePrice: string; resellerPrice: string;
-  wholesalePrice: string; wholesaleMinQty: string; productionCost: string; stockStatus: string;
+  wholesalePrice: string; productionCost: string; stockStatus: string;
   stock: string; lowStockThreshold: string; weightKg: string; lengthCm: string; widthCm: string;
   heightCm: string; image: string; isDefault: boolean;
 }
@@ -36,7 +36,7 @@ const PAYMENT_METHODS = [
 const blank = {
   id: 0, name: "", slug: "", sku: "", category: "men", productType: "simple",
   shortDescription: "", description: "",
-  regularPrice: "", salePrice: "", resellerPrice: "", wholesalePrice: "", wholesaleMinQty: "50",
+  regularPrice: "", salePrice: "", resellerPrice: "", wholesalePrice: "",
   productionCost: "", saleStart: "", saleEnd: "",
   stock: "", lowStockThreshold: "10", stockStatus: "in_stock", allowBackorder: false, soldIndividually: false,
   sizes: "", colors: "", image: "", images: "",
@@ -118,7 +118,7 @@ export default function AdminProductsPage() {
       ...blank, ...p,
       slug: "", // regenerated server-side; leave blank on edit
       regularPrice: str(p.regularPrice), salePrice: str(p.salePrice),
-      resellerPrice: str(p.resellerPrice), wholesalePrice: str(p.wholesalePrice), wholesaleMinQty: str(p.wholesaleMinQty || 50),
+      resellerPrice: str(p.resellerPrice), wholesalePrice: str(p.wholesalePrice),
       productionCost: str(p.productionCost), saleStart: p.saleStart || "", saleEnd: p.saleEnd || "",
       stock: str(p.stock), lowStockThreshold: str(p.lowStockThreshold || 10),
       sizes: arr(p.sizes), colors: arr(p.colors), images: arr(p.images),
@@ -127,7 +127,7 @@ export default function AdminProductsPage() {
       weightKg: str(p.weightKg), lengthCm: str(p.lengthCm), widthCm: str(p.widthCm), heightCm: str(p.heightCm),
       variants: (p.variants ?? []).map((v: any) => ({
         sku: v.sku, attributeSummary: v.attributeSummary, price: str(v.price), salePrice: str(v.salePrice),
-        resellerPrice: str(v.resellerPrice), wholesalePrice: str(v.wholesalePrice), wholesaleMinQty: str(v.wholesaleMinQty),
+        resellerPrice: str(v.resellerPrice), wholesalePrice: str(v.wholesalePrice),
         productionCost: str(v.productionCost), stockStatus: v.stockStatus || "in_stock", stock: str(v.stock),
         lowStockThreshold: str(v.lowStockThreshold || 10), weightKg: str(v.weightKg), lengthCm: str(v.lengthCm),
         widthCm: str(v.widthCm), heightCm: str(v.heightCm), image: v.image || "", isDefault: !!v.isDefault,
@@ -296,7 +296,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
         return existing.get(summary) ?? {
           sku: `${f.sku || "VAR"}-${i + 1}`, attributeSummary: summary,
           price: f.regularPrice, salePrice: f.salePrice, resellerPrice: f.resellerPrice,
-          wholesalePrice: f.wholesalePrice, wholesaleMinQty: f.wholesaleMinQty, productionCost: f.productionCost,
+          wholesalePrice: f.wholesalePrice, productionCost: f.productionCost,
           stockStatus: "in_stock", stock: "0", lowStockThreshold: f.lowStockThreshold,
           weightKg: f.weightKg, lengthCm: f.lengthCm, widthCm: f.widthCm, heightCm: f.heightCm,
           image: "", isDefault: i === 0,
@@ -444,9 +444,8 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                 <div className="grid grid-cols-2 gap-4">
                   <F label="Regular Price (Rs)"><NumIn v={form.regularPrice} on={set("regularPrice")} /></F>
                   <F label="Sale Price (Rs)"><NumIn v={form.salePrice} on={set("salePrice")} placeholder="Optional" /></F>
-                  <F label="Reseller Price (Rs)"><NumIn v={form.resellerPrice} on={set("resellerPrice")} placeholder="Auto 80% if blank" /></F>
-                  <F label="Wholesale Price (Rs)"><NumIn v={form.wholesalePrice} on={set("wholesalePrice")} placeholder="Auto 72% if blank" /></F>
-                  <F label="Wholesale Min Quantity"><NumIn v={form.wholesaleMinQty} on={set("wholesaleMinQty")} int /></F>
+                  <F label="Reseller Price (Rs)"><NumIn v={form.resellerPrice} on={set("resellerPrice")} placeholder="Not shown to resellers if blank" /></F>
+                  <F label="Wholesale Price (Rs)"><NumIn v={form.wholesalePrice} on={set("wholesalePrice")} placeholder="Applies at 12+ units if set" /></F>
                   <F label="Product Cost"><NumIn v={form.productionCost} on={set("productionCost")} /></F>
                 </div>
                 <h3 className="pt-2 text-sm font-bold text-navy-800">Shipping &amp; Dimensions</h3>
@@ -562,7 +561,6 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                             <VarMoney label="Sale Price" value={v.salePrice} onChange={(value) => updateVariant(setForm, i, "salePrice", value)} />
                             <VarMoney label="Reseller Price" value={v.resellerPrice} onChange={(value) => updateVariant(setForm, i, "resellerPrice", value)} />
                             <VarMoney label="Wholesale Price" value={v.wholesalePrice} onChange={(value) => updateVariant(setForm, i, "wholesalePrice", value)} />
-                            <VarInt label="Wholesale Min Qty" value={v.wholesaleMinQty} onChange={(value) => updateVariant(setForm, i, "wholesaleMinQty", value)} />
                             <VarMoney label="Product Cost" value={v.productionCost} onChange={(value) => updateVariant(setForm, i, "productionCost", value)} />
                             <VarField label="Stock Status"><select value={v.stockStatus} onChange={(e) => updateVariant(setForm, i, "stockStatus", e.target.value)} className="input"><option value="in_stock">In Stock</option><option value="out_of_stock">Out of Stock</option><option value="on_backorder">On Backorder</option></select></VarField>
                             <VarInt label="Stock Quantity" value={v.stock} onChange={(value) => updateVariant(setForm, i, "stock", value)} />

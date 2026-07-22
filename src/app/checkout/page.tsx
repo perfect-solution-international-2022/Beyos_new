@@ -8,9 +8,6 @@ import { useCart } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import { useAuth } from "@/context/AuthProvider";
 
-const FREE_SHIPPING_THRESHOLD = 10000;
-const SHIPPING_FEE = 500;
-
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -22,6 +19,7 @@ export default function CheckoutPage() {
 
   const [discount, setDiscount] = useState(0);
   const [freeShippingPromo, setFreeShippingPromo] = useState(false);
+  const [shipping, setShipping] = useState(0);
 
   const [form, setForm] = useState({
     name: "",
@@ -76,10 +74,35 @@ export default function CheckoutPage() {
   }, [promoCode, subtotal]);
 
   const discountedSubtotal = Math.max(0, subtotal - discount);
-  const shipping =
-    subtotal === 0 || freeShippingPromo || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
-      ? 0
-      : SHIPPING_FEE;
+
+  // Weight-based shipping is computed server-side (admin-configured pricing).
+  useEffect(() => {
+    if (subtotal === 0) {
+      setShipping(0);
+      return;
+    }
+    let cancelled = false;
+    fetch("/api/shipping/estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: items.map((i) => ({ slug: i.slug, quantity: i.quantity, variantId: i.variantId })),
+        discountedSubtotal,
+        freeShipping: freeShippingPromo,
+      }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setShipping(Number(d.shipping) || 0);
+      })
+      .catch(() => {
+        if (!cancelled) setShipping(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [items, subtotal, discountedSubtotal, freeShippingPromo]);
+
   const total = discountedSubtotal + shipping;
 
   const update = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>

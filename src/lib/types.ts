@@ -20,6 +20,7 @@ export interface Product {
   stock: number;
   productType?: "simple" | "variable";
   variants?: ProductVariant[];
+  weightKg?: number;
 }
 
 export interface ProductVariant {
@@ -31,6 +32,7 @@ export interface ProductVariant {
   stock: number;
   image?: string;
   isDefault: boolean;
+  weightKg?: number;
 }
 
 export interface CartItem {
