@@ -51,7 +51,16 @@ const methodLabel: Record<string, string> = {
   pos_card: "POS Card",
 };
 
-export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?: boolean }) {
+type OrdersView = "all" | "pending" | "completed" | "rejected";
+
+const viewTitle: Record<OrdersView, string> = {
+  all: "All Orders",
+  pending: "Pending Orders",
+  completed: "Completed Orders",
+  rejected: "Rejected Orders",
+};
+
+export default function AdminOrdersView({ view = "all" }: { view?: OrdersView }) {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,15 +68,16 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
   const [typeFilter, setTypeFilter] = useState("all");
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [saving, setSaving] = useState("");
+  const pendingOnly = view === "pending";
 
   const load = () => {
-    const qs = pendingOnly ? "?view=pending" : "";
+    const qs = view !== "all" ? `?view=${view}` : "";
     fetch(`/api/admin/orders${qs}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setOrders(d.orders ?? []))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [pendingOnly]);
+  useEffect(load, [view]);
 
   // Customer orders only pay via OnePay (no COD) — this checkout doesn't confirm payment on
   // its own, so anything sitting "unpaid" needs an admin to notice and follow up.
@@ -76,19 +86,15 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
     [orders]
   );
 
-  const isPendingApproval = (o: Order) =>
-    o.type === "pos" ? o.deliveryStatus === "pending" : o.status.toLowerCase() === "pending";
-
   const filtered = useMemo(
     () =>
       orders.filter(
         (o) =>
-          (!pendingOnly || isPendingApproval(o)) &&
           (typeFilter === "all" || o.type === typeFilter) &&
           (!unpaidOnly || (o.type === "customer" && o.paymentStatus !== "paid")) &&
           (!search || `${o.orderRef} ${o.customerName}`.toLowerCase().includes(search.toLowerCase()))
       ),
-    [orders, search, typeFilter, unpaidOnly, pendingOnly]
+    [orders, search, typeFilter, unpaidOnly]
   );
 
   const updateStatus = async (o: Order, status: string) => {
@@ -104,26 +110,6 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
       setSaving("");
     }
   };
-
-  const acceptReseller = (o: Order) => updateStatus(o, "confirmed");
-  const rejectReseller = (o: Order) => updateStatus(o, "rejected");
-
-  const setPosDeliveryStatus = async (o: Order, deliveryStatus: string) => {
-    setSaving(o.orderRef);
-    setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, deliveryStatus } : x)));
-    try {
-      await fetch(`/api/pos/sales/${encodeURIComponent(o.orderRef)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deliveryStatus }),
-      });
-      toast(deliveryStatus === "cancelled" ? `Rejected ${o.orderRef}` : `Accepted ${o.orderRef}`);
-    } finally {
-      setSaving("");
-    }
-  };
-  const acceptPos = (o: Order) => setPosDeliveryStatus(o, "accepted");
-  const rejectPos = (o: Order) => setPosDeliveryStatus(o, "cancelled");
 
   const markPaid = async (o: Order) => {
     setSaving(o.orderRef + ":pay");
@@ -142,7 +128,7 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-navy-800">{pendingOnly ? "Pending Orders" : "All Orders"}</h1>
+      <h1 className="text-2xl font-bold text-navy-800">{viewTitle[view]}</h1>
 
       {!loading && unpaidCustomerOrders.length > 0 && (
         <button
@@ -261,48 +247,13 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                       <div className="flex flex-col gap-1.5 text-xs text-navy-800/45">
                         <span>{o.fulfillmentType === "delivery" ? "POS delivery" : "Store pickup"}</span>
                         {o.fulfillmentType === "delivery" && (
-                          <>
-                            <span className={`badge w-fit capitalize ${deliveryBadge[o.deliveryStatus ?? "pending"] ?? "bg-navy-50 text-navy-800"}`}>
-                              {o.deliveryStatus ?? "pending"}
-                            </span>
-                            {o.deliveryStatus === "pending" && (
-                              <div className="flex gap-1.5">
-                                <button
-                                  disabled={saving === o.orderRef}
-                                  onClick={() => acceptPos(o)}
-                                  className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
-                                >
-                                  Accept
-                                </button>
-                                <button
-                                  disabled={saving === o.orderRef}
-                                  onClick={() => rejectPos(o)}
-                                  className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
-                          </>
+                          <span className={`badge w-fit capitalize ${deliveryBadge[o.deliveryStatus ?? "pending"] ?? "bg-navy-50 text-navy-800"}`}>
+                            {o.deliveryStatus ?? "pending"}
+                          </span>
                         )}
                       </div>
                     ) : o.type === "reseller" && o.status === "pending" ? (
-                      <div className="flex gap-1.5">
-                        <button
-                          disabled={saving === o.orderRef}
-                          onClick={() => acceptReseller(o)}
-                          className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
-                        >
-                          Accept
-                        </button>
-                        <button
-                          disabled={saving === o.orderRef}
-                          onClick={() => rejectReseller(o)}
-                          className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
-                        >
-                          Reject
-                        </button>
-                      </div>
+                      <span className="text-xs text-navy-800/45">Review to accept/reject</span>
                     ) : (
                       <select
                         value={o.status}
@@ -319,9 +270,11 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                   <td className="px-6 py-4 text-right">
                     <Link
                       href={`/admin/orders/${encodeURIComponent(o.orderRef)}`}
-                      className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100"
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                        pendingOnly ? "bg-brand text-white hover:bg-brand/90" : "bg-navy-50 text-navy-800 hover:bg-navy-100"
+                      }`}
                     >
-                      View
+                      {pendingOnly ? "Review" : "View"}
                     </Link>
                   </td>
                 </tr>

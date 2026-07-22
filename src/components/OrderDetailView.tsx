@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
+import { useToast } from "@/context/ToastProvider";
 
 interface OrderItem {
   name: string;
@@ -85,9 +86,11 @@ function formatStatus(status: string): string {
 }
 
 export default function OrderDetailView({ orderRef }: { orderRef: string }) {
+  const { toast } = useToast();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deciding, setDeciding] = useState(false);
 
   const load = () => {
     fetch(`/api/admin/orders/${encodeURIComponent(orderRef)}`, { cache: "no-store" })
@@ -111,6 +114,39 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
 
   const status = statusColor(order.status);
 
+  const isPendingReseller = order.type === "reseller" && order.status === "pending";
+  const isPendingPosDelivery = order.type === "pos" && order.fulfillmentType === "delivery" && order.deliveryStatus === "pending";
+
+  const decideReseller = async (status: "confirmed" | "rejected") => {
+    setDeciding(true);
+    try {
+      await fetch("/api/admin/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "reseller", orderRef: order.orderRef, status }),
+      });
+      toast(status === "confirmed" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
+      load();
+    } finally {
+      setDeciding(false);
+    }
+  };
+
+  const decidePos = async (deliveryStatus: "accepted" | "cancelled") => {
+    setDeciding(true);
+    try {
+      await fetch(`/api/pos/sales/${encodeURIComponent(order.orderRef)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliveryStatus }),
+      });
+      toast(deliveryStatus === "accepted" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
+      load();
+    } finally {
+      setDeciding(false);
+    }
+  };
+
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -118,6 +154,24 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
           <h1 className="text-2xl font-bold text-navy-800">{typeLabel[order.type]}</h1>
           <p className="mt-1 text-sm text-navy-800/50">Order ID: #{order.orderRef}</p>
         </div>
+        {(isPendingReseller || isPendingPosDelivery) && (
+          <div className="flex gap-2">
+            <button
+              disabled={deciding}
+              onClick={() => (isPendingReseller ? decideReseller("confirmed") : decidePos("accepted"))}
+              className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+            >
+              Accept
+            </button>
+            <button
+              disabled={deciding}
+              onClick={() => (isPendingReseller ? decideReseller("rejected") : decidePos("cancelled"))}
+              className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
+            >
+              Reject
+            </button>
+          </div>
+        )}
       </div>
 
       {order.rejectReason && (

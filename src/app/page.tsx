@@ -29,8 +29,8 @@ const features = [
     icon: "lock",
   },
   {
-    title: "Fast & Free Delivery",
-    desc: "Free island-wide shipping on orders over LKR 10,000, delivered fast.",
+    title: "Fast Island-Wide Delivery",
+    desc: "Reliable, fast shipping to every corner of Sri Lanka.",
     icon: "truck",
   },
 ];

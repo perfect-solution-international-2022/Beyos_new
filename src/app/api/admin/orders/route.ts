@@ -124,7 +124,18 @@ export async function GET(request: Request) {
       // Reseller orders and POS delivery orders need explicit admin approval —
       // they stay out of "All Orders" until accepted/rejected from Pending Orders.
       .filter((o) => {
-        if (view === "pending") return true;
+        const isPending = o.type === "pos"
+          ? "deliveryStatus" in o && o.deliveryStatus === "pending"
+          : o.type === "reseller" && o.status === "pending";
+        const isRejected = o.type === "pos"
+          ? "deliveryStatus" in o && o.deliveryStatus === "cancelled"
+          : o.status === "cancelled" || o.status === "rejected";
+        const isCompleted = o.type === "pos"
+          ? "deliveryStatus" in o && (o.deliveryStatus === "delivered")
+          : o.status === "delivered" || o.status === "completed";
+        if (view === "pending") return isPending;
+        if (view === "completed") return isCompleted;
+        if (view === "rejected") return isRejected;
         if (o.type === "reseller" && o.status === "pending") return false;
         if (o.type === "pos" && "deliveryStatus" in o && o.deliveryStatus === "pending") return false;
         return true;

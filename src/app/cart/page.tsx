@@ -7,8 +7,6 @@ import { useCart } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import CheckoutButton from "@/components/CheckoutButton";
 
-const FREE_SHIPPING_THRESHOLD = 10000;
-
 export default function CartPage() {
   const [mounted, setMounted] = useState(false);
   const { items, removeItem, updateQuantity, promoCode, setPromoCode } = useCart();
@@ -313,12 +311,6 @@ export default function CartPage() {
                   {shipping === 0 ? "Free" : formatPrice(shipping)}
                 </dd>
               </div>
-              {shipping > 0 && (
-                <p className="text-xs text-navy-800/50">
-                  Add {formatPrice(FREE_SHIPPING_THRESHOLD - discountedSubtotal)} more for
-                  free shipping.
-                </p>
-              )}
               <div className="flex justify-between border-t border-navy-800/10 pt-4 text-base">
                 <dt className="font-bold text-navy-800">Total</dt>
                 <dd className="font-bold text-navy-800">{formatPrice(total)}</dd>

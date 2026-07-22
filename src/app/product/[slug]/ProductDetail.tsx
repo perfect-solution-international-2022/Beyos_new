@@ -202,7 +202,7 @@ export default function ProductDetail({ product }: { product: Product }) {
             <DotIcon /> In stock — ships in 2–4 business days
           </li>
           <li className="flex items-center gap-3">
-            <DotIcon /> Free delivery on orders over LKR 10,000
+            <DotIcon /> Island-wide delivery
           </li>
           <li className="flex items-center gap-3">
             <DotIcon /> 7-day easy returns & exchanges

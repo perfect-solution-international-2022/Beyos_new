@@ -104,12 +104,23 @@ body {
 /* POS receipt printing: hide everything on the page except the receipt bill
    itself, so "Print" doesn't include the admin layout/modal chrome. */
 @media print {
+  @page {
+    margin: 0;
+  }
+  html, body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
   body * {
     visibility: hidden;
   }
   .receipt-print,
   .receipt-print * {
     visibility: visible;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
   }
   .receipt-print {
     position: absolute;

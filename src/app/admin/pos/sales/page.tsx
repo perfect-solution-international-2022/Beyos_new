@@ -67,9 +67,6 @@ export default function AdminPosSalesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [koombiyoBusy, setKoombiyoBusy] = useState<"waybill" | "place" | null>(null);
-  const [koombiyoError, setKoombiyoError] = useState("");
-  const [specialNote, setSpecialNote] = useState("");
 
   const load = (q?: string) => {
     setLoading(true);
@@ -85,55 +82,6 @@ export default function AdminPosSalesPage() {
     const res = await fetch(`/api/pos/sales/${receiptNumber}`, { cache: "no-store" });
     const d = await res.json();
     if (d.receipt) setReceipt(d.receipt);
-  };
-
-  const updateDeliveryStatus = async (receiptNumber: string, deliveryStatus: string) => {
-    const res = await fetch(`/api/pos/sales/${receiptNumber}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deliveryStatus }),
-    });
-    if (!res.ok) return;
-    setSales((prev) => prev.map((s) => (s.receiptNumber === receiptNumber ? { ...s, deliveryStatus } : s)));
-    setReceipt((prev) => (prev && prev.receiptNumber === receiptNumber ? { ...prev, deliveryStatus } : prev));
-  };
-
-  const requestWaybill = async () => {
-    if (!receipt) return;
-    setKoombiyoBusy("waybill");
-    setKoombiyoError("");
-    try {
-      const res = await fetch("/api/admin/pos/sales/koombiyo", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receiptNumber: receipt.receiptNumber, action: "request-waybill" }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Could not request a waybill ID");
-      setReceipt((prev) => (prev ? { ...prev, koombiyoWaybillId: d.waybillId } : prev));
-    } catch (error) {
-      setKoombiyoError(error instanceof Error ? error.message : "Could not request a waybill ID");
-    } finally {
-      setKoombiyoBusy(null);
-    }
-  };
-
-  const placeOrder = async () => {
-    if (!receipt) return;
-    setKoombiyoBusy("place");
-    setKoombiyoError("");
-    try {
-      const res = await fetch("/api/admin/pos/sales/koombiyo", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receiptNumber: receipt.receiptNumber, action: "place-order", specialNote }),
-      });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error || "Could not place the order with Koombiyo");
-      setReceipt((prev) => (prev ? { ...prev, koombiyoStatus: d.courierStatus, deliveryStatus: d.deliveryStatus } : prev));
-      setSales((prev) => prev.map((s) => (s.receiptNumber === receipt.receiptNumber ? { ...s, deliveryStatus: d.deliveryStatus } : s)));
-    } catch (error) {
-      setKoombiyoError(error instanceof Error ? error.message : "Could not place the order with Koombiyo");
-    } finally {
-      setKoombiyoBusy(null);
-    }
   };
 
   return (
@@ -207,15 +155,8 @@ export default function AdminPosSalesPage() {
       {receipt && (
         <ReceiptModal
           receipt={receipt}
-          onClose={() => { setReceipt(null); setKoombiyoError(""); setSpecialNote(""); }}
-          onStatusChange={(status) => updateDeliveryStatus(receipt.receiptNumber, status)}
+          onClose={() => setReceipt(null)}
           onEdit={() => router.push(`/admin/pos?edit=${encodeURIComponent(receipt.receiptNumber)}`)}
-          koombiyoBusy={koombiyoBusy}
-          koombiyoError={koombiyoError}
-          specialNote={specialNote}
-          onSpecialNoteChange={setSpecialNote}
-          onRequestWaybill={requestWaybill}
-          onPlaceOrder={placeOrder}
         />
       )}
     </div>
@@ -225,105 +166,17 @@ export default function AdminPosSalesPage() {
 function ReceiptModal({
   receipt,
   onClose,
-  onStatusChange,
   onEdit,
-  koombiyoBusy,
-  koombiyoError,
-  specialNote,
-  onSpecialNoteChange,
-  onRequestWaybill,
-  onPlaceOrder,
 }: {
   receipt: Receipt;
   onClose: () => void;
-  onStatusChange: (status: string) => void;
   onEdit: () => void;
-  koombiyoBusy: "waybill" | "place" | null;
-  koombiyoError: string;
-  specialNote: string;
-  onSpecialNoteChange: (value: string) => void;
-  onRequestWaybill: () => void;
-  onPlaceOrder: () => void;
 }) {
   const editable = canEditSale(receipt, receipt.koombiyoWaybillId);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
         <POSReceiptBill receipt={receipt} />
-
-        {receipt.fulfillmentType === "delivery" && (
-          <div className="mx-6 mb-4 space-y-3 rounded-lg bg-navy-50 p-3 print:hidden">
-            {koombiyoError && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{koombiyoError}</p>
-            )}
-
-            {receipt.deliveryStatus === "cancelled" ? (
-              <p className="text-xs font-semibold text-red-600">This delivery order was rejected.</p>
-            ) : (
-              <>
-                {(receipt.deliveryStatus ?? "pending") === "pending" && (
-                  <div>
-                    <p className="mb-1.5 text-xs font-semibold text-navy-800">
-                      This delivery order needs approval before it can be dispatched.
-                    </p>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => onStatusChange("accepted")}
-                        className="flex-1 rounded-lg bg-emerald-100 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        onClick={() => onStatusChange("cancelled")}
-                        className="flex-1 rounded-lg bg-red-100 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-200"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-1.5 text-xs font-semibold text-navy-800">Waybill ID</p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={receipt.koombiyoWaybillId ?? ""}
-                      placeholder="Click &quot;Request Waybill ID&quot; to get a waybill"
-                      className="input flex-1 bg-white text-xs disabled:text-navy-800/40"
-                    />
-                    <button
-                      onClick={onRequestWaybill}
-                      disabled={koombiyoBusy !== null}
-                      className="shrink-0 rounded-lg bg-navy-800 px-3 py-2 text-xs font-semibold text-white hover:bg-navy-900 disabled:opacity-50"
-                    >
-                      {koombiyoBusy === "waybill" ? "Requesting…" : "Request Waybill ID"}
-                    </button>
-                  </div>
-                </div>
-
-                {receipt.koombiyoWaybillId && (
-                  <div>
-                    <p className="mb-1.5 text-xs font-semibold text-navy-800">Special notes</p>
-                    <textarea
-                      value={specialNote}
-                      onChange={(e) => onSpecialNoteChange(e.target.value)}
-                      rows={2}
-                      className="input w-full resize-none bg-white text-xs"
-                    />
-                    <button
-                      onClick={onPlaceOrder}
-                      disabled={koombiyoBusy !== null}
-                      className="btn-primary mt-2 w-full disabled:opacity-50"
-                    >
-                      {koombiyoBusy === "place" ? "Processing…" : "Place Order"}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
 
         <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
           <button onClick={onClose} className="btn-outline">Close</button>

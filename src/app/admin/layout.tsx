@@ -36,6 +36,8 @@ const sections: Section[] = [
       { label: "Orders", icon: "cart", children: [
         { label: "All Orders", href: "/admin/orders" },
         { label: "Pending Orders", href: "/admin/orders/pending" },
+        { label: "Completed Orders", href: "/admin/orders/completed" },
+        { label: "Rejected Orders", href: "/admin/orders/rejected" },
       ] },
       { label: "POS", icon: "terminal", children: [
         { label: "POS", href: "/admin/pos" },

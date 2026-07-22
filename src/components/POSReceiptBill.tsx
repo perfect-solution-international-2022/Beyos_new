@@ -38,121 +38,133 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
   const date = new Date(receipt.createdAt);
 
   return (
-    <div className="receipt-print mx-auto w-full max-w-[420px] bg-white px-6 py-8 font-mono text-[#1a1a1a] print:max-w-none">
-      <div className="flex flex-col items-center text-center">
-        <Image src="/images/logo.png" alt="Beyos Clothing" width={120} height={60} className="h-auto w-28 object-contain" />
-        <p className="mt-3 text-xs leading-relaxed">Kendagaha junction, Elpitiya 80458</p>
-        <p className="text-xs leading-relaxed">Tel: +94 77 170 3844</p>
-      </div>
-
-      <div className="my-4 border-t border-dashed border-[#1a1a1a]/40" />
-
-      <p className="text-center text-sm font-bold tracking-wide">*** RECEIPT BILL ***</p>
-
-      <div className="my-4 border-t border-dashed border-[#1a1a1a]/40" />
-
-      <div className="text-xs leading-relaxed">
-        <p>Bill No: {receipt.receiptNumber}</p>
-        <p>
-          Date:{" "}
-          {date.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })},{" "}
-          {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true })}
-        </p>
-        {receipt.customerName && receipt.customerName !== "Walk-in Customer" && <p>Customer: {receipt.customerName}</p>}
-      </div>
-
-      {receipt.fulfillmentType === "delivery" && (
-        <div className="mt-3 text-xs leading-relaxed">
-          <p className="font-bold">Deliver to:</p>
-          <p>{receipt.deliveryAddress}</p>
-          {receipt.deliveryCity && <p>{receipt.deliveryCity}</p>}
+    <div className="receipt-print mx-auto w-full max-w-[520px] rounded-[28px] bg-[#f7f7f8] p-8 text-[#1a1a2e] shadow-[0_1px_3px_rgba(0,0,0,0.08)] print:max-w-none print:rounded-none print:shadow-none">
+      {/* Brand header */}
+      <div className="flex items-center gap-4">
+        <Image src="/images/logo.png" alt="Beyos Clothing" width={80} height={80} className="h-16 w-16 shrink-0 object-contain" />
+        <div>
+          <p className="text-2xl font-extrabold tracking-tight">
+            <span className="text-navy-900">BEYOS</span> <span className="text-brand">CLOTHING</span>
+          </p>
+          <p className="mt-0.5 text-xs font-medium uppercase tracking-[0.25em] text-navy-800/50">Style Is Forever</p>
         </div>
-      )}
+      </div>
 
-      <div className="my-4 border-t border-dashed border-[#1a1a1a]/40" />
+      <div className="mt-5 flex flex-wrap items-start gap-x-6 gap-y-2 border-t border-b border-dashed border-navy-800/15 py-3 text-xs text-navy-800/70">
+        <span>Kendagaha junction, Elpitiya 80458</span>
+        <span>+94 77 170 3844</span>
+      </div>
 
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-[#1a1a1a]/40 text-left">
-            <th className="w-6 pb-2 font-bold">No.</th>
-            <th className="pb-2 font-bold">Product</th>
-            <th className="pb-2 font-bold">SKU</th>
-            <th className="pb-2 text-right font-bold">Price</th>
-            <th className="pb-2 text-right font-bold">QTY</th>
-            <th className="pb-2 text-right font-bold">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          {receipt.items.map((it, i) => (
-            <tr key={i} className="align-top">
-              <td className="py-1.5">{i + 1}</td>
-              <td className="py-1.5 pr-2">
-                {it.name}
-                {(it.size || it.color) && (
-                  <span className="block text-[10px] text-[#1a1a1a]/60">{[it.size, it.color].filter(Boolean).join(" / ")}</span>
-                )}
-              </td>
-              <td className="py-1.5">{it.sku || "—"}</td>
-              <td className="py-1.5 text-right">{it.unitPrice.toFixed(2)}</td>
-              <td className="py-1.5 text-right">{it.quantity}</td>
-              <td className="py-1.5 text-right">{it.lineTotal.toFixed(2)}</td>
+      {/* Title */}
+      <p className="mt-6 text-center text-xl font-extrabold tracking-[0.15em] text-navy-900">RECEIPT BILL</p>
+
+      {/* Bill meta */}
+      <div className="mt-4 rounded-2xl border border-navy-800/10 bg-white px-5 py-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-navy-800/60">Bill No</span>
+          <span className="font-semibold text-navy-900">{receipt.receiptNumber}</span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-navy-800/60">Date</span>
+          <span className="font-semibold text-navy-900">
+            {date.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })}
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-navy-800/60">Time</span>
+          <span className="font-semibold text-navy-900">
+            {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true })}
+          </span>
+        </div>
+        {receipt.customerName && receipt.customerName !== "Walk-in Customer" && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-navy-800/60">Customer</span>
+            <span className="font-semibold text-navy-900">{receipt.customerName}</span>
+          </div>
+        )}
+        {receipt.fulfillmentType === "delivery" && (
+          <div className="mt-2 flex flex-wrap items-start justify-between gap-2">
+            <span className="text-navy-800/60">Deliver to</span>
+            <span className="text-right font-semibold text-navy-900">
+              {receipt.deliveryAddress}
+              {receipt.deliveryCity ? `, ${receipt.deliveryCity}` : ""}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Items table */}
+      <div className="mt-5 overflow-hidden rounded-2xl border border-navy-800/10">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-navy-900 text-left text-xs font-semibold uppercase tracking-wide text-white">
+              <th className="w-8 px-4 py-3">No.</th>
+              <th className="px-2 py-3">Product</th>
+              <th className="px-2 py-3">SKU</th>
+              <th className="px-2 py-3 text-right">Price</th>
+              <th className="px-2 py-3 text-right">Qty</th>
+              <th className="px-4 py-3 text-right">Subtotal</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-white">
+            {receipt.items.map((it, i) => (
+              <tr key={i} className="border-t border-navy-800/10 align-top">
+                <td className="px-4 py-3 text-navy-800/70">{i + 1}</td>
+                <td className="px-2 py-3">
+                  <span className="font-semibold text-navy-900">{it.name}</span>
+                  {(it.size || it.color) && (
+                    <span className="block text-xs text-navy-800/50">{[it.size, it.color].filter(Boolean).join(" / ")}</span>
+                  )}
+                </td>
+                <td className="px-2 py-3 text-navy-800/70">{it.sku || "—"}</td>
+                <td className="px-2 py-3 text-right text-navy-800/70">{billPrice(it.unitPrice)}</td>
+                <td className="px-2 py-3 text-right text-navy-800/70">{it.quantity}</td>
+                <td className="px-4 py-3 text-right font-semibold text-navy-900">{billPrice(it.lineTotal)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="my-4 border-t border-dashed border-[#1a1a1a]/40" />
-
-      <div className="space-y-1.5 text-sm">
+      {/* Totals */}
+      <div className="mt-5 space-y-2.5 text-sm">
         <div className="flex justify-between">
-          <span>Subtotal</span>
-          <span>{billPrice(receipt.subtotal)}</span>
+          <span className="text-navy-800/70">Subtotal</span>
+          <span className="font-semibold text-navy-900">{billPrice(receipt.subtotal)}</span>
         </div>
         {receipt.discountAmount > 0 && (
           <div className="flex justify-between">
-            <span>Discount</span>
-            <span>-{billPrice(receipt.discountAmount)}</span>
+            <span className="text-navy-800/70">Discount</span>
+            <span className="font-semibold text-emerald-600">-{billPrice(receipt.discountAmount)}</span>
           </div>
         )}
         {receipt.taxAmount > 0 && (
           <div className="flex justify-between">
-            <span>Tax</span>
-            <span>{billPrice(receipt.taxAmount)}</span>
+            <span className="text-navy-800/70">Tax</span>
+            <span className="font-semibold text-navy-900">{billPrice(receipt.taxAmount)}</span>
           </div>
         )}
         {!!receipt.deliveryFee && (
           <div className="flex justify-between">
-            <span>Delivery</span>
-            <span>{billPrice(receipt.deliveryFee)}</span>
+            <span className="text-navy-800/70">Delivery</span>
+            <span className="font-semibold text-navy-900">{billPrice(receipt.deliveryFee)}</span>
           </div>
         )}
-        <div className="flex justify-between pt-2 text-base font-bold">
-          <span>Grand Total</span>
-          <span>{billPrice(receipt.total)}</span>
+
+        <div className="flex items-center justify-between rounded-xl bg-navy-900 px-5 py-3.5">
+          <span className="text-base font-bold text-white">Grand Total</span>
+          <span className="text-lg font-extrabold text-white">{billPrice(receipt.total)}</span>
         </div>
-        {receipt.paymentMethod === "cash" && receipt.amountTendered !== null && (
-          <>
-            <div className="flex justify-between text-xs text-[#1a1a1a]/70">
-              <span>Cash Tendered</span>
-              <span>{billPrice(receipt.amountTendered)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-[#1a1a1a]/70">
-              <span>Change</span>
-              <span>{billPrice(receipt.changeDue ?? 0)}</span>
-            </div>
-          </>
-        )}
+
         {receipt.paymentMethod === "card" && (
-          <div className="flex justify-between text-xs text-[#1a1a1a]/70">
-            <span>Payment Method</span>
-            <span>Card</span>
+          <div className="flex justify-between">
+            <span className="text-navy-800/70">Payment Method</span>
+            <span className="font-semibold text-navy-900">Card</span>
           </div>
         )}
       </div>
 
-      <div className="my-4 border-t border-dashed border-[#1a1a1a]/40" />
-
-      <p className="text-center text-sm font-bold">THANK YOU FOR YOUR PURCHASE!</p>
+      <p className="mt-7 text-center text-sm font-bold tracking-[0.1em] text-navy-900">THANK YOU FOR YOUR PURCHASE!</p>
     </div>
   );
 }

@@ -786,7 +786,7 @@ function Row({ label, value, bold, tone }: { label: string; value: string; bold?
 function ReceiptModal({ receipt, onClose }: { receipt: Receipt; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
         <POSReceiptBill receipt={receipt} />
         <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
           <button onClick={onClose} className="btn-outline">New Sale</button>
