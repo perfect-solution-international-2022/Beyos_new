@@ -19,6 +19,7 @@ interface Order {
   koombiyoStatus: string | null;
   koombiyoUpdatedAt: string | null;
   fulfillmentType?: string;
+  deliveryStatus?: string | null;
   cashierName?: string;
   createdAt: string;
 }
@@ -30,6 +31,13 @@ const paymentBadge: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",
   unpaid: "bg-amber-100 text-amber-700",
   refunded: "bg-red-100 text-red-700",
+};
+
+const deliveryBadge: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700",
+  shipped: "bg-blue-100 text-blue-700",
+  delivered: "bg-emerald-100 text-emerald-700",
+  cancelled: "bg-red-100 text-red-700",
 };
 
 const methodLabel: Record<string, string> = {
@@ -270,9 +278,14 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                   </td>
                   <td className="px-6 py-4">
                     {o.type === "pos" ? (
-                      <span className="text-xs text-navy-800/45">
-                        {o.fulfillmentType === "delivery" ? "POS delivery" : "Store pickup"}
-                      </span>
+                      <div className="flex flex-col gap-1 text-xs text-navy-800/45">
+                        <span>{o.fulfillmentType === "delivery" ? "POS delivery" : "Store pickup"}</span>
+                        {o.fulfillmentType === "delivery" && (
+                          <span className={`badge w-fit capitalize ${deliveryBadge[o.deliveryStatus ?? "pending"] ?? "bg-navy-50 text-navy-800"}`}>
+                            {o.deliveryStatus ?? "pending"}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <select
                         value={o.status}
