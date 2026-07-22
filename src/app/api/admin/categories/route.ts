@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 
@@ -71,6 +72,8 @@ export async function POST(request: Request) {
       [name, slug, b.parentId || null, Boolean(b.homepageVisible), Boolean(b.shopVisible), nextOrder, href]
     );
     const created = await query<{ id: number }>("SELECT id FROM categories WHERE slug = ? LIMIT 1", [slug]);
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({ ok: true, id: created[0]?.id });
   } catch (err) {
     console.error("admin categories POST error:", err);
@@ -103,6 +106,8 @@ export async function PATCH(request: Request) {
        WHERE id = ?`,
       [name, slug, b.parentId || null, Boolean(b.homepageVisible), Boolean(b.shopVisible), href, b.id]
     );
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({ ok: true, id: Number(b.id) });
   } catch (err) {
     console.error("admin categories PATCH error:", err);
@@ -118,6 +123,8 @@ export async function DELETE(request: Request) {
   if (!b.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   try {
     await query("DELETE FROM categories WHERE id = ?", [b.id]);
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin categories DELETE error:", err);

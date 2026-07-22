@@ -103,7 +103,7 @@ export default function Header() {
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-1">
+        <div className="hidden items-center gap-1 lg:flex">
           {/* Account */}
           <div className="relative">
             {mounted && user ? (

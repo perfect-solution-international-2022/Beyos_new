@@ -7,9 +7,10 @@ import Newsletter from "@/components/Newsletter";
 import { getFeaturedProducts } from "@/lib/products-db";
 import { getHomeCategories } from "@/lib/categories-db";
 
-// Featured products come from MySQL (admin-managed) — must not be cached
-// at build time, or admin edits wouldn't show up until a rebuild.
-export const dynamic = "force-dynamic";
+// Featured products come from MySQL (admin-managed). ISR keeps the page
+// cached and fast, while admin writes call revalidatePath("/") for instant
+// updates — a 60s revalidate is just the safety-net upper bound.
+export const revalidate = 60;
 
 const features = [
   {

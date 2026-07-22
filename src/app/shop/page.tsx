@@ -9,7 +9,9 @@ export const metadata: Metadata = {
   description: "Browse the full Beyos Clothing collection for men and women.",
 };
 
-export const dynamic = "force-dynamic";
+// ISR: cached for speed, refreshed instantly on admin writes via
+// revalidatePath("/shop"), with a 60s revalidate as the safety-net upper bound.
+export const revalidate = 60;
 
 export default async function ShopPage() {
   const [products, categories] = await Promise.all([

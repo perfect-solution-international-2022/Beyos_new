@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/admin";
 import { query } from "@/lib/db";
 
@@ -42,6 +43,8 @@ export async function POST(request: Request) {
       "UPDATE categories SET image_data = ?, image_mime = ? WHERE id = ?",
       [Buffer.from(bytes), image.type, categoryId]
     );
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({
       ok: true,
       imageUrl: `/api/categories/${categoryId}/image?v=${Date.now()}`,
@@ -65,5 +68,7 @@ export async function DELETE(request: Request) {
   if (!Number.isInteger(categoryId) || categoryId <= 0)
     return NextResponse.json({ error: "Invalid category" }, { status: 400 });
   await query("UPDATE categories SET image_data = NULL, image_mime = NULL WHERE id = ?", [categoryId]);
+  revalidatePath("/");
+  revalidatePath("/shop");
   return NextResponse.json({ ok: true });
 }

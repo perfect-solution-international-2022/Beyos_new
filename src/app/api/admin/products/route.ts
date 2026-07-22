@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 
@@ -228,6 +229,8 @@ export async function POST(request: Request) {
     await saveVariants(productId, variants);
     await saveLinks(productId, b.links);
     await associateImages(productId, image, gallery);
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({ ok: true, slug });
     } catch (error) {
       if (productId) await query("DELETE FROM products WHERE id = ?", [productId]).catch(() => {});
@@ -294,6 +297,8 @@ export async function PATCH(request: Request) {
     if (b.variants !== undefined) await saveVariants(b.id, b.variants);
     if (b.links !== undefined) await saveLinks(b.id, b.links);
     if (b.image !== undefined || b.images !== undefined) await associateImages(b.id, b.image, b.images);
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin products PATCH error:", err);
@@ -309,6 +314,8 @@ export async function DELETE(request: Request) {
   if (!b.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   try {
     await query("DELETE FROM products WHERE id = ?", [b.id]);
+    revalidatePath("/");
+    revalidatePath("/shop");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin products DELETE error:", err);

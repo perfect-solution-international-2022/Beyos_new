@@ -14,7 +14,7 @@ export const pool =
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "beyos",
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 20,
     queueLimit: 0,
     namedPlaceholders: true,
     dateStrings: true,
