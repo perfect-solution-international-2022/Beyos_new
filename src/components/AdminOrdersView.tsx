@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import ResellerStatusBadge from "@/components/ResellerStatusBadge";
@@ -113,39 +114,6 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
     }
   };
 
-  const runKoombiyoAction = async (o: Order) => {
-    const action = o.koombiyoWaybillId ? "track" : "dispatch";
-    setSaving(`${o.orderRef}:koombiyo`);
-    try {
-      const response = await fetch("/api/admin/orders/koombiyo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderRef: o.orderRef, action, type: o.type }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Koombiyo request failed");
-      setOrders((previous) =>
-        previous.map((item) =>
-          item.orderRef === o.orderRef
-            ? {
-                ...item,
-                status: data.status || item.status,
-                paymentStatus: data.status === "delivered" ? "paid" : item.paymentStatus,
-                koombiyoWaybillId: data.waybillId,
-                koombiyoStatus: data.courierStatus,
-                koombiyoUpdatedAt: data.updatedAt || new Date().toISOString(),
-              }
-            : item
-        )
-      );
-      toast(action === "dispatch" ? `${o.orderRef} sent to Koombiyo` : `Tracking updated for ${o.orderRef}`);
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "Koombiyo request failed", "error");
-    } finally {
-      setSaving("");
-    }
-  };
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-navy-800">{pendingOnly ? "Pending Orders" : "All Orders"}</h1>
@@ -209,13 +177,14 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
               <th className="px-6 py-4">Payment</th>
               <th className="px-6 py-4">Courier</th>
               <th className="px-6 py-4">Update</th>
+              <th className="px-6 py-4"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={10} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={9} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
+              <tr><td colSpan={10} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
             ) : (
               filtered.map((o) => (
                 <tr
@@ -252,25 +221,10 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {o.type === "customer" || o.type === "reseller" ? (
-                      <div className="flex min-w-[130px] flex-col gap-1.5">
-                        {o.koombiyoWaybillId && (
-                          <>
-                            <span className="font-mono text-xs font-semibold text-navy-800">{o.koombiyoWaybillId}</span>
-                            <span className="text-xs text-navy-800/55">{o.koombiyoStatus || "Awaiting update"}</span>
-                          </>
-                        )}
-                        <button
-                          disabled={saving === `${o.orderRef}:koombiyo` || o.status === "cancelled"}
-                          onClick={() => runKoombiyoAction(o)}
-                          className="w-fit text-xs font-semibold text-brand hover:underline disabled:opacity-40"
-                        >
-                          {saving === `${o.orderRef}:koombiyo`
-                            ? "Working…"
-                            : o.koombiyoWaybillId
-                              ? "Sync tracking"
-                              : "Send to Koombiyo"}
-                        </button>
+                    {(o.type === "customer" || o.type === "reseller") && o.koombiyoWaybillId ? (
+                      <div className="flex min-w-[130px] flex-col gap-1">
+                        <span className="font-mono text-xs font-semibold text-navy-800">{o.koombiyoWaybillId}</span>
+                        <span className="text-xs text-navy-800/55">{o.koombiyoStatus || "Awaiting update"}</span>
                       </div>
                     ) : (
                       <span className="text-navy-800/30">—</span>
@@ -298,6 +252,14 @@ export default function AdminOrdersView({ pendingOnly = false }: { pendingOnly?:
                         ))}
                       </select>
                     )}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <Link
+                      href={`/admin/orders/${encodeURIComponent(o.orderRef)}`}
+                      className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100"
+                    >
+                      View
+                    </Link>
                   </td>
                 </tr>
               ))

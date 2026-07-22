@@ -27,13 +27,13 @@ export async function POST(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let body: { orderRef?: string; action?: "dispatch" | "track"; specialNote?: string; type?: string };
+  let body: { orderRef?: string; action?: "request-waybill" | "place-order" | "track"; specialNote?: string; type?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  if (!body.orderRef || !["dispatch", "track"].includes(body.action || "")) {
+  if (!body.orderRef || !["request-waybill", "place-order", "track"].includes(body.action || "")) {
     return NextResponse.json({ error: "Order reference and action are required" }, { status: 400 });
   }
 
@@ -62,10 +62,23 @@ export async function POST(request: Request) {
       await Promise.allSettled(tasks);
     };
 
-    if (body.action === "dispatch") {
+    if (body.action === "request-waybill") {
       const waybillId = order.koombiyo_waybill_id || (await requestWaybill());
+      if (!order.koombiyo_waybill_id) {
+        await query(
+          `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_waybill_id = ? WHERE order_ref = ?`,
+          [waybillId, order.order_ref]
+        );
+      }
+      return NextResponse.json({ ok: true, waybillId });
+    }
+
+    if (body.action === "place-order") {
+      if (!order.koombiyo_waybill_id) {
+        return NextResponse.json({ error: "Request a waybill ID before placing the order" }, { status: 400 });
+      }
       const response = await submitOrder({
-        waybillId,
+        waybillId: order.koombiyo_waybill_id,
         orderRef: order.order_ref,
         receiverName: order.customer_name,
         receiverStreet: `${order.address}${order.city ? `, ${order.city}` : ""}`,
@@ -76,15 +89,15 @@ export async function POST(request: Request) {
         cityId: order.city_id ?? undefined,
       });
       await query(
-        `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_waybill_id = ?, koombiyo_status = 'Booked',
+        `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_status = 'Booked',
          koombiyo_response = ?, koombiyo_updated_at = NOW(), status = 'confirmed'
          WHERE order_ref = ?`,
-        [waybillId, JSON.stringify(response), order.order_ref]
+        [JSON.stringify(response), order.order_ref]
       );
       if (order.status !== "confirmed") {
         await notify("confirmed");
       }
-      return NextResponse.json({ ok: true, waybillId, courierStatus: "Booked", status: "confirmed" });
+      return NextResponse.json({ ok: true, waybillId: order.koombiyo_waybill_id, courierStatus: "Booked", status: "confirmed" });
     }
 
     if (!order.koombiyo_waybill_id) {

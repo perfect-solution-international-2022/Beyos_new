@@ -11,10 +11,6 @@ interface AdminUser {
   phone: string;
   city: string | null;
   resellerStatus: "pending" | "approved" | "suspended" | "rejected";
-  allowPriceOverride: boolean;
-  minMarkupPct: number;
-  maxMarkupPct: number | null;
-  creditLimit: number;
   createdAt: string;
 }
 
@@ -86,23 +82,6 @@ export default function AdminUsersTable({
     }
   };
 
-  const savePricingRules = async (u: AdminUser) => {
-    setSaving(u.id);
-    try {
-      const res = await fetch("/api/admin/users", {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: u.id, pricingRules: {
-          allowPriceOverride: u.allowPriceOverride, minMarkupPct: u.minMarkupPct,
-          maxMarkupPct: u.maxMarkupPct, creditLimit: u.creditLimit,
-        } }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not save pricing rules");
-      toast("Reseller pricing rules saved");
-    } catch (error) { toast(error instanceof Error ? error.message : "Could not save pricing rules", "error"); }
-    finally { setSaving(0); }
-  };
-
   const del = async (u: AdminUser) => {
     const ok = await confirm({
       title: "Delete user?",
@@ -138,15 +117,14 @@ export default function AdminUsersTable({
               <th className="px-6 py-4">Phone</th>
               <th className="px-6 py-4">Joined</th>
               <th className="px-6 py-4">Role</th>
-              {role === "reseller" && <th className="px-6 py-4">Pricing Rules</th>}
               {manage && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={role === "reseller" ? 6 : manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={role === "reseller" ? 6 : manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
+              <tr><td colSpan={manage ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
             ) : (
               filtered.map((u) => (
                 <tr key={u.id} className="border-b border-navy-800/5 last:border-0">
@@ -193,20 +171,6 @@ export default function AdminUsersTable({
                       </div>
                     )}
                   </td>
-                  {role === "reseller" && (
-                    <td className="px-6 py-4">
-                      <div className="grid min-w-[340px] grid-cols-4 gap-2 text-xs">
-                        <label className="col-span-4 flex items-center gap-2">
-                          <input type="checkbox" checked={u.allowPriceOverride} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, allowPriceOverride: e.target.checked } : x))} />
-                          Allow custom customer price
-                        </label>
-                        <input aria-label="Minimum markup percent" title="Minimum markup %" type="number" min="0" value={u.minMarkupPct} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, minMarkupPct: Number(e.target.value) } : x))} className="input px-2 py-1" placeholder="Min %" />
-                        <input aria-label="Maximum markup percent" title="Maximum markup %" type="number" min="0" value={u.maxMarkupPct ?? ""} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, maxMarkupPct: e.target.value === "" ? null : Number(e.target.value) } : x))} className="input px-2 py-1" placeholder="Max %" />
-                        <input aria-label="Credit limit" title="Credit limit" type="number" min="0" value={u.creditLimit} onChange={(e) => setUsers((xs) => xs.map((x) => x.id === u.id ? { ...x, creditLimit: Number(e.target.value) } : x))} className="input px-2 py-1" placeholder="Credit" />
-                        <button disabled={saving === u.id} onClick={() => savePricingRules(u)} className="rounded-lg bg-brand px-2 py-1 font-semibold text-white disabled:opacity-50">Save</button>
-                      </div>
-                    </td>
-                  )}
                   {manage && (
                     <td className="px-6 py-4">
                       <div className="flex justify-end">

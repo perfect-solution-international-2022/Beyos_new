@@ -44,6 +44,8 @@ interface Receipt {
   deliveryAddress?: string | null;
   deliveryCity?: string | null;
   deliveryStatus?: string | null;
+  koombiyoWaybillId?: string | null;
+  koombiyoStatus?: string | null;
   createdAt: string;
 }
 
@@ -52,6 +54,9 @@ export default function AdminPosSalesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [koombiyoBusy, setKoombiyoBusy] = useState<"waybill" | "place" | null>(null);
+  const [koombiyoError, setKoombiyoError] = useState("");
+  const [specialNote, setSpecialNote] = useState("");
 
   const load = (q?: string) => {
     setLoading(true);
@@ -77,6 +82,45 @@ export default function AdminPosSalesPage() {
     if (!res.ok) return;
     setSales((prev) => prev.map((s) => (s.receiptNumber === receiptNumber ? { ...s, deliveryStatus } : s)));
     setReceipt((prev) => (prev && prev.receiptNumber === receiptNumber ? { ...prev, deliveryStatus } : prev));
+  };
+
+  const requestWaybill = async () => {
+    if (!receipt) return;
+    setKoombiyoBusy("waybill");
+    setKoombiyoError("");
+    try {
+      const res = await fetch("/api/admin/pos/sales/koombiyo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiptNumber: receipt.receiptNumber, action: "request-waybill" }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Could not request a waybill ID");
+      setReceipt((prev) => (prev ? { ...prev, koombiyoWaybillId: d.waybillId } : prev));
+    } catch (error) {
+      setKoombiyoError(error instanceof Error ? error.message : "Could not request a waybill ID");
+    } finally {
+      setKoombiyoBusy(null);
+    }
+  };
+
+  const placeOrder = async () => {
+    if (!receipt) return;
+    setKoombiyoBusy("place");
+    setKoombiyoError("");
+    try {
+      const res = await fetch("/api/admin/pos/sales/koombiyo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiptNumber: receipt.receiptNumber, action: "place-order", specialNote }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || "Could not place the order with Koombiyo");
+      setReceipt((prev) => (prev ? { ...prev, koombiyoStatus: d.courierStatus, deliveryStatus: d.deliveryStatus } : prev));
+      setSales((prev) => prev.map((s) => (s.receiptNumber === receipt.receiptNumber ? { ...s, deliveryStatus: d.deliveryStatus } : s)));
+    } catch (error) {
+      setKoombiyoError(error instanceof Error ? error.message : "Could not place the order with Koombiyo");
+    } finally {
+      setKoombiyoBusy(null);
+    }
   };
 
   return (
@@ -150,37 +194,107 @@ export default function AdminPosSalesPage() {
       {receipt && (
         <ReceiptModal
           receipt={receipt}
-          onClose={() => setReceipt(null)}
+          onClose={() => { setReceipt(null); setKoombiyoError(""); setSpecialNote(""); }}
           onStatusChange={(status) => updateDeliveryStatus(receipt.receiptNumber, status)}
+          koombiyoBusy={koombiyoBusy}
+          koombiyoError={koombiyoError}
+          specialNote={specialNote}
+          onSpecialNoteChange={setSpecialNote}
+          onRequestWaybill={requestWaybill}
+          onPlaceOrder={placeOrder}
         />
       )}
     </div>
   );
 }
 
-function ReceiptModal({ receipt, onClose, onStatusChange }: { receipt: Receipt; onClose: () => void; onStatusChange: (status: string) => void }) {
+function ReceiptModal({
+  receipt,
+  onClose,
+  onStatusChange,
+  koombiyoBusy,
+  koombiyoError,
+  specialNote,
+  onSpecialNoteChange,
+  onRequestWaybill,
+  onPlaceOrder,
+}: {
+  receipt: Receipt;
+  onClose: () => void;
+  onStatusChange: (status: string) => void;
+  koombiyoBusy: "waybill" | "place" | null;
+  koombiyoError: string;
+  specialNote: string;
+  onSpecialNoteChange: (value: string) => void;
+  onRequestWaybill: () => void;
+  onPlaceOrder: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
         <POSReceiptBill receipt={receipt} />
 
         {receipt.fulfillmentType === "delivery" && (
-          <div className="mx-6 mb-6 rounded-lg bg-navy-50 p-3 print:hidden">
-            <p className="mb-1.5 text-xs font-semibold text-navy-800">Delivery status</p>
-            <div className="flex gap-1.5">
-              {(["pending", "out_for_delivery", "delivered"] as const).map((s) => (
+          <div className="mx-6 mb-4 space-y-3 rounded-lg bg-navy-50 p-3 print:hidden">
+            {koombiyoError && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{koombiyoError}</p>
+            )}
+
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-navy-800">Waybill ID</p>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={receipt.koombiyoWaybillId ?? ""}
+                  placeholder="Click &quot;Request Waybill ID&quot; to get a waybill"
+                  className="input flex-1 bg-white text-xs disabled:text-navy-800/40"
+                />
                 <button
-                  key={s}
-                  onClick={() => onStatusChange(s)}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
-                    (receipt.deliveryStatus ?? "pending") === s
-                      ? DELIVERY_STATUS_STYLES[s]
-                      : "bg-white text-navy-800/50 hover:bg-navy-100"
-                  }`}
+                  onClick={onRequestWaybill}
+                  disabled={koombiyoBusy !== null}
+                  className="shrink-0 rounded-lg bg-navy-800 px-3 py-2 text-xs font-semibold text-white hover:bg-navy-900 disabled:opacity-50"
                 >
-                  {DELIVERY_STATUS_LABELS[s]}
+                  {koombiyoBusy === "waybill" ? "Requesting…" : "Request Waybill ID"}
                 </button>
-              ))}
+              </div>
+            </div>
+
+            {receipt.koombiyoWaybillId && (
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-navy-800">Special notes</p>
+                <textarea
+                  value={specialNote}
+                  onChange={(e) => onSpecialNoteChange(e.target.value)}
+                  rows={2}
+                  className="input w-full resize-none bg-white text-xs"
+                />
+                <button
+                  onClick={onPlaceOrder}
+                  disabled={koombiyoBusy !== null}
+                  className="btn-primary mt-2 w-full disabled:opacity-50"
+                >
+                  {koombiyoBusy === "place" ? "Processing…" : "Place Order"}
+                </button>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-navy-800">Delivery status</p>
+              <div className="flex gap-1.5">
+                {(["pending", "out_for_delivery", "delivered"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => onStatusChange(s)}
+                    className={`flex-1 rounded-lg py-1.5 text-xs font-semibold transition ${
+                      (receipt.deliveryStatus ?? "pending") === s
+                        ? DELIVERY_STATUS_STYLES[s]
+                        : "bg-white text-navy-800/50 hover:bg-navy-100"
+                    }`}
+                  >
+                    {DELIVERY_STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

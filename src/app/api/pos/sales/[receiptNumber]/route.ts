@@ -45,6 +45,8 @@ export async function GET(
         deliveryAddress: sale.delivery_address,
         deliveryCity: sale.delivery_city,
         deliveryStatus: sale.delivery_status,
+        koombiyoWaybillId: sale.koombiyo_waybill_id,
+        koombiyoStatus: sale.koombiyo_status,
         createdAt: sale.created_at,
       },
     });
