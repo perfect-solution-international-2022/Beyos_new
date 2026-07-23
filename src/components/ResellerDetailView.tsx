@@ -125,7 +125,7 @@ export default function ResellerDetailView({ resellerId }: { resellerId: string 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {/* Orders */}
-          <div className="rounded-2xl border border-navy-800/5 bg-white shadow-sm">
+          <div id="orders" className="rounded-2xl border border-navy-800/5 bg-white shadow-sm scroll-mt-24">
             <div className="px-6 pt-6"><h2 className="font-bold text-navy-800">Recent Orders</h2></div>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full text-left text-sm">

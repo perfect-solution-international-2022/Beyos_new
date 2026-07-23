@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
+import InvoiceView from "@/components/InvoiceView";
 
 interface OrderItem {
   name: string;
@@ -91,6 +92,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deciding, setDeciding] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const load = () => {
     fetch(`/api/admin/orders/${encodeURIComponent(orderRef)}`, { cache: "no-store" })
@@ -115,15 +117,16 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
   const status = statusColor(order.status);
 
   const isPendingReseller = order.type === "reseller" && order.status === "pending";
+  const isPendingCustomerCod = order.type === "customer" && order.paymentMethod === "cod" && order.status === "pending";
   const isPendingPosDelivery = order.type === "pos" && order.fulfillmentType === "delivery" && order.deliveryStatus === "pending";
 
-  const decideReseller = async (status: "confirmed" | "rejected") => {
+  const decideOrder = async (type: "reseller" | "customer", status: "confirmed" | "rejected" | "cancelled") => {
     setDeciding(true);
     try {
       await fetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "reseller", orderRef: order.orderRef, status }),
+        body: JSON.stringify({ type, orderRef: order.orderRef, status }),
       });
       toast(status === "confirmed" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
       load();
@@ -154,24 +157,42 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
           <h1 className="text-2xl font-bold text-navy-800">{typeLabel[order.type]}</h1>
           <p className="mt-1 text-sm text-navy-800/50">Order ID: #{order.orderRef}</p>
         </div>
-        {(isPendingReseller || isPendingPosDelivery) && (
-          <div className="flex gap-2">
+        <div className="flex gap-2">
+          {order.type !== "pos" && (
             <button
-              disabled={deciding}
-              onClick={() => (isPendingReseller ? decideReseller("confirmed") : decidePos("accepted"))}
-              className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+              onClick={() => setShowInvoice(true)}
+              className="rounded-lg bg-navy-50 px-4 py-2 text-sm font-semibold text-navy-800 hover:bg-navy-100"
             >
-              Accept
+              View Invoice
             </button>
-            <button
-              disabled={deciding}
-              onClick={() => (isPendingReseller ? decideReseller("rejected") : decidePos("cancelled"))}
-              className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
-            >
-              Reject
-            </button>
-          </div>
-        )}
+          )}
+          {(isPendingReseller || isPendingCustomerCod || isPendingPosDelivery) && (
+            <>
+              <button
+                disabled={deciding}
+                onClick={() =>
+                  isPendingPosDelivery
+                    ? decidePos("accepted")
+                    : decideOrder(isPendingReseller ? "reseller" : "customer", "confirmed")
+                }
+                className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
+              >
+                Accept
+              </button>
+              <button
+                disabled={deciding}
+                onClick={() =>
+                  isPendingPosDelivery
+                    ? decidePos("cancelled")
+                    : decideOrder(isPendingReseller ? "reseller" : "customer", isPendingReseller ? "rejected" : "cancelled")
+                }
+                className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
+              >
+                Reject
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {order.rejectReason && (
@@ -379,6 +400,24 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
 
       {(order.type === "customer" || order.type === "reseller" || (order.type === "pos" && order.fulfillmentType === "delivery")) && (
         <KoombiyoWizard order={order} onUpdated={load} />
+      )}
+
+      {showInvoice && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0"
+          onClick={() => setShowInvoice(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <InvoiceView order={order} />
+            <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
+              <button onClick={() => setShowInvoice(false)} className="btn-outline">Close</button>
+              <button onClick={() => window.print()} className="btn-primary">Print</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

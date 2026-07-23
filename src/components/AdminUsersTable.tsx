@@ -175,12 +175,20 @@ export default function AdminUsersTable({
                   </td>
                   {role === "reseller" && (
                     <td className="px-6 py-4">
-                      <Link
-                        href={`/admin/resellers/${u.id}`}
-                        className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100"
-                      >
-                        View
-                      </Link>
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/admin/resellers/${u.id}`}
+                          className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100"
+                        >
+                          View
+                        </Link>
+                        <Link
+                          href={`/admin/resellers/${u.id}#orders`}
+                          className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100"
+                        >
+                          Orders
+                        </Link>
+                      </div>
                     </td>
                   )}
                   {manage && (

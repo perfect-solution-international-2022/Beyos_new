@@ -20,6 +20,7 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState(0);
   const [freeShippingPromo, setFreeShippingPromo] = useState(false);
   const [shipping, setShipping] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<"onepay" | "cod">("onepay");
 
   const [form, setForm] = useState({
     name: "",
@@ -124,6 +125,19 @@ export default function CheckoutPage() {
         })),
         promoCode: promoCode || undefined,
       });
+
+      if (paymentMethod === "cod") {
+        const res = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not place order");
+        useCart.getState().clear();
+        router.push(`/checkout/onepay/return?ref=${data.order.orderId}`);
+        return;
+      }
 
       const res = await fetch("/api/checkout/onepay", {
         method: "POST",
@@ -256,18 +270,55 @@ export default function CheckoutPage() {
           </div>
 
           <h2 className="mt-10 text-lg font-bold text-navy-800">Payment</h2>
-          <div className="mt-4 flex items-start gap-3 rounded-2xl border border-brand bg-brand-50 p-5 text-sm">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
-              <rect x="1" y="5" width="22" height="15" rx="2" />
-              <line x1="1" y1="10" x2="23" y2="10" />
-              <path d="M6 15h4" />
-            </svg>
-            <div>
-              <div className="font-semibold text-navy-800">Pay by Card</div>
-              <p className="mt-1 text-navy-800/60">
-                Secure card payment via OnePay. You&apos;ll be redirected to complete payment.
-              </p>
-            </div>
+          <div className="mt-4 space-y-3">
+            <label
+              className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm transition ${
+                paymentMethod === "onepay" ? "border-brand bg-brand-50" : "border-navy-800/10 hover:border-navy-800/20"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                checked={paymentMethod === "onepay"}
+                onChange={() => setPaymentMethod("onepay")}
+                className="mt-1 shrink-0 accent-brand"
+              />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
+                <rect x="1" y="5" width="22" height="15" rx="2" />
+                <line x1="1" y1="10" x2="23" y2="10" />
+                <path d="M6 15h4" />
+              </svg>
+              <div>
+                <div className="font-semibold text-navy-800">Pay by Card</div>
+                <p className="mt-1 text-navy-800/60">
+                  Secure card payment via OnePay. You&apos;ll be redirected to complete payment.
+                </p>
+              </div>
+            </label>
+
+            <label
+              className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm transition ${
+                paymentMethod === "cod" ? "border-brand bg-brand-50" : "border-navy-800/10 hover:border-navy-800/20"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                checked={paymentMethod === "cod"}
+                onChange={() => setPaymentMethod("cod")}
+                className="mt-1 shrink-0 accent-brand"
+              />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
+                <rect x="2" y="6" width="20" height="12" rx="2" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+              <div>
+                <div className="font-semibold text-navy-800">Cash on Delivery</div>
+                <p className="mt-1 text-navy-800/60">
+                  Pay in cash when your order arrives.
+                </p>
+              </div>
+            </label>
           </div>
 
           {error && (
@@ -346,7 +397,13 @@ export default function CheckoutPage() {
             disabled={submitting}
             className="btn-primary mt-6 w-full"
           >
-            {submitting ? "Redirecting to OnePay…" : "Continue to Payment"}
+            {submitting
+              ? paymentMethod === "cod"
+                ? "Placing Order…"
+                : "Redirecting to OnePay…"
+              : paymentMethod === "cod"
+                ? "Place Order"
+                : "Continue to Payment"}
           </button>
           <p className="mt-3 text-center text-xs text-navy-800/40">
             🔒 Secure, encrypted checkout

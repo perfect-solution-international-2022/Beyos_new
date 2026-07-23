@@ -252,7 +252,8 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                           </span>
                         )}
                       </div>
-                    ) : o.type === "reseller" && o.status === "pending" ? (
+                    ) : (o.type === "reseller" && o.status === "pending") ||
+                      (o.type === "customer" && o.paymentMethod === "cod" && o.status === "pending") ? (
                       <span className="text-xs text-navy-800/45">Review to accept/reject</span>
                     ) : (
                       <select

@@ -121,12 +121,15 @@ export async function GET(request: Request) {
         createdAt: o.created_at,
       })),
     ]
-      // Reseller orders and POS delivery orders need explicit admin approval —
-      // they stay out of "All Orders" until accepted/rejected from Pending Orders.
+      // Reseller orders, POS delivery orders, and COD customer orders need explicit
+      // admin approval — they stay out of "All Orders" until accepted/rejected from
+      // Pending Orders. Customer orders paid via OnePay skip this (already paid).
       .filter((o) => {
         const isPending = o.type === "pos"
           ? "deliveryStatus" in o && o.deliveryStatus === "pending"
-          : o.type === "reseller" && o.status === "pending";
+          : o.type === "reseller"
+            ? o.status === "pending"
+            : o.type === "customer" && o.paymentMethod === "cod" && o.status === "pending";
         const isRejected = o.type === "pos"
           ? "deliveryStatus" in o && o.deliveryStatus === "cancelled"
           : o.status === "cancelled" || o.status === "rejected";
@@ -138,6 +141,7 @@ export async function GET(request: Request) {
         if (view === "rejected") return isRejected;
         if (o.type === "reseller" && o.status === "pending") return false;
         if (o.type === "pos" && "deliveryStatus" in o && o.deliveryStatus === "pending") return false;
+        if (o.type === "customer" && o.paymentMethod === "cod" && o.status === "pending") return false;
         return true;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
