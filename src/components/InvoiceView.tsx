@@ -54,7 +54,7 @@ export default function InvoiceView({ order }: { order: InvoiceData }) {
               <span className="text-navy-900">BEYOS</span> <span className="text-brand">CLOTHING</span>
             </p>
             <p className="text-xs text-navy-800/50">Kendagaha junction, Elpitiya 80458</p>
-            <p className="text-xs text-navy-800/50">+94 77 170 3844</p>
+            <p className="text-xs text-navy-800/50">+94 74 319 1200</p>
           </div>
         </div>
         <div className="text-right">

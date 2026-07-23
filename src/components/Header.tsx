@@ -98,7 +98,7 @@ export default function Header() {
           <PhoneIcon />
           <div className="flex flex-col">
             <span className="text-xs font-semibold text-navy-800">
-              Hotline: <a href="tel:+94771703844" className="hover:text-brand">+94 77 170 3844</a>
+              Hotline: <a href="tel:+94743191200" className="hover:text-brand">+94 74 319 1200</a>
             </span>
             <span className="text-[11px] text-navy-800/50">Pickup your order for free</span>
           </div>

@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 
 const contactDetails = [
   { icon: "✉", title: "Email Support", value: "support@beyosclothing.com", href: "mailto:support@beyosclothing.com" },
-  { icon: "☎", title: "Phone", value: "0771703844", href: "tel:+94771703844" },
+  { icon: "☎", title: "Phone", value: "0743191200", href: "tel:+94743191200" },
   { icon: "●", title: "Location", value: "Kendagaha junction, Elpitiya 80458" },
 ];
 

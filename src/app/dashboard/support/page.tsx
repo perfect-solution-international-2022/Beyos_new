@@ -92,7 +92,7 @@ export default function SupportPage() {
               </li>
               <li className="flex items-center gap-3">
                 <ContactIcon name="phone" />
-                +94 77 123 4567
+                +94 74 319 1200
               </li>
               <li className="flex items-center gap-3">
                 <ContactIcon name="clock" />

@@ -52,7 +52,7 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
 
       <div className="mt-5 flex flex-wrap items-start gap-x-6 gap-y-2 border-t border-b border-dashed border-navy-800/15 py-3 text-xs text-navy-800/70">
         <span>Kendagaha junction, Elpitiya 80458</span>
-        <span>+94 77 170 3844</span>
+        <span>+94 74 319 1200</span>
       </div>
 
       {/* Title */}
