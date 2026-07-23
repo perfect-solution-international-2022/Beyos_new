@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -15,7 +15,7 @@ function hasValidSignature(bytes: Uint8Array, type: string) {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let body: { promotionId?: number };
   try {

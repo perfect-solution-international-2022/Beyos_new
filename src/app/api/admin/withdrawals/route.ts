@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("finance");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const rows = await query<{
@@ -35,7 +35,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("finance");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: { withdrawRef?: string; status?: string };

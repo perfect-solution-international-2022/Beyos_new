@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ ref: string }> }
 ) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { ref } = await params;

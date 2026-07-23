@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { sendOrderStatusSms } from "@/lib/sms";
 import { sendOrderEmail } from "@/lib/mail";
 
@@ -9,7 +9,7 @@ const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "del
 const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"];
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const view = new URL(request.url).searchParams.get("view");
 
@@ -154,7 +154,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: { type?: string; orderRef?: string; status?: string; paymentStatus?: string };

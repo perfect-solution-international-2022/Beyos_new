@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 
 function parseRange(searchParams: URLSearchParams) {
   const end = searchParams.get("end") || new Date().toISOString().slice(0, 10);
@@ -11,7 +11,7 @@ function parseRange(searchParams: URLSearchParams) {
 }
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("finance");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);

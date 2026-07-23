@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
 
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -7,7 +7,7 @@ const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const MAX_FILES = 12;
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {

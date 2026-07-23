@@ -4,11 +4,13 @@ export const SESSION_COOKIE_NAME = "beyos_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
 
 export type SessionRole = "buyer" | "reseller" | "admin";
+export type AdminRole = "super" | "manager" | "cashier";
 
 export interface SessionPayload extends JWTPayload {
   uid: number;
   role: SessionRole;
   sv: number;
+  ar?: AdminRole;
 }
 
 export function sessionSecretKey(): Uint8Array {
@@ -28,7 +30,8 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     if (
       typeof payload.uid !== "number" ||
       typeof payload.sv !== "number" ||
-      !["buyer", "reseller", "admin"].includes(String(payload.role))
+      !["buyer", "reseller", "admin"].includes(String(payload.role)) ||
+      (payload.ar !== undefined && !["super", "manager", "cashier"].includes(String(payload.ar)))
     ) {
       return null;
     }

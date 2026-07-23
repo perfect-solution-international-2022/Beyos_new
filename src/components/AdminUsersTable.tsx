@@ -9,6 +9,7 @@ interface AdminUser {
   name: string;
   email: string;
   role: string;
+  adminRole: "super" | "manager" | "cashier" | null;
   phone: string;
   city: string | null;
   resellerStatus: "pending" | "approved" | "suspended" | "rejected";
@@ -21,7 +22,13 @@ const roleBadge: Record<string, string> = {
   buyer: "bg-blue-100 text-blue-700",
 };
 
-const blank = { firstName: "", lastName: "", email: "", phone: "", password: "", role: "buyer" };
+const adminRoleLabel: Record<string, string> = {
+  super: "Super Admin",
+  manager: "Manager",
+  cashier: "Cashier",
+};
+
+const blank = { firstName: "", lastName: "", email: "", phone: "", password: "", role: "buyer", adminRole: "super" };
 
 export default function AdminUsersTable({
   title,
@@ -56,10 +63,20 @@ export default function AdminUsersTable({
 
   const changeRole = async (id: number, newRole: string) => {
     setSaving(id);
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role: newRole } : u)));
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role: newRole, adminRole: newRole === "admin" ? (u.adminRole ?? "super") : null } : u)));
     try {
       await fetch("/api/admin/users", {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, role: newRole }),
+      });
+    } finally { setSaving(0); }
+  };
+
+  const changeAdminRole = async (id: number, adminRole: string) => {
+    setSaving(id);
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, adminRole: adminRole as AdminUser["adminRole"] } : u)));
+    try {
+      await fetch("/api/admin/users", {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, adminRole }),
       });
     } finally { setSaving(0); }
   };
@@ -141,19 +158,36 @@ export default function AdminUsersTable({
                   <td className="px-6 py-4 text-navy-800/60">{new Date(u.createdAt).toLocaleDateString("en-GB")}</td>
                   <td className="px-6 py-4">
                     {manage ? (
-                      <select
-                        value={u.role}
-                        disabled={saving === u.id}
-                        onChange={(e) => changeRole(u.id, e.target.value)}
-                        className="rounded-lg border border-navy-800/15 bg-white px-2 py-1.5 text-xs font-medium capitalize text-navy-800 outline-none focus:border-brand"
-                      >
-                        <option value="buyer">buyer</option>
-                        <option value="reseller">reseller</option>
-                        <option value="admin">admin</option>
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={u.role}
+                          disabled={saving === u.id}
+                          onChange={(e) => changeRole(u.id, e.target.value)}
+                          className="rounded-lg border border-navy-800/15 bg-white px-2 py-1.5 text-xs font-medium capitalize text-navy-800 outline-none focus:border-brand"
+                        >
+                          <option value="buyer">buyer</option>
+                          <option value="reseller">reseller</option>
+                          <option value="admin">admin</option>
+                        </select>
+                        {u.role === "admin" && (
+                          <select
+                            value={u.adminRole ?? "super"}
+                            disabled={saving === u.id}
+                            onChange={(e) => changeAdminRole(u.id, e.target.value)}
+                            className="rounded-lg border border-navy-800/15 bg-white px-2 py-1.5 text-xs font-medium text-navy-800 outline-none focus:border-brand"
+                          >
+                            <option value="super">Super Admin</option>
+                            <option value="manager">Manager</option>
+                            <option value="cashier">Cashier</option>
+                          </select>
+                        )}
+                      </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {u.role === "admin" && u.adminRole && (
+                          <span className="badge bg-navy-50 text-navy-800">{adminRoleLabel[u.adminRole]}</span>
+                        )}
                         {role === "reseller" && (
                           <>
                             <span className={`badge capitalize ${u.resellerStatus === "approved" ? "bg-emerald-100 text-emerald-700" : u.resellerStatus === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
@@ -246,6 +280,15 @@ function NewUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
               <option value="buyer">Buyer</option><option value="reseller">Reseller</option><option value="admin">Admin</option>
             </select>
           </Field>
+          {form.role === "admin" && (
+            <Field label="Admin Role">
+              <select value={form.adminRole} onChange={(e) => set("adminRole")(e.target.value)} className="input">
+                <option value="super">Super Admin — full access</option>
+                <option value="manager">Manager — Catalog, Sales, POS</option>
+                <option value="cashier">Cashier — POS only</option>
+              </select>
+            </Field>
+          )}
           {error && <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</p>}
         </div>
         <div className="mt-6 flex justify-end gap-3">

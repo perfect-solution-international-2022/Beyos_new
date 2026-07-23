@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { getDeliveryPricing, setDeliveryPricing } from "@/lib/shipping";
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("system");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const pricing = await getDeliveryPricing();
   return NextResponse.json({ pricing });
 }
 
 export async function PUT(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("system");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: { basePrice?: number; extraKgPrice?: number };

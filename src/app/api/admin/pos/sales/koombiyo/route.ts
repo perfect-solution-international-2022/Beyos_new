@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
 import { requestWaybill, submitOrder } from "@/lib/koombiyo";
 
@@ -15,7 +15,7 @@ interface PosSaleRow {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: { receiptNumber?: string; action?: "request-waybill" | "place-order"; specialNote?: string };

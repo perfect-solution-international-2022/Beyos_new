@@ -5,18 +5,21 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthProvider";
+import { AdminSection, canAccessSection } from "@/lib/adminSections";
 
 interface Leaf { label: string; href: string; }
 interface Item { label: string; icon: string; href?: string; children?: Leaf[]; }
-interface Section { title: string; items: Item[]; }
+interface Section { title: string; section: AdminSection; items: Item[]; }
 
 const sections: Section[] = [
   {
     title: "Overview",
+    section: "sales",
     items: [{ label: "Dashboard", icon: "grid", href: "/admin" }],
   },
   {
     title: "Catalog",
+    section: "catalog",
     items: [
       { label: "Products", icon: "tag", children: [
         { label: "All Products", href: "/admin/products" },
@@ -32,6 +35,7 @@ const sections: Section[] = [
   },
   {
     title: "Sales",
+    section: "sales",
     items: [
       { label: "Orders", icon: "cart", children: [
         { label: "All Orders", href: "/admin/orders" },
@@ -48,6 +52,7 @@ const sections: Section[] = [
   },
   {
     title: "People",
+    section: "people",
     items: [
       { label: "Resellers", icon: "store", href: "/admin/resellers" },
       { label: "Customers", icon: "users", href: "/admin/customers" },
@@ -56,6 +61,7 @@ const sections: Section[] = [
   },
   {
     title: "Finance",
+    section: "finance",
     items: [
       { label: "Withdraw", icon: "cash", children: [
         { label: "Pending Withdrawals", href: "/admin/withdrawals/pending" },
@@ -69,6 +75,7 @@ const sections: Section[] = [
   },
   {
     title: "System",
+    section: "system",
     items: [
       { label: "Delivery Pricing", icon: "gear", href: "/admin/delivery-pricing" },
       { label: "Settings", icon: "gear", href: "/admin/settings" },
@@ -78,13 +85,48 @@ const sections: Section[] = [
 
 interface SearchEntry { label: string; href: string; group: string; }
 
-const searchIndex: SearchEntry[] = sections.flatMap((s) =>
-  s.items.flatMap((item) =>
-    item.children
-      ? item.children.map((c) => ({ label: c.label, href: c.href, group: item.label }))
-      : [{ label: item.label, href: item.href!, group: s.title }]
-  )
-);
+function searchIndexFor(visibleSections: Section[]): SearchEntry[] {
+  return visibleSections.flatMap((s) =>
+    s.items.flatMap((item) =>
+      item.children
+        ? item.children.map((c) => ({ label: c.label, href: c.href, group: item.label }))
+        : [{ label: item.label, href: item.href!, group: s.title }]
+    )
+  );
+}
+
+// Cashier's landing page is the POS till, not the dashboard — the dashboard
+// itself lives under the "sales" section, which cashier can't see.
+function landingPageFor(adminRole: string | null | undefined): string {
+  return adminRole === "cashier" ? "/admin/pos" : "/admin";
+}
+
+// Maps every known admin path to the section that governs it, so direct
+// navigation (typed URL, bookmark, stale link) gets redirected just like a
+// hidden sidebar entry would be.
+const pathSection = new Map<string, AdminSection>();
+sections.forEach((s) => {
+  s.items.forEach((item) => {
+    if (item.href) pathSection.set(item.href.split("?")[0], s.section);
+    item.children?.forEach((c) => pathSection.set(c.href.split("?")[0], s.section));
+  });
+});
+pathSection.set("/admin/pos", "pos");
+
+function sectionForPath(pathname: string): AdminSection | null {
+  if (pathSection.has(pathname)) return pathSection.get(pathname)!;
+  // Dynamic detail routes (e.g. /admin/orders/ABC123, /admin/resellers/5) —
+  // match by longest registered prefix.
+  let best: AdminSection | null = null;
+  let bestLen = -1;
+  pathSection.forEach((section, path) => {
+    if (pathname.startsWith(path + "/") && path.length > bestLen) {
+      best = section;
+      bestLen = path.length;
+    }
+  });
+  return best;
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -100,9 +142,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (loading) return;
-    if (!user) router.replace("/login?redirect=/admin");
-    else if (user.role !== "admin") router.replace("/");
-  }, [loading, user, router]);
+    if (!user) { router.replace("/login?redirect=/admin"); return; }
+    if (user.role !== "admin") { router.replace("/"); return; }
+    const section = sectionForPath(pathname);
+    if (section && !canAccessSection(user.adminRole, section)) {
+      router.replace(landingPageFor(user.adminRole));
+    }
+  }, [loading, user, router, pathname]);
 
   useEffect(() => {
     sections.forEach((s) =>
@@ -125,13 +171,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
+  const visibleSections = useMemo(
+    () => (user ? sections.filter((s) => canAccessSection(user.adminRole, s.section)) : []),
+    [user]
+  );
+  const searchIndex = useMemo(() => searchIndexFor(visibleSections), [visibleSections]);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return searchIndex
       .filter((e) => e.label.toLowerCase().includes(q) || e.group.toLowerCase().includes(q))
       .slice(0, 8);
-  }, [query]);
+  }, [query, searchIndex]);
 
   if (loading || !user || user.role !== "admin") {
     return <div className="flex min-h-screen items-center justify-center bg-navy-50 text-navy-800/50">Loading admin…</div>;
@@ -139,6 +191,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (pathname === "/admin/pos") {
     return <div className="min-h-screen bg-[#f5f6f8]">{children}</div>;
+  }
+
+  const currentSection = sectionForPath(pathname);
+  if (currentSection && !canAccessSection(user.adminRole, currentSection)) {
+    return <div className="flex min-h-screen items-center justify-center bg-navy-50 text-navy-800/50">Redirecting…</div>;
   }
 
   const toggleGroup = (label: string) =>
@@ -176,7 +233,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Nav */}
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4 pt-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
-          {sections.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.title}>
               <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-white/30">{section.title}</p>
               <div className="space-y-0.5">

@@ -14,6 +14,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: "buyer" | "reseller" | "admin";
+  adminRole?: "super" | "manager" | "cashier" | null;
 }
 
 export interface RegisterPayload {

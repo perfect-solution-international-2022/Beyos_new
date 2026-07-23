@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { hashPassword } from "@/lib/auth";
 import { findOpenShift } from "@/lib/pos";
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("system");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const rows = await query<{
@@ -32,7 +32,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("system");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: { name?: string; pin?: string };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("system");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: { id?: number; name?: string; pin?: string; isActive?: boolean };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
@@ -93,7 +93,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("system");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: { id?: number };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }

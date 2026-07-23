@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { hashPassword, findUserByEmail } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("people");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
       name: string;
       email: string;
       role: string;
+      admin_role: string | null;
       phone: string;
       city: string | null;
       reseller_status: string;
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
       credit_limit: string;
       created_at: string;
     }>(
-      `SELECT id, name, email, role, phone, city, reseller_status, allow_price_override,
+      `SELECT id, name, email, role, admin_role, phone, city, reseller_status, allow_price_override,
               min_markup_pct, max_markup_pct, credit_limit, created_at
        FROM users ${where} ORDER BY created_at DESC`,
       params
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
         name: u.name,
         email: u.email,
         role: u.role,
+        adminRole: u.admin_role,
         phone: u.phone,
         city: u.city,
         resellerStatus: u.reseller_status,
@@ -60,7 +62,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("people");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: any;
@@ -72,6 +74,7 @@ export async function POST(request: Request) {
   const phone = (b.phone ?? "").trim();
   const password = b.password ?? "";
   const role = ["buyer", "reseller", "admin"].includes(b.role) ? b.role : "buyer";
+  const adminRole = role === "admin" && ["super", "manager", "cashier"].includes(b.adminRole) ? b.adminRole : role === "admin" ? "super" : null;
 
   if (!firstName || !lastName || !email || !password) {
     return NextResponse.json({ error: "First name, last name, email and password are required" }, { status: 400 });
@@ -89,8 +92,8 @@ export async function POST(request: Request) {
     const hash = await hashPassword(password);
     const name = `${firstName} ${lastName}`.trim();
     await query(
-      "INSERT INTO users (name, first_name, last_name, email, password_hash, role, reseller_status, phone) VALUES (?,?,?,?,?,?,?,?)",
-      [name, firstName, lastName, email, hash, role, "approved", phone]
+      "INSERT INTO users (name, first_name, last_name, email, password_hash, role, admin_role, reseller_status, phone) VALUES (?,?,?,?,?,?,?,?,?)",
+      [name, firstName, lastName, email, hash, role, adminRole, "approved", phone]
     );
     return NextResponse.json({ ok: true });
   } catch (err) {
@@ -100,7 +103,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("people");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
@@ -116,17 +119,17 @@ export async function DELETE(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("people");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let body: { id?: number; role?: string; resellerStatus?: string; pricingRules?: { allowPriceOverride?: boolean; minMarkupPct?: number; maxMarkupPct?: number | null; creditLimit?: number } };
+  let body: { id?: number; role?: string; adminRole?: string; resellerStatus?: string; pricingRules?: { allowPriceOverride?: boolean; minMarkupPct?: number; maxMarkupPct?: number | null; creditLimit?: number } };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { id, role, resellerStatus, pricingRules } = body;
-  if (!id || (!role && !resellerStatus && !pricingRules)) {
+  const { id, role, adminRole, resellerStatus, pricingRules } = body;
+  if (!id || (!role && !adminRole && !resellerStatus && !pricingRules)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (id === admin.id) {
@@ -137,9 +140,20 @@ export async function PATCH(request: Request) {
       if (!["buyer", "reseller", "admin"].includes(role)) {
         return NextResponse.json({ error: "Invalid role" }, { status: 400 });
       }
+      const nextAdminRole = role === "admin"
+        ? (["super", "manager", "cashier"].includes(adminRole || "") ? adminRole : "super")
+        : null;
       await query(
-        "UPDATE users SET role = ?, reseller_status = ?, session_version = session_version + 1 WHERE id = ?",
-        [role, "approved", id]
+        "UPDATE users SET role = ?, admin_role = ?, reseller_status = ?, session_version = session_version + 1 WHERE id = ?",
+        [role, nextAdminRole, "approved", id]
+      );
+    } else if (adminRole) {
+      if (!["super", "manager", "cashier"].includes(adminRole)) {
+        return NextResponse.json({ error: "Invalid admin role" }, { status: 400 });
+      }
+      await query(
+        "UPDATE users SET admin_role = ?, session_version = session_version + 1 WHERE id = ? AND role = 'admin'",
+        [adminRole, id]
       );
     } else if (resellerStatus) {
       if (!["approved", "suspended", "rejected"].includes(resellerStatus || "")) {

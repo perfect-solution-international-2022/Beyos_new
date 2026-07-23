@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 140);
@@ -77,7 +77,7 @@ async function saveLinks(productId: number, links: any[]) {
 }
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const rows = await query<any>(`SELECT * FROM products ORDER BY created_at DESC, id DESC`);
@@ -161,7 +161,7 @@ function productTextError(b: any, requireName: boolean): string | null {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: any;
@@ -243,7 +243,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: any;
@@ -307,7 +307,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }

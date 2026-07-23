@@ -29,7 +29,9 @@ function LoginForm() {
         redirect !== "/"
           ? redirect
           : u.role === "admin"
-            ? "/admin"
+            ? u.adminRole === "cashier"
+              ? "/admin/pos"
+              : "/admin"
             : u.role === "reseller"
               ? "/reseller"
               : "/";

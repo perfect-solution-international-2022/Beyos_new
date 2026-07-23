@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { walletBalance } from "@/lib/reseller";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("people");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const id = Number((await params).id);

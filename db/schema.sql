@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(190) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   role          ENUM('buyer','reseller','admin') NOT NULL DEFAULT 'buyer',
+  admin_role    ENUM('super','manager','cashier') NULL DEFAULT NULL,
   reseller_status ENUM('pending','approved','suspended','rejected') NOT NULL DEFAULT 'approved',
   allow_price_override TINYINT(1) NOT NULL DEFAULT 1,
   min_markup_pct DECIMAL(6,2) NOT NULL DEFAULT 0,

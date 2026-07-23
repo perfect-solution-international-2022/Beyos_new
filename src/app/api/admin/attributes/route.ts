@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 
 const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 200);
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const attrs = await query<{ id: number; name: string; slug: string }>(
@@ -32,7 +32,7 @@ export async function GET() {
 
 // Create an attribute with values, OR add values to an existing attribute.
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
@@ -90,7 +90,7 @@ export async function PATCH(request: Request) {
 
 // Delete an attribute (id) or a single value (valueId).
 export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
