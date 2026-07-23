@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/store/cart";
+import { useCart, effectiveUnitPrice } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import { useAuth } from "@/context/AuthProvider";
 
@@ -393,7 +393,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <span className="text-sm font-semibold text-navy-800">
-                  {formatPrice(item.price * item.quantity)}
+                  {formatPrice(effectiveUnitPrice(item) * item.quantity)}
                 </span>
               </li>
             ))}

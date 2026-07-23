@@ -272,7 +272,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
   const isVariable = form.productType === "variable";
   const tabs = isVariable
-    ? ["general", "inventory", "attributes", "variations", "linked", "payments"]
+    ? ["general", "attributes", "variations", "linked", "payments"]
     : ["general", "inventory", "linked", "payments"];
   const tabLabels: Record<string, string> = {
     general: "General", inventory: "Inventory", attributes: "Attributes",
@@ -312,7 +312,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
     if (Object.keys(validationErrors).length) {
       setFieldErrors(validationErrors);
       const firstField = Object.keys(validationErrors)[0] as TextFieldKey;
-      if (firstField === "sku") setTab("inventory");
+      if (firstField === "sku") setTab(isVariable ? "variations" : "inventory");
       setError("Please correct the text-field errors before saving.");
       return;
     }
@@ -519,6 +519,10 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                     generateVariations();
                   }} className="btn-primary px-5 py-2 text-sm">Generate Variations</button>
                 </div>
+                <div className="mb-6 flex flex-wrap gap-5 rounded-lg border border-[#e5e7eb] bg-[#fafafa] px-4 py-3.5">
+                  <Check label="Allow backorder when out of stock" checked={form.allowBackorder} on={set("allowBackorder")} />
+                  <Check label="Sold individually (limit one per order)" checked={form.soldIndividually} on={set("soldIndividually")} />
+                </div>
                 {form.variants.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-[#d1d5db] bg-[#f9fafb] px-5 py-10 text-center text-sm text-[#6b7280]">
                     No variations yet. Select attributes and click &quot;Generate Variations&quot; to create them.
@@ -564,6 +568,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                             <VarMoney label="Product Cost" value={v.productionCost} onChange={(value) => updateVariant(setForm, i, "productionCost", value)} />
                             <VarField label="Stock Status"><select value={v.stockStatus} onChange={(e) => updateVariant(setForm, i, "stockStatus", e.target.value)} className="input"><option value="in_stock">In Stock</option><option value="out_of_stock">Out of Stock</option><option value="on_backorder">On Backorder</option></select></VarField>
                             <VarInt label="Stock Quantity" value={v.stock} onChange={(value) => updateVariant(setForm, i, "stock", value)} />
+                            <VarInt label="Low Stock Threshold" value={v.lowStockThreshold} onChange={(value) => updateVariant(setForm, i, "lowStockThreshold", value)} />
                             <VarMoney label="Weight (kg)" value={v.weightKg} onChange={(value) => updateVariant(setForm, i, "weightKg", value)} />
                             <VarMoney label="Length (cm)" value={v.lengthCm} onChange={(value) => updateVariant(setForm, i, "lengthCm", value)} />
                             <VarMoney label="Width (cm)" value={v.widthCm} onChange={(value) => updateVariant(setForm, i, "widthCm", value)} />

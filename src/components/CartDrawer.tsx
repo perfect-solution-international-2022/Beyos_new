@@ -3,8 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useCart } from "@/store/cart";
+import { useCart, effectiveUnitPrice } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 import CheckoutButton from "./CheckoutButton";
 
 export default function CartDrawer() {
@@ -152,9 +153,14 @@ export default function CartDrawer() {
                           </button>
                         </div>
                         <span className="text-sm font-bold text-navy-800">
-                          {formatPrice(item.price * item.quantity)}
+                          {formatPrice(effectiveUnitPrice(item) * item.quantity)}
                         </span>
                       </div>
+                      {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && item.quantity >= WHOLESALE_MIN_QTY && (
+                        <p className="mt-1 text-right text-[11px] font-semibold text-emerald-600">
+                          Bulk price of {formatPrice(item.wholesalePrice)}/unit applied
+                        </p>
+                      )}
                     </div>
                   </li>
                 ))}

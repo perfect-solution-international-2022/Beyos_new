@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/store/cart";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 
 export default function ProductDetail({ product }: { product: Product }) {
   const defaultVariant = product.variants?.find((variant) => variant.isDefault) || product.variants?.[0];
@@ -18,11 +19,15 @@ export default function ProductDetail({ product }: { product: Product }) {
   const addItem = useCart((s) => s.addItem);
   const selectedVariant = product.variants?.find((variant) => variant.id === variantId);
   const regularPrice = selectedVariant?.price ?? product.compareAtPrice ?? product.price;
-  const currentPrice = selectedVariant?.salePrice && selectedVariant.salePrice < regularPrice
+  const salePrice = selectedVariant?.salePrice && selectedVariant.salePrice < regularPrice
     ? selectedVariant.salePrice : selectedVariant?.price ?? product.price;
   const comparePrice = selectedVariant?.salePrice && selectedVariant.salePrice < regularPrice
     ? regularPrice : product.compareAtPrice;
   const currentStock = selectedVariant?.stock ?? product.stock;
+
+  const wholesalePrice = selectedVariant?.wholesalePrice ?? product.wholesalePrice;
+  const wholesaleActive = quantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
+  const currentPrice = wholesaleActive ? wholesalePrice : salePrice;
   const discount = comparePrice
     ? Math.round((1 - currentPrice / comparePrice) * 100)
     : 0;
@@ -32,7 +37,8 @@ export default function ProductDetail({ product }: { product: Product }) {
       productId: product.id,
       slug: product.slug,
       name: product.name,
-      price: currentPrice,
+      price: salePrice,
+      wholesalePrice: wholesalePrice ?? undefined,
       image: selectedVariant?.image || product.image,
       size: selectedVariant?.attributeSummary || size,
       color: selectedVariant ? "" : color,
@@ -132,7 +138,18 @@ export default function ProductDetail({ product }: { product: Product }) {
               </span>
             </>
           )}
+          {wholesaleActive && (
+            <span className="badge bg-emerald-50 text-emerald-700">Bulk price applied</span>
+          )}
         </div>
+
+        {wholesalePrice != null && wholesalePrice > 0 && (
+          <p className="mt-2 text-sm text-navy-800/60">
+            {wholesaleActive
+              ? `Bulk price of ${formatPrice(wholesalePrice)}/unit applied for ${WHOLESALE_MIN_QTY}+ units.`
+              : `Buy ${WHOLESALE_MIN_QTY}+ units and pay ${formatPrice(wholesalePrice)} per unit.`}
+          </p>
+        )}
 
         <p className="mt-6 leading-relaxed text-navy-800/70">
           {product.description}

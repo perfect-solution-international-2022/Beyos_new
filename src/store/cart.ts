@@ -3,6 +3,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { CartItem } from "@/lib/types";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
+
+/** The unit price actually charged for a line, given its live quantity. */
+export function effectiveUnitPrice(item: Pick<CartItem, "price" | "wholesalePrice" | "quantity">): number {
+  return item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && item.quantity >= WHOLESALE_MIN_QTY
+    ? item.wholesalePrice
+    : item.price;
+}
 
 interface CartState {
   items: CartItem[];
@@ -42,7 +50,7 @@ export const useCart = create<CartState>()(
             return {
               items: state.items.map((i) =>
                 sameLine(i, item.productId, item.size, item.color)
-                  ? { ...i, quantity: i.quantity + item.quantity }
+                  ? { ...i, quantity: i.quantity + item.quantity, wholesalePrice: item.wholesalePrice ?? i.wholesalePrice }
                   : i
               ),
               isOpen: true,
@@ -69,7 +77,7 @@ export const useCart = create<CartState>()(
       closeCart: () => set({ isOpen: false }),
       setPromoCode: (code) => set({ promoCode: code }),
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
-      subtotal: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      subtotal: () => get().items.reduce((sum, i) => sum + effectiveUnitPrice(i) * i.quantity, 0),
     }),
     { name: "beyos-cart" }
   )

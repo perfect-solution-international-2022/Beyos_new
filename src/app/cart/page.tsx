@@ -3,8 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useCart } from "@/store/cart";
+import { useCart, effectiveUnitPrice } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 import CheckoutButton from "@/components/CheckoutButton";
 
 export default function CartPage() {
@@ -189,10 +190,22 @@ export default function CartPage() {
                           {item.size} · {item.color}
                         </p>
                       </div>
-                      <p className="text-sm font-bold text-navy-800 min-[380px]:text-base">
-                        {formatPrice(item.price * item.quantity)}
-                      </p>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-navy-800 min-[380px]:text-base">
+                          {formatPrice(effectiveUnitPrice(item) * item.quantity)}
+                        </p>
+                        {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && item.quantity >= WHOLESALE_MIN_QTY && (
+                          <span className="badge mt-1 bg-emerald-50 text-emerald-700">Bulk price applied</span>
+                        )}
+                      </div>
                     </div>
+                    {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && (
+                      <p className="mt-1.5 text-xs text-navy-800/50">
+                        {item.quantity >= WHOLESALE_MIN_QTY
+                          ? `Calculated at the bulk price of ${formatPrice(item.wholesalePrice)}/unit (regular ${formatPrice(item.price)}/unit) for ${WHOLESALE_MIN_QTY}+ units.`
+                          : `Add ${WHOLESALE_MIN_QTY - item.quantity} more for the bulk price of ${formatPrice(item.wholesalePrice)}/unit.`}
+                      </p>
+                    )}
                     <div className="mt-auto flex flex-col items-start gap-2 pt-3 min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between">
                       <div className="flex items-center rounded-full border border-navy-800/15">
                         <button

@@ -2,6 +2,7 @@ import { pool } from "@/lib/db";
 import { getProductBySlug } from "@/lib/products-db";
 import { validatePromoCode, recordPromotionUsage, Promotion } from "@/lib/promotions";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 import type { PoolConnection } from "mysql2/promise";
 
 export interface CheckoutLine {
@@ -54,7 +55,13 @@ export async function computeOrderTotals(
     const qty = Math.max(1, Number(line.quantity) || 1);
     if (variant && variant.stock < qty) throw new Error(`Only ${variant.stock} available for ${variant.attributeSummary}`);
     const regularPrice = variant?.price ?? product.price;
-    const unitPrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
+    const salePrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
+    const wholesalePrice = variant?.wholesalePrice ?? product.wholesalePrice;
+    // Buying 12+ units of a single line switches that line to the bulk/wholesale
+    // unit price, for every customer — not just resellers.
+    const unitPrice = qty >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice
+      ? wholesalePrice
+      : salePrice;
     const lineTotal = unitPrice * qty;
     subtotal += lineTotal;
     totalWeightKg += (variant?.weightKg ?? product.weightKg ?? 0) * qty;

@@ -1,8 +1,8 @@
 import { query } from "./db";
 import { getCurrentUser, PublicUser } from "./auth";
+import { WHOLESALE_MIN_QTY } from "./pricing";
 
-/** Wholesale pricing kicks in automatically once a line's quantity reaches this. */
-export const WHOLESALE_MIN_QTY = 12;
+export { WHOLESALE_MIN_QTY };
 
 /** Returns the current user only if they are a reseller, else null. */
 export async function requireReseller(): Promise<PublicUser | null> {

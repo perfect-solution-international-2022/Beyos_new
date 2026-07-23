@@ -36,6 +36,7 @@ interface ProductRow {
   stock: number;
   product_type: "simple" | "variable";
   weight_kg: string | null;
+  wholesale_price: string | null;
 }
 
 function mapRow(r: ProductRow): Product {
@@ -59,13 +60,14 @@ function mapRow(r: ProductRow): Product {
     stock: r.stock,
     productType: r.product_type,
     weightKg: r.weight_kg ? Number(r.weight_kg) : undefined,
+    wholesalePrice: r.wholesale_price ? Number(r.wholesale_price) : undefined,
   };
 }
 
 interface VariantRow {
   id: number; product_id: number; sku: string; attribute_summary: string; price: string;
   sale_price: string | null; stock: number; image: string | null; is_default: number;
-  weight_kg: string | null;
+  weight_kg: string | null; wholesale_price: string | null;
 }
 
 const mapVariant = (row: VariantRow): ProductVariant => ({
@@ -73,13 +75,14 @@ const mapVariant = (row: VariantRow): ProductVariant => ({
   salePrice: row.sale_price == null ? undefined : Number(row.sale_price), stock: row.stock,
   image: row.image || undefined, isDefault: !!row.is_default,
   weightKg: row.weight_kg ? Number(row.weight_kg) : undefined,
+  wholesalePrice: row.wholesale_price == null ? undefined : Number(row.wholesale_price),
 });
 
 // Only products the admin has published and made public are visible to buyers.
 const STOREFRONT_WHERE = "visibility = 'public' AND is_publish = 1";
 const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, images,
-       description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg`;
-const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, stock, image, is_default, weight_kg";
+       description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg, wholesale_price`;
+const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, sale_price, stock, image, is_default, weight_kg, wholesale_price";
 
 export async function getAllProducts(): Promise<Product[]> {
   const [rows, variants] = await Promise.all([

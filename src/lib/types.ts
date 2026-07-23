@@ -21,6 +21,7 @@ export interface Product {
   productType?: "simple" | "variable";
   variants?: ProductVariant[];
   weightKg?: number;
+  wholesalePrice?: number;
 }
 
 export interface ProductVariant {
@@ -33,6 +34,7 @@ export interface ProductVariant {
   image?: string;
   isDefault: boolean;
   weightKg?: number;
+  wholesalePrice?: number;
 }
 
 export interface CartItem {
@@ -40,6 +42,7 @@ export interface CartItem {
   slug: string;
   name: string;
   price: number;
+  wholesalePrice?: number;
   image: string;
   size: string;
   color: string;
