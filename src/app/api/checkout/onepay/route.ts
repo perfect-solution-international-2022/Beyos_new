@@ -4,6 +4,7 @@ import { computeOrderTotals, createPendingOrder, cancelOrder, CheckoutLine, Cust
 import { createOnepayCheckout } from "@/lib/onepay";
 import { query } from "@/lib/db";
 import { sendOrderConfirmationSms } from "@/lib/sms";
+import { sendOrderEmail } from "@/lib/mail";
 
 interface CheckoutPayload {
   customer: CustomerInfo;
@@ -109,6 +110,11 @@ export async function POST(request: Request) {
       total: totals.total,
       status: "pending payment",
     });
+    if (customer.email) {
+      sendOrderEmail(customer.email, { orderRef, total: totals.total, status: "pending payment" }).catch((err) =>
+        console.error("onepay confirmation email error:", err)
+      );
+    }
 
     return NextResponse.json({ success: true, redirectUrl, orderRef });
   } catch (err) {

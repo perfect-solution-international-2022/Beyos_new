@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { computeOrderTotals, createPendingOrder, CheckoutLine, CustomerInfo } from "@/lib/orders";
 import { sendOrderConfirmationSms } from "@/lib/sms";
+import { sendOrderEmail } from "@/lib/mail";
 
 interface CheckoutPayload {
   customer: CustomerInfo;
@@ -67,6 +68,11 @@ export async function POST(request: Request) {
       total: totals.total,
       status: "pending",
     });
+    if (customer.email) {
+      sendOrderEmail(customer.email, { orderRef, total: totals.total, status: "pending" }).catch((err) =>
+        console.error("checkout confirmation email error:", err)
+      );
+    }
 
     return NextResponse.json({
       success: true,
