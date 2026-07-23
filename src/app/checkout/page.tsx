@@ -12,7 +12,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [mounted, setMounted] = useState(false);
-  const { items, promoCode } = useCart();
+  const { items, promoCode, setPromoCode } = useCart();
   const subtotal = useCart((s) => s.subtotal());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -21,6 +21,10 @@ export default function CheckoutPage() {
   const [freeShippingPromo, setFreeShippingPromo] = useState(false);
   const [shipping, setShipping] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"onepay" | "cod">("onepay");
+
+  const [promoInput, setPromoInput] = useState("");
+  const [applyingPromo, setApplyingPromo] = useState(false);
+  const [promoError, setPromoError] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -73,6 +77,37 @@ export default function CheckoutPage() {
         setFreeShippingPromo(false);
       });
   }, [promoCode, subtotal]);
+
+  const applyPromo = async () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setApplyingPromo(true);
+    setPromoError("");
+    try {
+      const res = await fetch("/api/promotions/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const data = await res.json();
+      if (!data.valid) throw new Error(data.error || "Invalid promo code");
+      setPromoCode(data.code);
+      setDiscount(data.subtotalDiscount);
+      setFreeShippingPromo(data.freeShipping);
+      setPromoInput("");
+    } catch (err) {
+      setPromoError(err instanceof Error ? err.message : "Invalid promo code");
+    } finally {
+      setApplyingPromo(false);
+    }
+  };
+
+  const removePromo = () => {
+    setPromoCode(null);
+    setDiscount(0);
+    setFreeShippingPromo(false);
+    setPromoError("");
+  };
 
   const discountedSubtotal = Math.max(0, subtotal - discount);
 
@@ -363,6 +398,43 @@ export default function CheckoutPage() {
               </li>
             ))}
           </ul>
+
+          {/* Promo code */}
+          <div className="mt-6 border-t border-navy-800/10 pt-5">
+            {promoCode ? (
+              <div className="flex items-center justify-between rounded-lg border border-brand/30 bg-brand-50 px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-brand">
+                    <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2A2 2 0 0 1 3 12V4a1 1 0 0 1 1-1h8a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.6Z" />
+                    <circle cx="7.5" cy="7.5" r="1.5" />
+                  </svg>
+                  <span className="font-mono text-sm font-semibold text-brand-700">{promoCode}</span>
+                </div>
+                <button type="button" onClick={removePromo} className="text-xs font-medium text-navy-800/50 hover:text-red-500">
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }}
+                  placeholder="Promo code"
+                  className="input flex-1 font-mono uppercase"
+                />
+                <button
+                  type="button"
+                  onClick={applyPromo}
+                  disabled={applyingPromo || !promoInput.trim()}
+                  className="btn-outline shrink-0 disabled:opacity-40"
+                >
+                  {applyingPromo ? "…" : "Apply"}
+                </button>
+              </div>
+            )}
+            {promoError && <p className="mt-2 text-xs text-red-500">{promoError}</p>}
+          </div>
 
           <dl className="mt-6 space-y-3 border-t border-navy-800/10 pt-5 text-sm">
             <div className="flex justify-between">

@@ -9,7 +9,9 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const rows = await query<any>(
-      `SELECT p.*,
+      `SELECT p.id, p.code, p.description, p.discount_type, p.discount_value, p.min_order_amount,
+              p.max_discount_amount, p.start_date, p.end_date, p.usage_limit, p.usage_limit_per_user,
+              p.is_active, p.created_at, (p.image_data IS NOT NULL) AS has_image,
               (SELECT COUNT(*) FROM promotion_usages u WHERE u.promotion_id = p.id) AS used_count
        FROM promotions p ORDER BY p.created_at DESC`
     );
@@ -28,6 +30,7 @@ export async function GET() {
         usageLimitPerUser: r.usage_limit_per_user,
         isActive: !!r.is_active,
         usedCount: Number(r.used_count),
+        imageUrl: r.has_image ? `/api/promotions/${r.id}/image` : null,
       })),
     });
   } catch (err) {

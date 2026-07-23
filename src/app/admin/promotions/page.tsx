@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/context/ToastProvider";
 import { formatPrice } from "@/lib/utils";
 
@@ -18,6 +20,7 @@ interface Promotion {
   usageLimitPerUser: number | null;
   isActive: boolean;
   usedCount: number;
+  imageUrl: string | null;
 }
 
 const blank = {
@@ -109,18 +112,24 @@ export default function AdminPromotionsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-navy-800">Promotions</h1>
-        <button onClick={() => setEditing({ ...blank })} className="btn-primary">+ Add Promo Code</button>
+        <div className="flex gap-2">
+          <Link href="/promotions" target="_blank" className="btn-outline">
+            View Promotions Page
+          </Link>
+          <button onClick={() => setEditing({ ...blank })} className="btn-primary">+ Add Promo Code</button>
+        </div>
       </div>
       <p className="mt-1 text-sm text-navy-800/50">
-        Discount codes buyers can apply at checkout.
+        Discount codes buyers can apply at checkout. Active codes with an image show up on the public Promotions page.
       </p>
 
       <div className="mt-6 overflow-x-auto rounded-2xl border border-navy-800/5 bg-white shadow-sm">
-        <table className="w-full min-w-[860px] text-left text-sm">
+        <table className="w-full min-w-[960px] text-left text-sm">
           <thead>
             <tr className="border-b border-navy-800/10 text-xs font-semibold uppercase tracking-wide text-navy-800/50">
+              <th className="px-6 py-4">Image</th>
               <th className="px-6 py-4">Code</th>
               <th className="px-6 py-4">Discount</th>
               <th className="px-6 py-4">Min Order</th>
@@ -131,14 +140,17 @@ export default function AdminPromotionsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : promos.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">No promo codes yet</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">No promo codes yet</td></tr>
             ) : (
               promos.map((p) => {
                 const s = statusOf(p);
                 return (
                   <tr key={p.id} className="border-b border-navy-800/5 last:border-0">
+                    <td className="px-6 py-3">
+                      <PromoImageCell promo={p} onChanged={load} />
+                    </td>
                     <td className="px-6 py-3">
                       <div className="font-mono font-semibold text-navy-800">{p.code}</div>
                       {p.description && <div className="text-xs text-navy-800/50">{p.description}</div>}
@@ -284,6 +296,80 @@ function PromotionModal({ data, onClose, onSaved }: { data: Form; onClose: () =>
           <button onClick={onClose} className="btn-outline">Cancel</button>
           <button onClick={save} disabled={saving} className="btn-primary">{saving ? "Saving…" : "Save"}</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PromoImageCell({ promo, onChanged }: { promo: Promotion; onChanged: () => void }) {
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const upload = async (file: File) => {
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("promotionId", String(promo.id));
+      form.append("image", file);
+      const res = await fetch("/api/admin/promotions/image", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed");
+      onChanged();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await fetch("/api/admin/promotions/image", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ promotionId: promo.id }),
+      });
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-navy-800/10 bg-navy-50">
+        {promo.imageUrl ? (
+          <Image src={promo.imageUrl} alt={promo.code} fill className="object-cover" />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-navy-800/25">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-5-5L5 21" />
+            </svg>
+          </span>
+        )}
+      </div>
+      <div className="flex flex-col gap-1">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }}
+        />
+        <button
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          className="text-left text-xs font-semibold text-brand hover:underline disabled:opacity-40"
+        >
+          {promo.imageUrl ? "Change" : "Upload"}
+        </button>
+        {promo.imageUrl && (
+          <button disabled={busy} onClick={remove} className="text-left text-xs font-semibold text-red-600 hover:underline disabled:opacity-40">
+            Remove
+          </button>
+        )}
       </div>
     </div>
   );

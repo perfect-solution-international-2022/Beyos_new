@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthProvider";
 const nav = [
   { href: "/", label: "Home" },
   { href: "/shop", label: "Shop" },
+  { href: "/promotions", label: "Promotions" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
 ];

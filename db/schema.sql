@@ -302,6 +302,8 @@ CREATE TABLE IF NOT EXISTS promotions (
   usage_limit         INT NULL,
   usage_limit_per_user INT NULL,
   is_active           TINYINT(1) NOT NULL DEFAULT 1,
+  image_data          LONGBLOB NULL,
+  image_mime          VARCHAR(100) NULL,
   created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
