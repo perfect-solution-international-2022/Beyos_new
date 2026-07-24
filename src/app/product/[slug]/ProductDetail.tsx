@@ -7,9 +7,33 @@ import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/store/cart";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 
+// Matches the admin's attribute order (Size, then Color) — see
+// src/app/admin/products/page.tsx's generateVariations().
+const GROUP_LABELS = ["Size", "Color"];
+
+// Variant attribute summaries look like "L / White" — one token per admin
+// attribute group (Size, Color, ...), in the same order for every variant of
+// a product. Splitting by position lets us render one pill-picker per
+// attribute instead of a single flat dropdown of every combination.
+function variantOptionGroups(variants: NonNullable<Product["variants"]>): string[][] {
+  const groupCount = Math.max(0, ...variants.map((v) => v.attributeSummary.split(" / ").length));
+  const groups: string[][] = Array.from({ length: groupCount }, () => []);
+  for (const variant of variants) {
+    const tokens = variant.attributeSummary.split(" / ");
+    tokens.forEach((token, i) => {
+      if (token && !groups[i].includes(token)) groups[i].push(token);
+    });
+  }
+  return groups;
+}
+
 export default function ProductDetail({ product }: { product: Product }) {
-  const defaultVariant = product.variants?.find((variant) => variant.isDefault) || product.variants?.[0];
-  const [variantId, setVariantId] = useState<number | null>(defaultVariant?.id ?? null);
+  const variants = product.variants ?? [];
+  const defaultVariant = variants.find((variant) => variant.isDefault) || variants[0];
+  const optionGroups = variantOptionGroups(variants);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(
+    defaultVariant?.attributeSummary.split(" / ") ?? []
+  );
   const [size, setSize] = useState(product.sizes[0]);
   const [color, setColor] = useState(product.colors[0]);
   const [quantity, setQuantity] = useState(1);
@@ -17,7 +41,9 @@ export default function ProductDetail({ product }: { product: Product }) {
   const [added, setAdded] = useState(false);
 
   const addItem = useCart((s) => s.addItem);
-  const selectedVariant = product.variants?.find((variant) => variant.id === variantId);
+  const selectedVariant = variants.find(
+    (variant) => variant.attributeSummary === selectedOptions.join(" / ")
+  );
   const regularPrice = selectedVariant?.price ?? product.compareAtPrice ?? product.price;
   const salePrice = selectedVariant?.salePrice && selectedVariant.salePrice < regularPrice
     ? selectedVariant.salePrice : selectedVariant?.price ?? product.price;
@@ -155,22 +181,52 @@ export default function ProductDetail({ product }: { product: Product }) {
           {product.description}
         </p>
 
-        {product.productType === "variable" && product.variants?.length ? (
-          <div className="mt-7">
-            <label htmlFor="product-variation" className="text-sm font-semibold text-navy-800">Choose variation</label>
-            <select id="product-variation" value={variantId ?? ""} onChange={(event) => {
-              const next = product.variants?.find((variant) => variant.id === Number(event.target.value));
-              setVariantId(next?.id ?? null);
-              setQuantity(1);
-              if (next?.image) setActiveImage(next.image);
-            }} className="input mt-3">
-              {product.variants.map((variant) => (
-                <option key={variant.id} value={variant.id} disabled={variant.stock < 1}>
-                  {variant.attributeSummary || variant.sku} — {variant.stock} available
-                </option>
-              ))}
-            </select>
-            {selectedVariant && <p className="mt-2 text-xs text-navy-800/50">SKU: {selectedVariant.sku || product.sku}</p>}
+        {product.productType === "variable" && variants.length ? (
+          <div className="mt-7 space-y-6">
+            {optionGroups.map((values, groupIndex) => (
+              <div key={groupIndex}>
+                <p className="text-sm font-semibold text-navy-800">
+                  {GROUP_LABELS[groupIndex] ?? `Option ${groupIndex + 1}`}
+                  {selectedOptions[groupIndex] && (
+                    <span className="font-normal text-navy-800/60"> : {selectedOptions[groupIndex]}</span>
+                  )}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {values.map((value) => {
+                    const candidate = selectedOptions.map((v, i) => (i === groupIndex ? value : v));
+                    const matches = variants.filter((v) => v.attributeSummary === candidate.join(" / "));
+                    const available = matches.some((v) => v.stock > 0);
+                    const isSelected = selectedOptions[groupIndex] === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        disabled={!available}
+                        onClick={() => {
+                          const next = selectedOptions.map((v, i) => (i === groupIndex ? value : v));
+                          setSelectedOptions(next);
+                          setQuantity(1);
+                          const match = variants.find((v) => v.attributeSummary === next.join(" / "));
+                          if (match?.image) setActiveImage(match.image);
+                        }}
+                        className={`min-w-[3rem] rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                          isSelected
+                            ? "border-navy-800 bg-navy-800 text-white"
+                            : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {selectedVariant ? (
+              <p className="text-xs text-navy-800/50">SKU: {selectedVariant.sku || product.sku}</p>
+            ) : (
+              <p className="text-xs text-red-500">This combination is unavailable.</p>
+            )}
           </div>
         ) : (
           <>
