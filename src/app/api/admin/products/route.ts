@@ -260,7 +260,7 @@ export async function PATCH(request: Request) {
     shortDescription: "short_description", description: "description",
     productionCost: "production_cost", resellerPrice: "reseller_price", wholesalePrice: "wholesale_price",
     saleStart: "sale_start", saleEnd: "sale_end",
-    stock: "stock", lowStockThreshold: "low_stock_threshold", stockStatus: "stock_status",
+    lowStockThreshold: "low_stock_threshold", stockStatus: "stock_status",
     badge: "badge", image: "image", visibility: "visibility",
     weightKg: "weight_kg", lengthCm: "length_cm", widthCm: "width_cm", heightCm: "height_cm",
     metaTitle: "meta_title", metaDescription: "meta_description", metaKeywords: "meta_keywords",
@@ -269,6 +269,15 @@ export async function PATCH(request: Request) {
   const params: unknown[] = [];
   for (const [key, col] of Object.entries(scalar)) {
     if (b[key] !== undefined) { sets.push(`${col} = ?`); params.push(b[key] === "" ? null : b[key]); }
+  }
+  // Variable products' total stock is derived from their variations, never
+  // trusted from the client's (hidden, stale) top-level stock field.
+  if (b.productType === "variable" && b.variants !== undefined) {
+    sets.push("stock = ?");
+    params.push((b.variants as any[]).reduce((sum, variant) => sum + (Number(variant.stock) || 0), 0));
+  } else if (b.stock !== undefined) {
+    sets.push("stock = ?");
+    params.push(b.stock === "" ? null : b.stock);
   }
   // Regular/sale price
   if (b.regularPrice !== undefined || b.salePrice !== undefined || b.price !== undefined) {
