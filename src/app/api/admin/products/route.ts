@@ -190,7 +190,8 @@ export async function POST(request: Request) {
   if (!name || price <= 0) return NextResponse.json({ error: "Name and a valid regular price are required" }, { status: 400 });
 
   const slug = ((b.slug ?? "").trim() ? slugify(b.slug) : slugify(name)) + "-" + Math.random().toString(36).slice(2, 5);
-  const sku = (b.sku ?? "").trim() || "BEY-" + Math.floor(1000 + Math.random() * 8999);
+  const skuSource = b.productType === "variable" && defaultVariant ? defaultVariant.sku : b.sku;
+  const sku = (skuSource ?? "").trim() || "BEY-" + Math.floor(1000 + Math.random() * 8999);
   const image = (b.image ?? "").trim() || "/images/placeholder.svg";
   const gallery = csv(b.images);
   const images = JSON.stringify(gallery.length ? gallery : [image]);
@@ -256,7 +257,7 @@ export async function PATCH(request: Request) {
   }
 
   const scalar: Record<string, string> = {
-    name: "name", category: "category", sku: "sku", productType: "product_type",
+    name: "name", category: "category", productType: "product_type",
     shortDescription: "short_description", description: "description",
     productionCost: "production_cost", resellerPrice: "reseller_price", wholesalePrice: "wholesale_price",
     saleStart: "sale_start", saleEnd: "sale_end",
@@ -270,14 +271,27 @@ export async function PATCH(request: Request) {
   for (const [key, col] of Object.entries(scalar)) {
     if (b[key] !== undefined) { sets.push(`${col} = ?`); params.push(b[key] === "" ? null : b[key]); }
   }
-  // Variable products' total stock is derived from their variations, never
-  // trusted from the client's (hidden, stale) top-level stock field.
+  // Variable products' total stock and SKU are derived from their
+  // variations, never trusted from the client's (hidden, stale) top-level
+  // stock/sku fields.
   if (b.productType === "variable" && b.variants !== undefined) {
+    const variants = b.variants as any[];
+    const defaultVariant = variants.find((v) => v.isDefault) || variants[0];
     sets.push("stock = ?");
-    params.push((b.variants as any[]).reduce((sum, variant) => sum + (Number(variant.stock) || 0), 0));
-  } else if (b.stock !== undefined) {
-    sets.push("stock = ?");
-    params.push(b.stock === "" ? null : b.stock);
+    params.push(variants.reduce((sum, variant) => sum + (Number(variant.stock) || 0), 0));
+    if (defaultVariant?.sku !== undefined) {
+      sets.push("sku = ?");
+      params.push((defaultVariant.sku ?? "").trim() || null);
+    }
+  } else {
+    if (b.stock !== undefined) {
+      sets.push("stock = ?");
+      params.push(b.stock === "" ? null : b.stock);
+    }
+    if (b.sku !== undefined) {
+      sets.push("sku = ?");
+      params.push(b.sku === "" ? null : b.sku);
+    }
   }
   // Regular/sale price
   if (b.regularPrice !== undefined || b.salePrice !== undefined || b.price !== undefined) {
