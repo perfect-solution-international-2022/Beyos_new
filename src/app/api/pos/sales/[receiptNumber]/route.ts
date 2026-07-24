@@ -34,7 +34,7 @@ export async function GET(
         customerName: sale.customer_name || "Walk-in Customer",
         customerPhone: sale.customer_phone || "",
         items: items.map((i: any) => ({
-          slug: i.product_slug, name: i.name, sku: i.sku, size: i.size, color: i.color,
+          slug: i.product_slug, variantId: i.variant_id, name: i.name, sku: i.sku, size: i.size, color: i.color,
           quantity: i.quantity, unitPrice: Number(i.unit_price), lineTotal: Number(i.line_total),
         })),
         subtotal: Number(sale.subtotal),
@@ -95,10 +95,11 @@ export async function PATCH(
       try {
         await conn.beginTransaction();
         const [items] = await conn.execute(
-          "SELECT product_slug, quantity FROM pos_sale_items WHERE sale_id = ?",
+          "SELECT product_slug, variant_id, quantity FROM pos_sale_items WHERE sale_id = ?",
           [sale.id]
         );
-        for (const item of items as { product_slug: string; quantity: number }[]) {
+        for (const item of items as { product_slug: string; variant_id: number | null; quantity: number }[]) {
+          if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
           await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
         }
         await conn.execute(
@@ -128,6 +129,7 @@ export async function PATCH(
 
 interface EditSaleLine {
   slug: string;
+  variantId?: number | null;
   size: string;
   color: string;
   quantity: number;
@@ -197,10 +199,11 @@ export async function PUT(
 
     // Restore stock for the sale's current items before applying the edited cart.
     const [oldItems] = await conn.execute(
-      "SELECT product_slug, quantity FROM pos_sale_items WHERE sale_id = ?",
+      "SELECT product_slug, variant_id, quantity FROM pos_sale_items WHERE sale_id = ?",
       [sale.id]
     );
-    for (const item of oldItems as { product_slug: string; quantity: number }[]) {
+    for (const item of oldItems as { product_slug: string; variant_id: number | null; quantity: number }[]) {
+      if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
       await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
     }
     await conn.execute("DELETE FROM pos_sale_items WHERE sale_id = ?", [sale.id]);
@@ -208,7 +211,7 @@ export async function PUT(
     let subtotal = 0;
     let totalWeightKg = 0;
     const lineItems: {
-      slug: string; sku: string; name: string; size: string; color: string;
+      slug: string; variantId: number | null; sku: string; name: string; size: string; color: string;
       quantity: number; unitPrice: number; lineTotal: number;
     }[] = [];
 
@@ -220,19 +223,38 @@ export async function PUT(
       const product = (rows as any[])[0];
       if (!product) throw new Error(`Unknown product: ${line.slug}`);
       const qty = Math.max(1, Number(line.quantity) || 1);
-      if (product.stock < qty) {
+
+      let variant: any = null;
+      if (line.variantId) {
+        const [variantRows] = await conn.execute(
+          "SELECT id, sku, price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          [line.variantId, product.id]
+        );
+        variant = (variantRows as any[])[0];
+        if (!variant) throw new Error(`The selected option for ${product.name} is unavailable`);
+        if (variant.stock < qty) {
+          throw new Error(`Not enough stock for ${product.name} (${variant.attribute_summary}) — ${variant.stock} left`);
+        }
+      } else if (product.stock < qty) {
         throw new Error(`Not enough stock for ${product.name} (${product.stock} left)`);
       }
-      const unitPrice = Number(product.price);
+
+      const unitPrice = Number(variant?.price ?? product.price);
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
       totalWeightKg += Number(product.weight_kg || 0) * qty;
       lineItems.push({
-        slug: product.slug, sku: product.sku, name: product.name,
-        size: line.size || "", color: line.color || "",
+        slug: product.slug, variantId: variant?.id ?? null, sku: variant?.sku || product.sku, name: product.name,
+        size: line.size || variant?.attribute_summary || "", color: line.color || "",
         quantity: qty, unitPrice, lineTotal,
       });
-      await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
+
+      if (variant) {
+        await conn.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [qty, variant.id]);
+        await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
+      } else {
+        await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
+      }
     }
 
     const discountAmount = Math.min(Math.max(0, Number(b.discountAmount) || 0), subtotal);
@@ -267,9 +289,9 @@ export async function PUT(
 
     for (const li of lineItems) {
       await conn.execute(
-        `INSERT INTO pos_sale_items (sale_id, product_slug, sku, name, size, color, quantity, unit_price, line_total)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-        [sale.id, li.slug, li.sku, li.name, li.size, li.color, li.quantity, li.unitPrice, li.lineTotal]
+        `INSERT INTO pos_sale_items (sale_id, product_slug, variant_id, sku, name, size, color, quantity, unit_price, line_total)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [sale.id, li.slug, li.variantId, li.sku, li.name, li.size, li.color, li.quantity, li.unitPrice, li.lineTotal]
       );
     }
 

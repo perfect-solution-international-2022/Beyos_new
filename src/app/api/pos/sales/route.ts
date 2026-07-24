@@ -55,6 +55,7 @@ export async function GET(request: Request) {
 
 interface SaleLine {
   slug: string;
+  variantId?: number | null;
   size: string;
   color: string;
   quantity: number;
@@ -125,7 +126,7 @@ export async function POST(request: Request) {
     let subtotal = 0;
     let totalWeightKg = 0;
     const lineItems: {
-      slug: string; sku: string; name: string; size: string; color: string;
+      slug: string; variantId: number | null; sku: string; name: string; size: string; color: string;
       quantity: number; unitPrice: number; lineTotal: number;
     }[] = [];
 
@@ -137,19 +138,38 @@ export async function POST(request: Request) {
       const product = (rows as any[])[0];
       if (!product) throw new Error(`Unknown product: ${line.slug}`);
       const qty = Math.max(1, Number(line.quantity) || 1);
-      if (product.stock < qty) {
+
+      let variant: any = null;
+      if (line.variantId) {
+        const [variantRows] = await conn.execute(
+          "SELECT id, sku, price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          [line.variantId, product.id]
+        );
+        variant = (variantRows as any[])[0];
+        if (!variant) throw new Error(`The selected option for ${product.name} is unavailable`);
+        if (variant.stock < qty) {
+          throw new Error(`Not enough stock for ${product.name} (${variant.attribute_summary}) — ${variant.stock} left`);
+        }
+      } else if (product.stock < qty) {
         throw new Error(`Not enough stock for ${product.name} (${product.stock} left)`);
       }
-      const unitPrice = Number(product.price);
+
+      const unitPrice = Number(variant?.price ?? product.price);
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
       totalWeightKg += Number(product.weight_kg || 0) * qty;
       lineItems.push({
-        slug: product.slug, sku: product.sku, name: product.name,
-        size: line.size || "", color: line.color || "",
+        slug: product.slug, variantId: variant?.id ?? null, sku: variant?.sku || product.sku, name: product.name,
+        size: line.size || variant?.attribute_summary || "", color: line.color || "",
         quantity: qty, unitPrice, lineTotal,
       });
-      await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
+
+      if (variant) {
+        await conn.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [qty, variant.id]);
+        await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
+      } else {
+        await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
+      }
     }
 
     const discountAmount = Math.min(Math.max(0, Number(b.discountAmount) || 0), subtotal);
@@ -186,9 +206,9 @@ export async function POST(request: Request) {
 
     for (const li of lineItems) {
       await conn.execute(
-        `INSERT INTO pos_sale_items (sale_id, product_slug, sku, name, size, color, quantity, unit_price, line_total)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-        [saleId, li.slug, li.sku, li.name, li.size, li.color, li.quantity, li.unitPrice, li.lineTotal]
+        `INSERT INTO pos_sale_items (sale_id, product_slug, variant_id, sku, name, size, color, quantity, unit_price, line_total)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [saleId, li.slug, li.variantId, li.sku, li.name, li.size, li.color, li.quantity, li.unitPrice, li.lineTotal]
       );
     }
 

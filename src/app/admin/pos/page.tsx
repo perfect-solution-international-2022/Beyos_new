@@ -8,6 +8,14 @@ import { useAuth } from "@/context/AuthProvider";
 import { SRI_LANKA_LOCATIONS } from "@/lib/sri-lanka-locations";
 import POSReceiptBill from "@/components/POSReceiptBill";
 
+interface ProductVariant {
+  id: number;
+  sku: string;
+  attributeSummary: string;
+  price: number;
+  stock: number;
+}
+
 interface Product {
   slug: string;
   sku: string;
@@ -18,10 +26,13 @@ interface Product {
   sizes: string[];
   colors: string[];
   weightKg: number;
+  productType: "simple" | "variable";
+  variants: ProductVariant[];
 }
 
 interface CartLine {
   slug: string;
+  variantId: number | null;
   sku: string;
   name: string;
   price: number;
@@ -41,7 +52,7 @@ interface Customer {
 
 interface Receipt {
   receiptNumber: string;
-  items: { name: string; sku?: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
+  items: { slug?: string; variantId?: number | null; name: string; sku?: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
   customerName: string;
   subtotal: number;
   discountAmount: number;
@@ -55,6 +66,17 @@ interface Receipt {
   deliveryAddress?: string | null;
   deliveryCity?: string | null;
   createdAt: string;
+}
+
+function mapProduct(p: any): Product {
+  return {
+    slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
+    image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [], weightKg: Number(p.weightKg) || 0,
+    productType: p.productType === "variable" ? "variable" : "simple",
+    variants: (p.variants ?? []).map((v: any) => ({
+      id: v.id, sku: v.sku, attributeSummary: v.attributeSummary, price: Number(v.price), stock: Number(v.stock),
+    })),
+  };
 }
 
 export default function AdminPosRegisterPage() {
@@ -98,14 +120,12 @@ function AdminPosRegister() {
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(editReceipt));
 
-  useEffect(() => {
+  const loadProducts = () =>
     fetch("/api/admin/products", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => setProducts((d.products ?? []).map((p: any) => ({
-        slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
-        image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [], weightKg: Number(p.weightKg) || 0,
-      }))));
-  }, []);
+      .then((d) => setProducts((d.products ?? []).map(mapProduct)));
+
+  useEffect(() => { loadProducts(); }, []);
 
   // Load an existing sale for editing (e.g. a cashier fixing a mistake) once
   // the live product catalog is available, so cart lines get real stock/sizes/colors.
@@ -118,17 +138,19 @@ function AdminPosRegister() {
         const r = d.receipt;
         if (!r) { toast("Could not load that sale for editing", "error"); return; }
         setCart(
-          (r.items as { slug?: string; sku?: string; name: string; size: string; color: string; quantity: number; unitPrice: number }[])
+          (r.items as { slug?: string; variantId?: number | null; sku?: string; name: string; size: string; color: string; quantity: number; unitPrice: number }[])
             .map((item) => {
               const product = products.find((p) => p.slug === item.slug);
+              const variant = item.variantId ? product?.variants.find((v) => v.id === item.variantId) : undefined;
               return {
                 slug: item.slug || "",
-                sku: item.sku || product?.sku || "",
+                variantId: item.variantId ?? null,
+                sku: item.sku || variant?.sku || product?.sku || "",
                 name: item.name,
                 price: item.unitPrice,
-                stock: (product?.stock ?? 0) + item.quantity,
-                sizes: product?.sizes ?? [],
-                colors: product?.colors ?? [],
+                stock: (variant?.stock ?? product?.stock ?? 0) + item.quantity,
+                sizes: variant ? [] : product?.sizes ?? [],
+                colors: variant ? [] : product?.colors ?? [],
                 size: item.size || "",
                 color: item.color || "",
                 quantity: item.quantity,
@@ -258,21 +280,36 @@ function AdminPosRegister() {
     setDeliveryModalOpen(false);
   };
 
-  const addToCart = (p: Product) => {
-    const size = p.sizes[0] ?? "";
-    const color = p.colors[0] ?? "";
+  const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
+
+  const addLineToCart = (p: Product, variant: ProductVariant | null) => {
+    const size = variant?.attributeSummary || p.sizes[0] || "";
+    const color = variant ? "" : p.colors[0] ?? "";
+    const stock = variant?.stock ?? p.stock;
+    const price = variant?.price ?? p.price;
+    const sku = variant?.sku || p.sku;
     setCart((prev) => {
-      const totalForProduct = prev.filter((l) => l.slug === p.slug).reduce((sum, l) => sum + l.quantity, 0);
-      if (totalForProduct >= p.stock) { toast(`Only ${p.stock} in stock`); return prev; }
-      const existing = prev.find((l) => l.slug === p.slug && l.size === size && l.color === color);
+      const totalForLine = prev
+        .filter((l) => l.slug === p.slug && l.variantId === (variant?.id ?? null))
+        .reduce((sum, l) => sum + l.quantity, 0);
+      if (totalForLine >= stock) { toast(`Only ${stock} in stock`); return prev; }
+      const existing = prev.find((l) => l.slug === p.slug && l.variantId === (variant?.id ?? null) && l.size === size && l.color === color);
       if (existing) {
         return prev.map((l) => (l === existing ? { ...l, quantity: l.quantity + 1 } : l));
       }
       return [...prev, {
-        slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
-        sizes: p.sizes, colors: p.colors, size, color, quantity: 1, weightKg: p.weightKg,
+        slug: p.slug, variantId: variant?.id ?? null, sku, name: p.name, price, stock,
+        sizes: variant ? [] : p.sizes, colors: variant ? [] : p.colors, size, color, quantity: 1, weightKg: p.weightKg,
       }];
     });
+  };
+
+  const addToCart = (p: Product) => {
+    if (p.productType === "variable") {
+      setVariantPickerProduct(p);
+      return;
+    }
+    addLineToCart(p, null);
   };
 
   const updateVariant = (idx: number, field: "size" | "color", value: string) => {
@@ -283,7 +320,10 @@ function AdminPosRegister() {
     setCart((prev) => {
       const line = prev[idx];
       if (!line) return prev;
-      const otherQuantity = prev.reduce((sum, item, i) => sum + (i !== idx && item.slug === line.slug ? item.quantity : 0), 0);
+      const otherQuantity = prev.reduce(
+        (sum, item, i) => sum + (i !== idx && item.slug === line.slug && item.variantId === line.variantId ? item.quantity : 0),
+        0
+      );
       const maxForLine = Math.max(0, line.stock - otherQuantity);
       return prev
         .map((item, i) => (i === idx ? { ...item, quantity: Math.min(maxForLine, Math.max(0, item.quantity + delta)) } : item))
@@ -320,7 +360,7 @@ function AdminPosRegister() {
       const res = await fetch(editReceipt ? `/api/pos/sales/${encodeURIComponent(editReceipt)}` : "/api/pos/sales", {
         method: editReceipt ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cart.map((l) => ({ slug: l.slug, size: l.size, color: l.color, quantity: l.quantity })),
+          items: cart.map((l) => ({ slug: l.slug, variantId: l.variantId, size: l.size, color: l.color, quantity: l.quantity })),
           customerName, customerPhone, discountAmount: discount, taxRate: rate,
           fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryCity,
         }),
@@ -334,11 +374,7 @@ function AdminPosRegister() {
       }
       setReceipt(d.receipt);
       resetSale();
-      fetch("/api/admin/products", { cache: "no-store" }).then((r) => r.json())
-        .then((dd) => setProducts((dd.products ?? []).map((p: any) => ({
-          slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
-          image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [],
-        }))));
+      loadProducts();
     } finally {
       setCompleting(false);
     }
@@ -440,10 +476,12 @@ function AdminPosRegister() {
                 <div className="flex min-h-[156px] flex-1 flex-col p-3">
                   <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-[#374151]">{p.name}</p>
                   <p className="mt-2 text-xs text-[#9ca3af]">SKU : {p.sku || "—"}</p>
-                  <p className="mt-2 text-xs text-[#6b7280]">{p.stock} Pcs</p>
+                  <p className="mt-2 text-xs text-[#6b7280]">{p.stock} Pcs{p.productType === "variable" ? ` · ${p.variants.length} variation${p.variants.length === 1 ? "" : "s"}` : ""}</p>
                   <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-                    <p className="font-bold text-[#ff8746]">{formatPrice(p.price)}</p>
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8746] text-xl font-light text-white transition group-hover:bg-[#f5851f]">+</span>
+                    <p className="font-bold text-[#ff8746]">{formatPrice(p.price)}{p.productType === "variable" ? "+" : ""}</p>
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8746] text-xl font-light text-white transition group-hover:bg-[#f5851f]">
+                      {p.productType === "variable" ? "…" : "+"}
+                    </span>
                   </div>
                 </div>
               </button>
@@ -479,6 +517,9 @@ function AdminPosRegister() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-[#374151]">{l.name}</p>
                     <p className="text-xs text-[#6b7280]">{formatPrice(l.price)} each</p>
+                    {l.variantId != null && l.size && (
+                      <p className="mt-1 inline-block rounded-md bg-white px-2 py-1 text-xs font-medium text-[#374151] ring-1 ring-[#e5e7eb]">{l.size}</p>
+                    )}
                     {(l.sizes.length > 0 || l.colors.length > 0) && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {l.sizes.length > 0 && (
@@ -630,6 +671,39 @@ function AdminPosRegister() {
             <div className="mt-7 flex justify-end gap-5">
               <button type="button" onClick={() => setAddCustomerOpen(false)} className="px-2 py-3 text-sm font-semibold text-[#ff7426]">Cancel</button>
               <button type="button" onClick={saveNewCustomer} disabled={addingCustomer} className="rounded-lg bg-[#ff8746] px-6 py-3 text-sm font-bold text-white hover:bg-[#f5851f] disabled:opacity-50">{addingCustomer ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {variantPickerProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" onClick={() => setVariantPickerProduct(null)}>
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-lg font-bold text-[#252525]">{variantPickerProduct.name}</h2>
+            <p className="mt-1 text-xs text-[#6b7280]">Choose a variation to add</p>
+            <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+              {variantPickerProduct.variants.length === 0 ? (
+                <p className="py-6 text-center text-sm text-[#9ca3af]">No variations available for this product.</p>
+              ) : (
+                variantPickerProduct.variants.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    disabled={v.stock <= 0}
+                    onClick={() => { addLineToCart(variantPickerProduct, v); setVariantPickerProduct(null); }}
+                    className="flex w-full items-center justify-between rounded-lg border border-[#e5e7eb] px-4 py-3 text-left transition hover:border-[#f5851f] hover:bg-[#fff7ed] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold text-[#374151]">{v.attributeSummary || v.sku}</span>
+                      <span className="text-xs text-[#9ca3af]">{v.stock} in stock</span>
+                    </span>
+                    <span className="font-bold text-[#ff8746]">{formatPrice(v.price)}</span>
+                  </button>
+                ))
+              )}
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button type="button" onClick={() => setVariantPickerProduct(null)} className="px-2 py-3 text-sm font-semibold text-[#ff7426]">Cancel</button>
             </div>
           </div>
         </div>

@@ -278,6 +278,7 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   sale_id      INT NOT NULL,
   product_slug VARCHAR(160) NOT NULL,
+  variant_id   INT NULL,
   sku          VARCHAR(60) NOT NULL DEFAULT '',
   name         VARCHAR(200) NOT NULL,
   size         VARCHAR(40) NOT NULL DEFAULT '',
@@ -286,6 +287,7 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
   unit_price   DECIMAL(10,2) NOT NULL,
   line_total   DECIMAL(10,2) NOT NULL,
   CONSTRAINT fk_positem_sale FOREIGN KEY (sale_id) REFERENCES pos_sales(id) ON DELETE CASCADE,
+  CONSTRAINT fk_positem_variant FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL,
   INDEX idx_positem_sale (sale_id)
 ) ENGINE=InnoDB;
 
