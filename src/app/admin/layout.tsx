@@ -70,6 +70,7 @@ const sections: Section[] = [
       { label: "Reports", icon: "chart", children: [
         { label: "Sales Report", href: "/admin/reports" },
         { label: "Item Report", href: "/admin/reports/item" },
+        { label: "Lost Profit Report", href: "/admin/reports/lost-profit" },
       ] },
     ],
   },
