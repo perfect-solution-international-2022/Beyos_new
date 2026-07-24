@@ -1,0 +1,12 @@
+<svg width="400" height="400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad11" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#654321;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b6914;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="400" height="400" fill="url(#grad11)"/>
+  <rect x="100" y="180" width="200" height="40" rx="20" fill="#fff" opacity="0.2"/>
+  <text x="50%" y="45%" font-family="Arial, sans-serif" font-size="24" fill="#ffffff" text-anchor="middle" font-weight="bold">Leather Belt</text>
+  <text x="50%" y="55%" font-family="Arial, sans-serif" font-size="16" fill="#d4af37" text-anchor="middle">Genuine Leather</text>
+</svg>

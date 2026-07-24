@@ -1,0 +1,44 @@
+{
+  "name": "beyos",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
+    "db:migrate:categories": "node --env-file=.env.local scripts/migrate-home-categories.mjs",
+    "db:migrate:reseller": "node --env-file=.env.local scripts/migrate-reseller-parity.mjs",
+    "db:migrate:product-images": "node --env-file=.env.local scripts/migrate-product-images.mjs",
+    "db:migrate:product-variants": "node --env-file=.env.local scripts/migrate-product-variants.mjs",
+    "db:migrate:pos-customers": "node --env-file=.env.local scripts/migrate-pos-customers.mjs",
+    "db:migrate:expenses": "node --env-file=.env.local scripts/migrate-expenses.mjs",
+    "db:seed:gen": "node --experimental-strip-types -e \"import('./src/lib/products.ts').then(m=>require('fs').writeFileSync('db/products.seed.json',JSON.stringify(m.products,null,2)))\""
+  },
+  "dependencies": {
+    "@types/nodemailer": "^8.0.1",
+    "bcryptjs": "2.4.3",
+    "jose": "5.9.6",
+    "mysql2": "3.11.3",
+    "next": "15.5.20",
+    "nodemailer": "^9.0.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "^3.10.0",
+    "zustand": "4.5.5"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "2.4.6",
+    "@types/node": "20.14.10",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.5.10",
+    "tailwindcss": "3.4.14",
+    "typescript": "5.5.4"
+  },
+  "overrides": {
+    "postcss": "8.5.10"
+  }
+}
