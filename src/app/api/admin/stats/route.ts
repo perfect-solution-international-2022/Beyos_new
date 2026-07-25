@@ -31,6 +31,13 @@ export async function GET() {
     const [cust] = await query<{ count: number }>(
       "SELECT COUNT(*) AS count FROM users WHERE role = 'buyer'"
     );
+    const [[pendingBuyer], [pendingReseller], [pendingUsers], [lowProducts], [lowVariants]] = await Promise.all([
+      query<{ count: number }>("SELECT COUNT(*) AS count FROM orders WHERE status = 'pending'"),
+      query<{ count: number }>("SELECT COUNT(*) AS count FROM reseller_orders WHERE status = 'pending'"),
+      query<{ count: number }>("SELECT COUNT(*) AS count FROM users WHERE role = 'reseller' AND reseller_status = 'pending'"),
+      query<{ count: number }>("SELECT COUNT(*) AS count FROM products WHERE product_type <> 'variable' AND stock <= low_stock_threshold AND is_publish = 1"),
+      query<{ count: number }>("SELECT COUNT(*) AS count FROM product_variants WHERE stock <= low_stock_threshold"),
+    ]);
 
     // Weekly order counts (this week, Sun–Sat) from both tables.
     const weekBuyer = await query<{ dow: number; c: number }>(
@@ -50,6 +57,9 @@ export async function GET() {
         totalOrders: Number(buyerAgg.count) + Number(resellerAgg.count),
         totalCustomers: Number(cust.count),
         monthlyRevenue: Number(buyerAgg.monthly) + Number(resellerAgg.monthly),
+        pendingOrders: Number(pendingBuyer.count) + Number(pendingReseller.count),
+        pendingResellers: Number(pendingUsers.count),
+        lowStockItems: Number(lowProducts.count) + Number(lowVariants.count),
       },
       weeklyOrders: week,
     });

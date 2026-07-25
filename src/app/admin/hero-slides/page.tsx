@@ -93,9 +93,9 @@ export default function AdminHeroSlidesPage() {
                   onClick={() => setEditing({ id: slide.id, image: slide.image, alt: slide.alt, order: String(slide.order), active: slide.active })}
                   className="rounded-lg bg-navy-50 px-3 py-2 text-xs font-semibold text-navy-800 hover:bg-navy-100"
                 >
-                  Edit
+                  Replace
                 </button>
-                <button onClick={() => remove(slide)} aria-label="Delete slide" className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 text-lg text-red-600 hover:bg-red-100">×</button>
+                <button onClick={() => remove(slide)} aria-label="Remove slide" title="Remove slide" className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-100">Remove</button>
               </div>
             </article>
           ))}
@@ -166,7 +166,7 @@ function SlideModal({ data, onClose, onSaved }: { data: SlideForm; onClose: () =
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white p-5 shadow-2xl sm:p-6" onClick={(event) => event.stopPropagation()}>
-        <h2 className="text-lg font-bold text-navy-800">{isEdit ? "Edit Hero Slide" : "Add Hero Slide"}</h2>
+        <h2 className="text-lg font-bold text-navy-800">{isEdit ? "Replace Hero Slide" : "Add Hero Slide"}</h2>
 
         <div className="mt-5 space-y-5">
           <div className="relative aspect-[16/9] overflow-hidden rounded-lg bg-navy-50">

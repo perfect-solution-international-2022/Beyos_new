@@ -26,6 +26,19 @@ type LocationMap = Record<string, Record<string, string[]>>;
 
 // Mirrors WHOLESALE_MIN_QTY in src/lib/reseller.ts — wholesale pricing applies at 12+ units.
 const WHOLESALE_MIN_QTY = 12;
+const VARIANT_GROUP_LABELS = ["Size", "Color"];
+
+function variantOptionGroups(variants: Variant[]): string[][] {
+  const groupCount = Math.max(0, ...variants.map((variant) => variant.summary.split(" / ").filter(Boolean).length));
+  const groups: string[][] = Array.from({ length: groupCount }, () => []);
+  for (const variant of variants) {
+    variant.summary.split(" / ").forEach((value, index) => {
+      const option = value.trim();
+      if (option && !groups[index].includes(option)) groups[index].push(option);
+    });
+  }
+  return groups;
+}
 
 export default function NewOrderPage() {
   const router = useRouter();
@@ -92,17 +105,24 @@ export default function NewOrderPage() {
 
 function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; rules: PricingRules; onClose: () => void; onAdd: (line: CartLine) => void }) {
   const defaultVariant = product.variants.find((variant) => variant.isDefault) ?? product.variants[0] ?? null;
-  const [variantId, setVariantId] = useState<number | null>(defaultVariant?.id ?? null);
+  const optionGroups = variantOptionGroups(product.variants);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultVariant?.summary.split(" / ").map((value) => value.trim()) ?? []);
+  const [fallbackVariantId, setFallbackVariantId] = useState<number | null>(defaultVariant?.id ?? null);
   const [quantity, setQuantity] = useState(1);
-  const variant = product.variants.find((item) => item.id === variantId) ?? null;
+  const variant = optionGroups.length
+    ? product.variants.find((item) => item.summary === selectedOptions.join(" / ")) ?? null
+    : product.variants.find((item) => item.id === fallbackVariantId) ?? null;
+  const variantId = variant?.id ?? null;
   const stock = variant?.stock ?? product.stock;
   const normalCost = variant?.resellerPrice ?? product.resellerPrice;
   const wholesaleCost = variant?.wholesalePrice ?? product.wholesalePrice;
   const cost = quantity >= WHOLESALE_MIN_QTY && wholesaleCost != null ? wholesaleCost : normalCost;
-  const regularRetail = variant?.price ?? product.price;
-  const retailPrice = variant?.salePrice != null && variant.salePrice > 0 && variant.salePrice < regularRetail
-    ? variant.salePrice
-    : regularRetail;
+  const regularRetail = variant?.price ?? product.compareAtPrice ?? product.price;
+  const retailPrice = variant
+    ? variant.salePrice != null && variant.salePrice > 0 && variant.salePrice < regularRetail
+      ? variant.salePrice
+      : regularRetail
+    : product.price;
   const minPrice = Math.max(cost, cost * (1 + rules.minMarkupPct / 100));
   const maxPrice = rules.maxMarkupPct == null ? null : cost * (1 + rules.maxMarkupPct / 100);
   const [sellingPrice, setSellingPrice] = useState(String(Math.max(retailPrice, minPrice)));
@@ -116,12 +136,61 @@ function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; r
       <div className="p-6"><div className="aspect-square overflow-hidden rounded-xl bg-navy-50"><Image src={variant?.image || product.image} alt={product.name} width={520} height={520} className="h-full w-full object-contain" /></div></div>
       <div className="border-navy-800/10 p-6 md:border-l"><div className="flex justify-between gap-4"><div><h2 className="text-xl font-bold text-navy-800">{product.name}</h2><p className="mt-1 text-sm text-brand">SKU: {variant?.sku || product.sku}</p></div><button onClick={onClose} aria-label="Close" className="text-2xl text-navy-800/40">×</button></div>
         <p className="mt-3 text-sm text-navy-800/60">{product.description}</p>
-        {product.variants.length > 0 && <div className="mt-5"><label className="text-sm font-semibold text-navy-800" htmlFor="variant">Size / colour / option</label><select id="variant" className="input mt-2" value={variantId ?? ""} onChange={(e) => setVariantId(Number(e.target.value))}>{product.variants.map((item) => <option key={item.id} value={item.id} disabled={item.stock < 1}>{item.summary || item.sku} — {item.stock} available</option>)}</select></div>}
-        <div className="mt-5 rounded-xl border-2 border-brand/25 bg-brand/5 p-5"><p className="text-xs font-bold uppercase tracking-[.12em] text-navy-800/55">Your reseller price</p><p className="mt-1 text-3xl font-extrabold text-brand">{formatPrice(cost)}</p>{wholesaleCost != null && <p className="mt-1 text-xs text-navy-800/60">{quantity >= WHOLESALE_MIN_QTY ? "Wholesale price active" : `Wholesale ${formatPrice(wholesaleCost)} from ${WHOLESALE_MIN_QTY} units`}</p>}</div>
+        {product.variants.length > 0 && (
+          <div className="mt-5 space-y-4">
+            {optionGroups.length ? optionGroups.map((values, groupIndex) => (
+              <div key={groupIndex}>
+                <p className="text-sm font-semibold text-navy-800">
+                  {VARIANT_GROUP_LABELS[groupIndex] ?? `Option ${groupIndex + 1}`}
+                  {selectedOptions[groupIndex] && <span className="font-normal text-navy-800/60">: {selectedOptions[groupIndex]}</span>}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {values.map((value) => {
+                    const candidate = selectedOptions.map((current, index) => index === groupIndex ? value : current);
+                    const exactMatch = product.variants.find((item) => item.summary === candidate.join(" / ") && item.stock > 0);
+                    const availableMatch = exactMatch ?? product.variants.find((item) => {
+                      const options = item.summary.split(" / ");
+                      return options[groupIndex] === value && item.stock > 0;
+                    });
+                    const selected = selectedOptions[groupIndex] === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        disabled={!availableMatch}
+                        onClick={() => setSelectedOptions(availableMatch?.summary.split(" / ") ?? candidate)}
+                        className={`min-w-[3rem] rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-35 ${selected ? "border-navy-800 bg-navy-800 text-white" : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"}`}
+                      >
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )) : (
+              <div>
+                <p className="text-sm font-semibold text-navy-800">Option</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {product.variants.map((item) => (
+                    <button key={item.id} type="button" disabled={item.stock < 1} onClick={() => setFallbackVariantId(item.id)} className={`rounded-lg border px-4 py-2 text-sm font-medium transition disabled:opacity-35 ${fallbackVariantId === item.id ? "border-navy-800 bg-navy-800 text-white" : "border-navy-800/15 text-navy-800"}`}>
+                      {item.summary || item.sku}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!variant && <p className="text-xs font-medium text-red-600">This variation combination is unavailable.</p>}
+          </div>
+        )}
+        <div className="mt-5 border-y border-navy-800/10 py-4">
+          <div className="flex items-center justify-between gap-4 text-sm"><span className="text-navy-800/55">Regular price</span><span className={retailPrice < regularRetail ? "text-navy-800/45 line-through" : "font-semibold text-navy-800"}>{formatPrice(regularRetail)}</span></div>
+          <div className="mt-2 flex items-center justify-between gap-4 text-sm"><span className="text-navy-800/55">Normal selling price</span><span className="font-bold text-navy-800">{formatPrice(retailPrice)}</span></div>
+        </div>
+        <div className="mt-4 rounded-lg border-2 border-brand/25 bg-brand/5 p-5"><p className="text-xs font-bold uppercase text-navy-800/55">Your reseller price</p><p className="mt-1 text-3xl font-extrabold text-brand">{formatPrice(cost)}</p>{wholesaleCost != null && <p className="mt-1 text-xs text-navy-800/60">{quantity >= WHOLESALE_MIN_QTY ? "Wholesale price active" : `Wholesale ${formatPrice(wholesaleCost)} from ${WHOLESALE_MIN_QTY} units`}</p>}</div>
         <div className="mt-5"><label className="text-sm font-semibold text-navy-800" htmlFor="selling-price">Customer selling price</label><input id="selling-price" disabled={!rules.allowPriceOverride} value={rules.allowPriceOverride ? sellingPrice : String(retailPrice)} onChange={(e) => setSellingPrice(e.target.value.replace(/[^0-9.]/g, ""))} className="input mt-2 disabled:bg-navy-50" inputMode="decimal" />
           <p className={`mt-1 text-xs ${invalidPrice ? "text-red-600" : "text-navy-800/50"}`}>{!rules.allowPriceOverride ? "The admin has fixed the customer price." : `Allowed: from ${formatPrice(minPrice)}${maxPrice == null ? "" : ` to ${formatPrice(maxPrice)}`}`}</p></div>
         <div className="mt-4"><p className="text-sm font-semibold text-navy-800">Quantity</p><div className="mt-2 inline-flex items-center rounded-full border border-navy-800/15"><button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="h-10 w-10">−</button><span className="w-12 text-center font-semibold">{quantity}</span><button onClick={() => setQuantity((q) => Math.min(stock, q + 1))} className="h-10 w-10">+</button></div><span className="ml-3 text-xs text-navy-800/50">{stock} available</span></div>
-        <button disabled={invalidPrice || stock < 1 || quantity > stock} onClick={() => onAdd({ key: `${product.slug}:${variantId ?? "base"}`, slug: product.slug, variantId, variantSummary: variant?.summary || "", sku: variant?.sku || product.sku, name: product.name, image: variant?.image || product.image, resellerPrice: cost, wholesalePrice: wholesaleCost, sellingPrice: rules.allowPriceOverride ? price : retailPrice, quantity, stock, weightKg: variant?.weightKg || product.weightKg || 0 })} className="btn-primary mt-6 w-full disabled:opacity-50">Add to order</button>
+        <button disabled={invalidPrice || stock < 1 || quantity > stock || (product.variants.length > 0 && !variant)} onClick={() => onAdd({ key: `${product.slug}:${variantId ?? "base"}`, slug: product.slug, variantId, variantSummary: variant?.summary || "", sku: variant?.sku || product.sku, name: product.name, image: variant?.image || product.image, resellerPrice: cost, wholesalePrice: wholesaleCost, sellingPrice: rules.allowPriceOverride ? price : retailPrice, quantity, stock, weightKg: variant?.weightKg || product.weightKg || 0 })} className="btn-primary mt-6 w-full disabled:opacity-50">Add to order</button>
       </div>
     </div>
   </div>;

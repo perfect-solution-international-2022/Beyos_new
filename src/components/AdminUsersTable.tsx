@@ -7,12 +7,16 @@ import { useToast } from "@/context/ToastProvider";
 interface AdminUser {
   id: number;
   name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: string;
   adminRole: "super" | "manager" | "cashier" | null;
   phone: string;
   city: string | null;
   resellerStatus: "pending" | "approved" | "suspended" | "rejected";
+  accountStatus: "active" | "suspended" | "disabled";
+  lastLoginAt: string | null;
   createdAt: string;
 }
 
@@ -43,8 +47,11 @@ export default function AdminUsersTable({
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [saving, setSaving] = useState(0);
   const [creating, setCreating] = useState(false);
+  const [viewing, setViewing] = useState<AdminUser | null>(null);
 
   const load = () => {
     const qs = role ? `?role=${role}` : "";
@@ -57,27 +64,77 @@ export default function AdminUsersTable({
   useEffect(() => { if (manage && new URLSearchParams(window.location.search).get("new")) setCreating(true); }, [manage]);
 
   const filtered = useMemo(
-    () => users.filter((u) => !search || `${u.name} ${u.email}`.toLowerCase().includes(search.toLowerCase())),
-    [users, search]
+    () => users.filter((u) => {
+      const matchesRole = !manage || roleFilter === "all" || u.role === roleFilter;
+      const matchesStatus = !manage || statusFilter === "all"
+        || (statusFilter === "pending" ? u.role === "reseller" && u.resellerStatus === "pending" : u.accountStatus === statusFilter);
+      const term = search.trim().toLowerCase();
+      const matchesSearch = !term || `${u.name} ${u.email} ${u.phone || ""} ${u.city || ""}`.toLowerCase().includes(term);
+      return matchesRole && matchesStatus && matchesSearch;
+    }),
+    [users, search, manage, roleFilter, statusFilter]
   );
 
   const changeRole = async (id: number, newRole: string) => {
     setSaving(id);
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role: newRole, adminRole: newRole === "admin" ? (u.adminRole ?? "super") : null } : u)));
     try {
-      await fetch("/api/admin/users", {
+      const response = await fetch("/api/admin/users", {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, role: newRole }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update role");
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role: newRole, adminRole: newRole === "admin" ? (u.adminRole ?? "super") : null } : u)));
+      setViewing((current) => current?.id === id ? { ...current, role: newRole, adminRole: newRole === "admin" ? (current.adminRole ?? "super") : null } : current);
+      toast("User role updated");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not update role", "error");
     } finally { setSaving(0); }
   };
 
   const changeAdminRole = async (id: number, adminRole: string) => {
     setSaving(id);
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, adminRole: adminRole as AdminUser["adminRole"] } : u)));
     try {
-      await fetch("/api/admin/users", {
+      const response = await fetch("/api/admin/users", {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, adminRole }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update admin access");
+      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, adminRole: adminRole as AdminUser["adminRole"] } : u)));
+      setViewing((current) => current?.id === id ? { ...current, adminRole: adminRole as AdminUser["adminRole"] } : current);
+      toast("Admin access updated");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not update admin access", "error");
+    } finally { setSaving(0); }
+  };
+
+  const changeAccountStatus = async (id: number, accountStatus: AdminUser["accountStatus"]) => {
+    setSaving(id);
+    try {
+      const response = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, accountStatus }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update account status");
+      setUsers((current) => current.map((user) => user.id === id ? { ...user, accountStatus } : user));
+      setViewing((current) => current?.id === id ? { ...current, accountStatus } : current);
+      toast(accountStatus === "active" ? "Account reactivated" : `Account ${accountStatus}`);
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not update account status", "error");
+    } finally { setSaving(0); }
+  };
+
+  const updateProfile = async (id: number, profile: { firstName: string; lastName: string; email: string; phone: string; city: string }) => {
+    setSaving(id);
+    try {
+      const response = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, profile }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update user");
+      const updates = { ...profile, name: `${profile.firstName.trim()} ${profile.lastName.trim()}`.trim() };
+      setUsers((current) => current.map((user) => user.id === id ? { ...user, ...updates } : user));
+      setViewing((current) => current?.id === id ? { ...current, ...updates } : current);
+      toast("User profile updated");
+      return true;
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not update user", "error");
+      return false;
     } finally { setSaving(0); }
   };
 
@@ -92,6 +149,7 @@ export default function AdminUsersTable({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not update reseller");
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, resellerStatus } : u)));
+      setViewing((current) => current?.id === id ? { ...current, resellerStatus } : current);
       toast(`Reseller ${resellerStatus}`);
     } catch (error) {
       toast(error instanceof Error ? error.message : "Could not update reseller");
@@ -108,79 +166,124 @@ export default function AdminUsersTable({
       danger: true,
     });
     if (!ok) return;
-    setUsers((prev) => prev.filter((x) => x.id !== u.id));
-    await fetch("/api/admin/users", {
-      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: u.id }),
-    });
-    toast(`Deleted ${u.name}`);
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: u.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not delete user");
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      toast(`Deleted ${u.name}`);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not delete user", "error");
+    }
   };
+
+  const counts = useMemo(() => ({
+    all: users.length,
+    buyer: users.filter((user) => user.role === "buyer").length,
+    reseller: users.filter((user) => user.role === "reseller").length,
+    admin: users.filter((user) => user.role === "admin").length,
+    pendingResellers: users.filter((user) => user.role === "reseller" && user.resellerStatus === "pending").length,
+    active: users.filter((user) => user.accountStatus === "active").length,
+    suspended: users.filter((user) => user.accountStatus === "suspended").length,
+  }), [users]);
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-navy-800">{title}</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-navy-800">{title}</h1>
+          <p className="mt-1 text-sm text-navy-800/55">
+            {manage ? "Manage customer, reseller and staff accounts and their access." : `View and manage ${title.toLowerCase()} accounts.`}
+          </p>
+        </div>
         {manage && <button onClick={() => setCreating(true)} className="btn-primary">+ Add User</button>}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-5 shadow-sm">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-md" placeholder="Search by name or email…" />
+      {manage && (
+        <>
+          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {([
+              ["all", "All Users", counts.all],
+              ["active", "Active", counts.active],
+              ["pending", "Pending approval", counts.pendingResellers],
+              ["suspended", "Suspended", counts.suspended],
+            ] as const).map(([value, label, count]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStatusFilter(value)}
+                className={`border bg-white p-4 text-left transition ${statusFilter === value ? "border-brand shadow-sm" : "border-navy-800/10 hover:border-navy-800/25"}`}
+              >
+                <span className="block text-xs font-semibold uppercase text-navy-800/50">{label}</span>
+                <span className="mt-1 block text-2xl font-bold text-navy-800">{count}</span>
+              </button>
+            ))}
+          </div>
+          {counts.pendingResellers > 0 && (
+            <button type="button" onClick={() => { setStatusFilter("pending"); setSearch(""); }} className="mt-4 flex w-full items-center justify-between border border-amber-300 bg-amber-50 px-4 py-3 text-left">
+              <span>
+                <span className="font-semibold text-amber-900">{counts.pendingResellers} reseller {counts.pendingResellers === 1 ? "application" : "applications"} waiting for approval</span>
+                <span className="ml-2 text-sm text-amber-800/70">Review the account details before approving.</span>
+              </span>
+              <span className="shrink-0 text-sm font-semibold text-amber-800">Review</span>
+            </button>
+          )}
+        </>
+      )}
+
+      <div className="mt-6 flex flex-col gap-3 border-y border-navy-800/10 bg-white px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-md" placeholder="Search name, email, phone or city…" />
+        {manage && <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="input lg:max-w-[180px]"><option value="all">All roles</option><option value="buyer">Customer</option><option value="reseller">Reseller</option><option value="admin">Staff & Admin</option></select>}
+        <div className="flex items-center justify-between gap-4 text-sm text-navy-800/55 sm:justify-end">
+          <span>{filtered.length} {filtered.length === 1 ? "record" : "records"}</span>
+          {(search || (manage && (roleFilter !== "all" || statusFilter !== "all"))) && (
+            <button type="button" onClick={() => { setSearch(""); setRoleFilter("all"); setStatusFilter("all"); }} className="font-semibold text-brand hover:underline">
+              Clear filters
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-navy-800/5 bg-white shadow-sm">
-        <table className="w-full min-w-[820px] text-left text-sm">
+      <div className="overflow-x-auto border-b border-navy-800/10 bg-white">
+        <table className="w-full min-w-[940px] text-left text-sm">
           <thead>
             <tr className="border-b border-navy-800/10 text-xs font-semibold uppercase tracking-wide text-navy-800/50">
               <th className="px-6 py-4">Name</th>
-              <th className="px-6 py-4">Email</th>
-              <th className="px-6 py-4">Phone</th>
-              <th className="px-6 py-4">Joined</th>
+              <th className="px-6 py-4">Contact</th>
+              <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Role</th>
+              <th className="px-6 py-4">Last active</th>
+              <th className="px-6 py-4">Joined</th>
               {role === "reseller" && <th className="px-6 py-4"></th>}
               {manage && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={manage ? 6 : role === "reseller" ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={manage ? 7 : role === "reseller" ? 7 : 6} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={manage ? 6 : role === "reseller" ? 6 : 5} className="px-6 py-10 text-center text-navy-800/50">No records found</td></tr>
+              <tr><td colSpan={manage ? 7 : role === "reseller" ? 7 : 6} className="px-6 py-12 text-center text-navy-800/50">No users match the current filters.</td></tr>
             ) : (
               filtered.map((u) => (
                 <tr key={u.id} className="border-b border-navy-800/5 last:border-0">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-white">{u.name.charAt(0).toUpperCase()}</span>
-                      <span className="font-medium text-navy-800">{u.name}</span>
+                      <span className="min-w-0"><span className="block font-medium text-navy-800">{u.name}</span><span className="block truncate text-xs text-navy-800/45">{u.email}</span></span>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-navy-800/70">{u.email}</td>
-                  <td className="px-6 py-4 text-navy-800/60">{u.phone || "—"}</td>
-                  <td className="px-6 py-4 text-navy-800/60">{new Date(u.createdAt).toLocaleDateString("en-GB")}</td>
+                  <td className="px-6 py-4 text-navy-800/60"><span className="block">{u.phone || "No phone"}</span><span className="mt-0.5 block text-xs text-navy-800/40">{u.city || "No location"}</span></td>
+                  <td className="px-6 py-4">
+                    <span className={`badge capitalize ${u.accountStatus === "active" ? "bg-emerald-100 text-emerald-700" : u.accountStatus === "suspended" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>{u.accountStatus}</span>
+                    {u.role === "reseller" && u.resellerStatus === "pending" && <span className="badge ml-2 bg-blue-100 text-blue-700">Approval pending</span>}
+                  </td>
                   <td className="px-6 py-4">
                     {manage ? (
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={u.role}
-                          disabled={saving === u.id}
-                          onChange={(e) => changeRole(u.id, e.target.value)}
-                          className="rounded-lg border border-navy-800/15 bg-white px-2 py-1.5 text-xs font-medium capitalize text-navy-800 outline-none focus:border-brand"
-                        >
-                          <option value="buyer">buyer</option>
-                          <option value="reseller">reseller</option>
-                          <option value="admin">admin</option>
-                        </select>
-                        {u.role === "admin" && (
-                          <select
-                            value={u.adminRole ?? "super"}
-                            disabled={saving === u.id}
-                            onChange={(e) => changeAdminRole(u.id, e.target.value)}
-                            className="rounded-lg border border-navy-800/15 bg-white px-2 py-1.5 text-xs font-medium text-navy-800 outline-none focus:border-brand"
-                          >
-                            <option value="super">Super Admin</option>
-                            <option value="manager">Manager</option>
-                            <option value="cashier">Cashier</option>
-                          </select>
-                        )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {u.adminRole && <span className="text-xs text-navy-800/45">{adminRoleLabel[u.adminRole]}</span>}
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
@@ -207,6 +310,8 @@ export default function AdminUsersTable({
                       </div>
                     )}
                   </td>
+                  <td className="px-6 py-4 text-navy-800/60">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-GB") : "Never"}</td>
+                  <td className="px-6 py-4 text-navy-800/60">{new Date(u.createdAt).toLocaleDateString("en-GB")}</td>
                   {role === "reseller" && (
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
@@ -227,8 +332,8 @@ export default function AdminUsersTable({
                   )}
                   {manage && (
                     <td className="px-6 py-4">
-                      <div className="flex justify-end">
-                        <button onClick={() => del(u)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Delete</button>
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setViewing(u)} className="rounded-lg bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand">Manage</button>
                       </div>
                     </td>
                   )}
@@ -240,6 +345,133 @@ export default function AdminUsersTable({
       </div>
 
       {creating && <NewUserModal onClose={() => setCreating(false)} onSaved={() => { setCreating(false); load(); toast("User created"); }} />}
+      {viewing && (
+        <UserDetailModal
+          user={viewing}
+          saving={saving === viewing.id}
+          onClose={() => setViewing(null)}
+          onApprove={() => changeResellerStatus(viewing.id, "approved")}
+          onSuspend={() => changeResellerStatus(viewing.id, "suspended")}
+          onReject={() => changeResellerStatus(viewing.id, "rejected")}
+          onChangeRole={(nextRole) => changeRole(viewing.id, nextRole)}
+          onChangeAdminRole={(nextRole) => changeAdminRole(viewing.id, nextRole)}
+          onChangeAccountStatus={(status) => changeAccountStatus(viewing.id, status)}
+          onSaveProfile={(profile) => updateProfile(viewing.id, profile)}
+          onDelete={async () => { await del(viewing); setViewing(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function UserDetailModal({
+  user, saving, onClose, onApprove, onSuspend, onReject, onChangeRole, onChangeAdminRole,
+  onChangeAccountStatus, onSaveProfile, onDelete,
+}: {
+  user: AdminUser;
+  saving: boolean;
+  onClose: () => void;
+  onApprove: () => void;
+  onSuspend: () => void;
+  onReject: () => void;
+  onChangeRole: (role: string) => void;
+  onChangeAdminRole: (role: string) => void;
+  onChangeAccountStatus: (status: AdminUser["accountStatus"]) => void;
+  onSaveProfile: (profile: { firstName: string; lastName: string; email: string; phone: string; city: string }) => Promise<boolean>;
+  onDelete: () => void;
+}) {
+  const [profile, setProfile] = useState({ firstName: user.firstName || user.name.split(" ")[0] || "", lastName: user.lastName || user.name.split(" ").slice(1).join(" "), email: user.email, phone: user.phone || "", city: user.city || "" });
+  const statusStyle = user.resellerStatus === "approved"
+    ? "bg-emerald-100 text-emerald-700"
+    : user.resellerStatus === "rejected"
+      ? "bg-red-100 text-red-700"
+      : "bg-amber-100 text-amber-700";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4" onClick={onClose}>
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-navy-800/10 px-5 py-5 sm:px-7">
+          <div className="flex min-w-0 items-center gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy-800 text-lg font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-bold text-navy-800">{user.name}</h2>
+              <p className="truncate text-sm text-navy-800/50">{user.email}</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close user details" title="Close" className="flex h-9 w-9 shrink-0 items-center justify-center text-2xl text-navy-800/45 hover:text-navy-800">×</button>
+        </div>
+
+        <div className="grid gap-x-8 gap-y-6 px-5 py-6 sm:grid-cols-2 sm:px-7">
+          <Detail label="User ID" value={`#${user.id}`} />
+          <Detail label="Joined" value={new Date(user.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })} />
+          <Detail label="Email"><a href={`mailto:${user.email}`} className="break-all font-medium text-brand hover:underline">{user.email}</a></Detail>
+          <Detail label="Phone">{user.phone ? <a href={`tel:${user.phone}`} className="font-medium text-brand hover:underline">{user.phone}</a> : <span>Not provided</span>}</Detail>
+          <Detail label="Location" value={user.city || "Not provided"} />
+          <Detail label="Account role">
+            <div className="flex flex-wrap gap-2">
+              <span className={`badge capitalize ${roleBadge[user.role] ?? "bg-navy-50 text-navy-800"}`}>{user.role}</span>
+              {user.adminRole && <span className="badge bg-navy-50 text-navy-800">{adminRoleLabel[user.adminRole]}</span>}
+            </div>
+          </Detail>
+        </div>
+
+        <div className="border-t border-navy-800/10 px-5 py-6 sm:px-7">
+          <h3 className="font-bold text-navy-800">Profile</h3>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field label="First name"><input className="input" value={profile.firstName} onChange={(event) => setProfile((current) => ({ ...current, firstName: event.target.value }))} /></Field>
+            <Field label="Last name"><input className="input" value={profile.lastName} onChange={(event) => setProfile((current) => ({ ...current, lastName: event.target.value }))} /></Field>
+            <Field label="Email"><input type="email" className="input" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} /></Field>
+            <Field label="Phone"><input className="input" value={profile.phone} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))} /></Field>
+            <Field label="City"><input className="input" value={profile.city} onChange={(event) => setProfile((current) => ({ ...current, city: event.target.value }))} /></Field>
+          </div>
+          <button type="button" disabled={saving} onClick={() => onSaveProfile(profile)} className="btn-primary mt-4 disabled:opacity-50">Save profile</button>
+        </div>
+
+        <div className="grid gap-5 border-t border-navy-800/10 px-5 py-6 sm:grid-cols-2 sm:px-7">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-navy-800">Account role</label>
+            <select value={user.role} disabled={saving} onChange={(event) => onChangeRole(event.target.value)} className="input">
+              <option value="buyer">Customer</option><option value="reseller">Reseller</option><option value="admin">Staff / Admin</option>
+            </select>
+          </div>
+          {user.role === "admin" && <div><label className="mb-1.5 block text-sm font-medium text-navy-800">Access level</label><select value={user.adminRole ?? "super"} disabled={saving} onChange={(event) => onChangeAdminRole(event.target.value)} className="input"><option value="super">Super Admin</option><option value="manager">Manager</option><option value="cashier">Cashier</option></select></div>}
+        </div>
+
+        {user.role === "reseller" && (
+          <div className="border-t border-navy-800/10 bg-navy-50/60 px-5 py-5 sm:px-7">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase text-navy-800/50">Reseller account status</p>
+                <span className={`badge mt-2 capitalize ${statusStyle}`}>{user.resellerStatus}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {user.resellerStatus !== "approved" && <button type="button" disabled={saving} onClick={onApprove} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Approve</button>}
+                {user.resellerStatus !== "suspended" && <button type="button" disabled={saving} onClick={onSuspend} className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800 disabled:opacity-50">Suspend</button>}
+                {user.resellerStatus !== "rejected" && <button type="button" disabled={saving} onClick={onReject} className="rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Reject</button>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4 border-t border-navy-800/10 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div><p className="text-sm font-semibold text-navy-800">Account access</p><p className="mt-0.5 text-xs text-navy-800/50">Suspending signs the user out and blocks future sign-ins.</p></div>
+          <div className="flex flex-wrap gap-2">
+            {user.accountStatus !== "active" && <button type="button" disabled={saving} onClick={() => onChangeAccountStatus("active")} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Reactivate</button>}
+            {user.accountStatus !== "suspended" && <button type="button" disabled={saving} onClick={() => onChangeAccountStatus("suspended")} className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800 disabled:opacity-50">Suspend</button>}
+            {user.accountStatus !== "disabled" && <button type="button" disabled={saving} onClick={() => onChangeAccountStatus("disabled")} className="rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Disable</button>}
+          </div>
+        </div>
+        <div className="border-t border-red-100 px-5 py-4 text-right sm:px-7"><button type="button" onClick={onDelete} className="text-sm font-semibold text-red-600 hover:underline">Delete user permanently</button></div>
+      </div>
+    </div>
+  );
+}
+
+function Detail({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase text-navy-800/45">{label}</p>
+      <div className="mt-1.5 text-sm text-navy-800/75">{children ?? value}</div>
     </div>
   );
 }

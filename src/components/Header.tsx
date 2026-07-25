@@ -38,6 +38,18 @@ export default function Header() {
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -54,7 +66,7 @@ export default function Header() {
           : "border-transparent bg-white"
       }`}
     >
-      <div className="container-x flex h-20 items-center justify-between gap-4">
+      <div className="container-x relative flex h-20 items-center justify-between gap-4">
         {/* Mobile menu button */}
         <button
           aria-label="Open menu"
@@ -65,7 +77,7 @@ export default function Header() {
         </button>
 
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2">
+        <Link href="/" className="absolute left-1/2 flex -translate-x-1/2 shrink-0 items-center gap-2 lg:static lg:translate-x-0">
           <Image
             src="/images/logo.png"
             alt="Beyos Clothing"
@@ -74,7 +86,7 @@ export default function Header() {
             className="h-14 w-14 object-contain"
             priority
           />
-          <span className="hidden text-xl font-bold tracking-tight text-navy-800 sm:block">
+          <span className="hidden text-xl font-bold tracking-tight text-navy-800 lg:block">
             Beyos<span className="text-brand"> Clothing</span>
           </span>
         </Link>
@@ -195,6 +207,19 @@ export default function Header() {
             )}
           </button>
         </div>
+
+        <button
+          aria-label="Open cart"
+          onClick={openCart}
+          className="relative flex h-10 w-10 items-center justify-center rounded-lg text-navy-800 hover:bg-navy-50 lg:hidden"
+        >
+          <BagIcon />
+          {mounted && totalItems > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[11px] font-bold text-white">
+              {totalItems}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Mobile search */}
@@ -225,21 +250,54 @@ export default function Header() {
         </div>
       </nav>
 
-      {/* Mobile nav */}
+      {/* Mobile and tablet navigation drawer */}
       {menuOpen && (
-        <nav className="border-t border-navy-800/10 bg-white lg:hidden">
-          <div className="container-x flex flex-col py-2">
-            {nav.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="rounded-lg px-2 py-3 text-sm font-medium text-navy-800 hover:bg-navy-50"
-              >
-                {item.label}
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button type="button" aria-label="Close menu" className="absolute inset-0 bg-navy-900/45 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
+          <nav className="absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col bg-white shadow-2xl" aria-label="Mobile navigation">
+            <div className="flex h-20 items-center justify-between border-b border-navy-800/10 px-5">
+              <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
+                <Image src="/images/logo.png" alt="Beyos Clothing" width={48} height={48} className="h-12 w-12 object-contain" />
+                <span className="text-lg font-bold text-navy-800">Beyos <span className="text-brand">Clothing</span></span>
               </Link>
-            ))}
-          </div>
-        </nav>
+              <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" title="Close menu" className="flex h-10 w-10 items-center justify-center rounded-lg text-navy-800 hover:bg-navy-50">
+                <MenuIcon open />
+              </button>
+            </div>
+
+            {mounted && user ? (
+              <div className="border-b border-navy-800/10 bg-navy-50/70 px-5 py-4">
+                <p className="text-sm font-semibold text-navy-800">{user.name}</p>
+                <p className="mt-0.5 truncate text-xs text-navy-800/50">{user.email}</p>
+                <Link href={user.role === "admin" ? "/admin" : user.role === "reseller" ? "/reseller" : "/dashboard"} className="mt-3 inline-flex text-sm font-semibold text-brand" onClick={() => setMenuOpen(false)}>
+                  {user.role === "admin" ? "Admin Dashboard" : user.role === "reseller" ? "Reseller Portal" : "My Account"} <span aria-hidden="true" className="ml-1">→</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 border-b border-navy-800/10 px-5 py-4">
+                <Link href="/login" className="btn-outline text-center" onClick={() => setMenuOpen(false)}>Sign In</Link>
+                <Link href="/register" className="btn-primary text-center" onClick={() => setMenuOpen(false)}>Register</Link>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto px-3 py-4">
+              {nav.map((item, index) => (
+                <Link key={item.label} href={item.href} onClick={() => setMenuOpen(false)} className={`flex items-center justify-between border-b border-navy-800/5 px-3 py-4 text-base font-semibold transition ${pathname === item.href ? "text-brand" : "text-navy-800 hover:text-brand"}`}>
+                  <span>{item.label}</span>
+                  <span aria-hidden="true" className="text-navy-800/25">{String(index + 1).padStart(2, "0")}</span>
+                </Link>
+              ))}
+              <Link href="/checkout" onClick={() => setMenuOpen(false)} className="mt-4 flex items-center justify-between bg-navy-900 px-4 py-3.5 text-sm font-semibold text-white">
+                <span>Go to Checkout</span><span aria-hidden="true">→</span>
+              </Link>
+            </div>
+
+            <div className="border-t border-navy-800/10 px-5 py-4">
+              <a href="tel:+94743191200" className="block text-sm font-semibold text-navy-800">Hotline: +94 74 319 1200</a>
+              {mounted && user && <button type="button" onClick={async () => { await logout(); setMenuOpen(false); }} className="mt-3 text-sm font-semibold text-red-600">Sign out</button>}
+            </div>
+          </nav>
+        </div>
       )}
     </header>
   );

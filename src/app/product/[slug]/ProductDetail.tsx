@@ -218,20 +218,22 @@ export default function ProductDetail({ product }: { product: Product }) {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {values.map((value) => {
                     const candidate = selectedOptions.map((v, i) => (i === groupIndex ? value : v));
-                    const matches = variants.filter((v) => v.attributeSummary === candidate.join(" / "));
-                    const available = matches.some((v) => v.stock > 0);
+                    const exactMatch = variants.find((v) => v.attributeSummary === candidate.join(" / ") && v.stock > 0);
+                    const availableMatch = exactMatch ?? variants.find((v) => {
+                      const options = v.attributeSummary.split(" / ");
+                      return options[groupIndex] === value && v.stock > 0;
+                    });
                     const isSelected = selectedOptions[groupIndex] === value;
                     return (
                       <button
                         key={value}
                         type="button"
-                        disabled={!available}
+                        disabled={!availableMatch}
                         onClick={() => {
-                          const next = selectedOptions.map((v, i) => (i === groupIndex ? value : v));
+                          const next = availableMatch?.attributeSummary.split(" / ") ?? candidate;
                           setSelectedOptions(next);
                           setQuantity(1);
-                          const match = variants.find((v) => v.attributeSummary === next.join(" / "));
-                          if (match?.image) setActiveImage(match.image);
+                          if (availableMatch?.image) setActiveImage(availableMatch.image);
                         }}
                         className={`min-w-[3rem] rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
                           isSelected

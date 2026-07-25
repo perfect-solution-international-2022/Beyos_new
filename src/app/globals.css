@@ -101,6 +101,56 @@ body {
   animation: fadeUp 0.5s ease-out both;
 }
 
+/* Admin SaaS workspace: consistent, compact operational surfaces across modules. */
+.admin-content .rounded-2xl,
+.admin-content .rounded-3xl,
+.admin-content .rounded-xl {
+  border-radius: 8px !important;
+}
+.admin-shell aside .rounded-xl,
+.admin-shell header .rounded-xl,
+.admin-shell header .rounded-2xl {
+  border-radius: 8px !important;
+}
+.admin-content .shadow-sm {
+  box-shadow: 0 1px 2px rgb(15 37 64 / 5%) !important;
+}
+.admin-content .shadow-lg,
+.admin-content .shadow-xl,
+.admin-content .shadow-2xl {
+  box-shadow: 0 16px 40px rgb(15 37 64 / 14%) !important;
+}
+.admin-content .btn,
+.admin-content .btn-primary,
+.admin-content .btn-dark,
+.admin-content .btn-outline {
+  min-height: 40px;
+  border-radius: 7px;
+  padding: 0.625rem 1rem;
+}
+.admin-content .input {
+  min-height: 40px;
+  border-radius: 7px;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+.admin-content table thead {
+  background: #f8fafc;
+}
+.admin-content table tbody tr {
+  transition: background-color 150ms ease;
+}
+.admin-content table tbody tr:hover {
+  background: rgb(246 247 249 / 75%);
+}
+.admin-content table th {
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+.admin-content h1 {
+  letter-spacing: 0;
+}
+
 /* POS receipt printing: hide everything on the page except the receipt bill
    itself, so "Print" doesn't include the admin layout/modal chrome. */
 @media print {

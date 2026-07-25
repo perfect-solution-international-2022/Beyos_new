@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAllProducts } from "@/lib/products-db";
+import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -7,7 +8,8 @@ export async function GET(request: Request) {
   const featured = searchParams.get("featured");
   const search = searchParams.get("search")?.trim().toLowerCase();
 
-  let result = await getAllProducts();
+  const user = await getCurrentUser();
+  let result = await getAllProducts(user?.role === "reseller");
   if (category) result = result.filter((p) => p.category === category);
   if (featured === "true") result = result.filter((p) => p.featured);
   if (search) result = result.filter((p) =>

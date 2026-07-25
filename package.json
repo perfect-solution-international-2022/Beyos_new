@@ -9,6 +9,8 @@
     "lint": "next lint",
     "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
     "db:migrate:categories": "node --env-file=.env.local scripts/migrate-home-categories.mjs",
+    "db:migrate:hero-slides": "node --env-file=.env.local scripts/migrate-hero-slides.mjs",
+    "db:migrate:saas-users": "node --env-file=.env.local scripts/migrate-saas-users.mjs",
     "db:migrate:reseller": "node --env-file=.env.local scripts/migrate-reseller-parity.mjs",
     "db:migrate:product-images": "node --env-file=.env.local scripts/migrate-product-images.mjs",
     "db:migrate:product-variants": "node --env-file=.env.local scripts/migrate-product-variants.mjs",

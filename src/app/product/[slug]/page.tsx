@@ -6,6 +6,7 @@ import ProductDetail from "./ProductDetail";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { getCurrentUser } from "@/lib/auth";
 
 function seoDescription(value: string): string {
   return value
@@ -51,10 +52,12 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  const user = await getCurrentUser();
+  const resellerOnly = user?.role === "reseller";
+  const product = await getProductBySlug(slug, resellerOnly);
   if (!product) notFound();
 
-  const related = await getRelatedProducts(product.slug, product.category);
+  const related = await getRelatedProducts(product.slug, product.category, resellerOnly);
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",

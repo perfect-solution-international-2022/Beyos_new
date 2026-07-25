@@ -95,9 +95,10 @@ const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, i
        payment_methods`;
 const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, sale_price, stock, image, is_default, weight_kg, wholesale_price";
 
-export async function getAllProducts(): Promise<Product[]> {
+export async function getAllProducts(resellerOnly = false): Promise<Product[]> {
+  const where = resellerOnly ? `${STOREFRONT_WHERE} AND is_reseller_product = 1` : STOREFRONT_WHERE;
   const [rows, variants] = await Promise.all([
-    query<ProductRow>(`SELECT ${SELECT_FIELDS} FROM products WHERE ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`),
+    query<ProductRow>(`SELECT ${SELECT_FIELDS} FROM products WHERE ${where} ORDER BY created_at DESC, id DESC`),
     query<VariantRow>(`SELECT ${VARIANT_FIELDS} FROM product_variants ORDER BY is_default DESC, id ASC`),
   ]);
   const variantsByProduct = new Map<number, ProductVariant[]>();
@@ -105,9 +106,10 @@ export async function getAllProducts(): Promise<Product[]> {
   return rows.map((row) => ({ ...mapRow(row), variants: variantsByProduct.get(row.id) || [] }));
 }
 
-export async function getProductBySlug(slug: string): Promise<Product | undefined> {
+export async function getProductBySlug(slug: string, resellerOnly = false): Promise<Product | undefined> {
+  const where = resellerOnly ? `${STOREFRONT_WHERE} AND is_reseller_product = 1` : STOREFRONT_WHERE;
   const rows = await query<ProductRow>(
-    `SELECT ${SELECT_FIELDS} FROM products WHERE slug = ? AND ${STOREFRONT_WHERE} LIMIT 1`,
+    `SELECT ${SELECT_FIELDS} FROM products WHERE slug = ? AND ${where} LIMIT 1`,
     [slug]
   );
   if (!rows[0]) return undefined;
@@ -133,10 +135,11 @@ export async function getFeaturedProducts(): Promise<Product[]> {
   return rows.map(mapRow);
 }
 
-export async function getRelatedProducts(slug: string, category: string): Promise<Product[]> {
+export async function getRelatedProducts(slug: string, category: string, resellerOnly = false): Promise<Product[]> {
+  const where = resellerOnly ? `${STOREFRONT_WHERE} AND is_reseller_product = 1` : STOREFRONT_WHERE;
   const rows = await query<ProductRow>(
     `SELECT ${SELECT_FIELDS} FROM products
-     WHERE category = ? AND slug <> ? AND ${STOREFRONT_WHERE}
+     WHERE category = ? AND slug <> ? AND ${where}
      ORDER BY created_at DESC, id DESC LIMIT 4`,
     [category, slug]
   );

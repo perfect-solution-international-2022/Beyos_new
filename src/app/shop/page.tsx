@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import ShopClient from "./ShopClient";
 import { getAllProducts } from "@/lib/products-db";
 import { getShopCategories } from "@/lib/categories-db";
+import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Shop",
@@ -20,8 +21,10 @@ export const metadata: Metadata = {
 export const revalidate = 60;
 
 export default async function ShopPage() {
+  const user = await getCurrentUser();
+  const resellerOnly = user?.role === "reseller";
   const [products, categories] = await Promise.all([
-    getAllProducts(),
+    getAllProducts(resellerOnly),
     getShopCategories(),
   ]);
 

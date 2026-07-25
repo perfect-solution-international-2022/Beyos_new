@@ -123,13 +123,17 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
   const decideOrder = async (type: "reseller" | "customer", status: "confirmed" | "rejected" | "cancelled") => {
     setDeciding(true);
     try {
-      await fetch("/api/admin/orders", {
+      const response = await fetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type, orderRef: order.orderRef, status }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update order");
       toast(status === "confirmed" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
       load();
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not update order", "error");
     } finally {
       setDeciding(false);
     }
@@ -138,13 +142,17 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
   const decidePos = async (deliveryStatus: "accepted" | "cancelled") => {
     setDeciding(true);
     try {
-      await fetch(`/api/pos/sales/${encodeURIComponent(order.orderRef)}`, {
+      const response = await fetch(`/api/pos/sales/${encodeURIComponent(order.orderRef)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ deliveryStatus }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update delivery order");
       toast(deliveryStatus === "accepted" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
       load();
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not update delivery order", "error");
     } finally {
       setDeciding(false);
     }
@@ -166,34 +174,42 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
               View Invoice
             </button>
           )}
-          {(isPendingReseller || isPendingCustomerCod || isPendingPosDelivery) && (
-            <>
-              <button
-                disabled={deciding}
-                onClick={() =>
-                  isPendingPosDelivery
-                    ? decidePos("accepted")
-                    : decideOrder(isPendingReseller ? "reseller" : "customer", "confirmed")
-                }
-                className="rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
-              >
-                Accept
-              </button>
-              <button
-                disabled={deciding}
-                onClick={() =>
-                  isPendingPosDelivery
-                    ? decidePos("cancelled")
-                    : decideOrder(isPendingReseller ? "reseller" : "customer", isPendingReseller ? "rejected" : "cancelled")
-                }
-                className="rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-40"
-              >
-                Reject
-              </button>
-            </>
-          )}
         </div>
       </div>
+
+      <div className="mt-6 grid grid-cols-2 border border-navy-800/10 bg-white lg:grid-cols-4">
+        <OrderMetric label="Order type" value={order.type === "pos" ? "POS sale" : order.type === "reseller" ? "Reseller order" : "Customer order"} />
+        <OrderMetric label="Order total" value={formatPrice(order.total)} />
+        <OrderMetric label="Payment" value={`${methodLabel[order.paymentMethod] ?? order.paymentMethod} · ${formatStatus(order.paymentStatus)}`} />
+        <OrderMetric label="Current status">
+          <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: status.bg, color: status.color }}>{formatStatus(order.status)}</span>
+        </OrderMetric>
+      </div>
+
+      {(isPendingReseller || isPendingCustomerCod || isPendingPosDelivery) && (
+        <div className="mt-4 flex flex-col gap-4 border border-amber-300 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold text-amber-900">This order needs your review</p>
+            <p className="mt-1 text-sm text-amber-800/75">Check the customer, delivery and item details below, then accept or reject the order.</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              disabled={deciding}
+              onClick={() => isPendingPosDelivery ? decidePos("accepted") : decideOrder(isPendingReseller ? "reseller" : "customer", "confirmed")}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              Accept order
+            </button>
+            <button
+              disabled={deciding}
+              onClick={() => isPendingPosDelivery ? decidePos("cancelled") : decideOrder(isPendingReseller ? "reseller" : "customer", isPendingReseller ? "rejected" : "cancelled")}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-red-700 ring-1 ring-red-200 disabled:opacity-40"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
 
       {order.rejectReason && (
         <div className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -419,6 +435,15 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function OrderMetric({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
+  return (
+    <div className="min-w-0 border-b border-r border-navy-800/10 p-4 last:border-r-0 lg:border-b-0">
+      <p className="text-xs font-semibold uppercase text-navy-800/45">{label}</p>
+      <div className="mt-1.5 break-words text-sm font-bold text-navy-800">{children ?? value}</div>
     </div>
   );
 }

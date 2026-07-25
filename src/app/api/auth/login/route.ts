@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { createSession, findUserByEmail, verifyPassword } from "@/lib/auth";
+import { createSession, findUserByEmail, getCurrentUser, verifyPassword } from "@/lib/auth";
 import { consumeRateLimit, requestIp } from "@/lib/rateLimit";
+import { query } from "@/lib/db";
 
 export async function POST(request: Request) {
   let body: { email?: string; password?: string };
@@ -39,17 +40,18 @@ export async function POST(request: Request) {
         { status: 401 }
       );
     }
+    if (user.account_status !== "active") {
+      return NextResponse.json(
+        { error: user.account_status === "suspended" ? "Your account has been suspended. Contact support." : "Your account is disabled. Contact support." },
+        { status: 403 }
+      );
+    }
 
     await createSession(user.id);
-    return NextResponse.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        adminRole: user.role === "admin" ? user.admin_role : null,
-      },
-    });
+    await query("UPDATE users SET last_login_at = NOW() WHERE id = ?", [user.id]);
+    const sessionUser = await getCurrentUser();
+    if (!sessionUser) throw new Error("Could not read the newly created session");
+    return NextResponse.json({ user: sessionUser });
   } catch (err) {
     console.error("login error:", err);
     return NextResponse.json(

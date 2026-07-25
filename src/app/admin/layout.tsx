@@ -25,7 +25,7 @@ const sections: Section[] = [
         { label: "All Products", href: "/admin/products" },
         { label: "Create Product", href: "/admin/products/new" },
       ] },
-      { label: "Category", icon: "folder", href: "/admin/categories" },
+      { label: "Categories", icon: "folder", href: "/admin/categories" },
       { label: "Hero Slides", icon: "image", href: "/admin/hero-slides" },
       { label: "Attributes", icon: "sliders", href: "/admin/attributes" },
       { label: "Inventory", icon: "box", children: [
@@ -55,16 +55,18 @@ const sections: Section[] = [
     title: "People",
     section: "people",
     items: [
-      { label: "Resellers", icon: "store", href: "/admin/resellers" },
-      { label: "Customers", icon: "users", href: "/admin/customers" },
-      { label: "Users", icon: "user", href: "/admin/users" },
+      { label: "User Management", icon: "users", children: [
+        { label: "All Users", href: "/admin/users" },
+        { label: "Customers", href: "/admin/customers" },
+        { label: "Resellers", href: "/admin/resellers" },
+      ] },
     ],
   },
   {
     title: "Finance",
     section: "finance",
     items: [
-      { label: "Withdraw", icon: "cash", children: [
+      { label: "Withdrawals", icon: "cash", children: [
         { label: "Pending Withdrawals", href: "/admin/withdrawals/pending" },
         { label: "Withdraw History", href: "/admin/withdrawals/history" },
       ] },
@@ -179,6 +181,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     [user]
   );
   const searchIndex = useMemo(() => searchIndexFor(visibleSections), [visibleSections]);
+  const currentPage = useMemo(() => {
+    const matches = searchIndex
+      .filter((entry) => pathname === entry.href.split("?")[0] || pathname.startsWith(entry.href.split("?")[0] + "/"))
+      .sort((a, b) => b.href.length - a.href.length);
+    return matches[0] ?? { label: pathname === "/admin" ? "Dashboard" : "Admin", group: "Overview", href: pathname };
+  }, [pathname, searchIndex]);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -216,10 +224,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9]">
+    <div className="admin-shell min-h-screen bg-[#f6f7f9]">
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-[268px] flex-col bg-gradient-to-b from-[#0a1a30] via-navy-900 to-[#0a1a30] text-white transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-[256px] flex-col bg-[#0a1a30] text-white transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -326,17 +334,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {sidebarOpen && <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-30 bg-navy-900/50 backdrop-blur-sm lg:hidden" />}
 
       {/* ── Main column ── */}
-      <div className="lg:pl-[268px]">
+      <div className="lg:pl-[256px]">
         <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between gap-3 border-b border-navy-800/[0.07] bg-white/85 px-4 backdrop-blur-md sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button onClick={() => setSidebarOpen((v) => !v)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-navy-800 hover:bg-navy-50 lg:hidden" aria-label="Toggle sidebar">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>
             </button>
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-[15px] font-bold text-navy-800">Welcome back, {user.name.split(" ")[0]} 👋</p>
-              <p className="hidden text-xs text-navy-800/40 sm:block">
-                {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-              </p>
+              <p className="truncate text-[15px] font-bold text-navy-800">{currentPage.label}</p>
+              <p className="hidden text-xs text-navy-800/40 sm:block">{currentPage.group} / {currentPage.label}</p>
             </div>
           </div>
 
@@ -407,7 +413,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
         </header>
-        <main className="p-4 sm:p-8">{children}</main>
+        <main className="admin-content mx-auto w-full max-w-[1680px] p-4 sm:p-6 xl:p-8">{children}</main>
       </div>
     </div>
   );

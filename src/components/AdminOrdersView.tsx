@@ -92,20 +92,31 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
         (o) =>
           (typeFilter === "all" || o.type === typeFilter) &&
           (!unpaidOnly || (o.type === "customer" && o.paymentStatus !== "paid")) &&
-          (!search || `${o.orderRef} ${o.customerName}`.toLowerCase().includes(search.toLowerCase()))
+          (!search || `${o.orderRef} ${o.customerName} ${o.customerPhone || ""}`.toLowerCase().includes(search.toLowerCase()))
       ),
     [orders, search, typeFilter, unpaidOnly]
   );
+  const summary = useMemo(() => ({
+    all: orders.length,
+    pending: orders.filter((order) => order.status === "pending").length,
+    paid: orders.filter((order) => order.paymentStatus === "paid").length,
+    total: orders.reduce((sum, order) => sum + order.amount, 0),
+  }), [orders]);
 
   const updateStatus = async (o: Order, status: string) => {
     setSaving(o.orderRef);
-    setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, status } : x)));
     try {
-      await fetch("/api/admin/orders", {
+      const response = await fetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: o.type, orderRef: o.orderRef, status }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update order status");
+      setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, status } : x)));
+      toast(`Order ${o.orderRef} updated`);
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not update order status", "error");
     } finally {
       setSaving("");
     }
@@ -113,14 +124,18 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
 
   const markPaid = async (o: Order) => {
     setSaving(o.orderRef + ":pay");
-    setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, paymentStatus: "paid" } : x)));
     try {
-      await fetch("/api/admin/orders", {
+      const response = await fetch("/api/admin/orders", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: o.type, orderRef: o.orderRef, paymentStatus: "paid" }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update payment");
+      setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, paymentStatus: "paid" } : x)));
       toast(`Marked ${o.orderRef} as paid`);
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not update payment", "error");
     } finally {
       setSaving("");
     }
@@ -128,7 +143,17 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-navy-800">{viewTitle[view]}</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-navy-800">{viewTitle[view]}</h1>
+        <p className="mt-1 text-sm text-navy-800/55">Review customer, reseller and POS orders from one place.</p>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <OrderSummary label="Orders" value={String(summary.all)} />
+        <OrderSummary label="Needs review" value={String(summary.pending)} emphasis={summary.pending > 0} />
+        <OrderSummary label="Paid" value={String(summary.paid)} />
+        <OrderSummary label="Order value" value={formatPrice(summary.total)} />
+      </div>
 
       {!loading && unpaidCustomerOrders.length > 0 && (
         <button
@@ -154,7 +179,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
       )}
 
       <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-navy-800/5 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-xs" placeholder="Search Order ID or Customer…" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-xs" placeholder="Search order, customer or phone…" />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="input sm:max-w-[180px]">
           <option value="all">All Types</option>
           <option value="customer">Customer</option>
@@ -205,10 +230,11 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                     o.type === "customer" && o.paymentStatus !== "paid" ? "bg-amber-50/50" : ""
                   }`}
                 >
-                  <td className="px-6 py-4 font-semibold text-brand">#{o.orderRef}</td>
+                  <td className="px-6 py-4"><Link href={`/admin/orders/${encodeURIComponent(o.orderRef)}`} className="font-semibold text-brand hover:underline">#{o.orderRef}</Link></td>
                   <td className="px-6 py-4 capitalize text-navy-800/60">{o.type === "pos" ? "POS" : o.type}</td>
                   <td className="px-6 py-4 text-navy-800">
-                    {o.customerName}
+                    <p className="font-medium">{o.customerName}</p>
+                    {o.customerPhone && <p className="mt-0.5 text-xs text-navy-800/45">{o.customerPhone}</p>}
                   </td>
                   <td className="px-6 py-4 font-bold text-navy-800">{formatPrice(o.amount)}</td>
                   <td className="px-6 py-4 text-navy-800/60">{new Date(o.createdAt).toLocaleDateString("en-GB")}</td>
@@ -275,7 +301,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                         pendingOnly ? "bg-brand text-white hover:bg-brand/90" : "bg-navy-50 text-navy-800 hover:bg-navy-100"
                       }`}
                     >
-                      {pendingOnly ? "Review" : "View"}
+                      {pendingOnly ? "Review order" : "View details"}
                     </Link>
                   </td>
                 </tr>
@@ -284,6 +310,15 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function OrderSummary({ label, value, emphasis = false }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div className={`border bg-white p-4 ${emphasis ? "border-amber-300 bg-amber-50" : "border-navy-800/10"}`}>
+      <p className={`text-xs font-semibold uppercase ${emphasis ? "text-amber-700" : "text-navy-800/45"}`}>{label}</p>
+      <p className="mt-1 text-xl font-bold text-navy-800">{value}</p>
     </div>
   );
 }

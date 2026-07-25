@@ -25,16 +25,15 @@ function LoginForm() {
     setLoading(true);
     try {
       const u = await login(email, password);
-      const dest =
-        redirect !== "/"
-          ? redirect
-          : u.role === "admin"
-            ? u.adminRole === "cashier"
-              ? "/admin/pos"
-              : "/admin"
-            : u.role === "reseller"
-              ? "/reseller"
-              : "/";
+      const roleHome = u.role === "admin"
+        ? u.adminRole === "cashier" ? "/admin/pos" : "/admin"
+        : u.role === "reseller" ? "/reseller"
+        : "/";
+      const redirectMatchesRole =
+        (u.role === "admin" && redirect.startsWith("/admin"))
+        || (u.role === "reseller" && redirect.startsWith("/reseller"))
+        || (u.role === "buyer" && !redirect.startsWith("/admin") && !redirect.startsWith("/reseller"));
+      const dest = redirect !== "/" && redirectMatchesRole ? redirect : roleHome;
       router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

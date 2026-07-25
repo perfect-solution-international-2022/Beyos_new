@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import HeroCarousel from "@/components/HeroCarousel";
+import CategoryCarousel from "@/components/CategoryCarousel";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import Newsletter from "@/components/Newsletter";
@@ -83,28 +84,7 @@ export default async function HomePage() {
             View all <span aria-hidden="true">→</span>
           </Link>
         </div>
-        <div className="-mx-4 mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-x-8 sm:gap-y-8 sm:overflow-visible sm:px-0 sm:pb-0">
-          {homeCategories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={cat.href}
-              className="group flex shrink-0 snap-start flex-col items-center text-center"
-            >
-              <div className="relative h-24 w-24 overflow-hidden rounded-full bg-navy-50 ring-1 ring-navy-800/5 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-lg min-[360px]:h-28 min-[360px]:w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36">
-                <Image
-                  src={cat.image}
-                  alt={cat.name}
-                  fill
-                  sizes="(min-width: 1024px) 144px, (min-width: 640px) 128px, (min-width: 360px) 112px, 96px"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              </div>
-              <h3 className="mt-4 text-base font-semibold text-navy-800 transition group-hover:text-brand">
-                {cat.name}
-              </h3>
-            </Link>
-          ))}
-        </div>
+        <CategoryCarousel categories={homeCategories} />
       </section>
 
       {/* Featured products */}

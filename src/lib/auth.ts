@@ -20,6 +20,7 @@ export interface DbUser {
   role: UserRole;
   admin_role: AdminRole | null;
   reseller_status: "pending" | "approved" | "suspended" | "rejected";
+  account_status: "active" | "suspended" | "disabled";
   session_version: number;
   created_at: string;
 }
@@ -44,11 +45,12 @@ export function verifyPassword(
 }
 
 export async function createSession(userId: number): Promise<void> {
-  const rows = await query<Pick<DbUser, "role" | "admin_role" | "reseller_status" | "session_version">>(
-    "SELECT role, admin_role, reseller_status, session_version FROM users WHERE id = ? LIMIT 1",
+  const rows = await query<Pick<DbUser, "role" | "admin_role" | "reseller_status" | "account_status" | "session_version">>(
+    "SELECT role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? LIMIT 1",
     [userId]
   );
   if (!rows[0]) throw new Error("Cannot create a session for an unknown user");
+  if (rows[0].account_status !== "active") throw new Error("This account is not active");
   const effectiveRole: UserRole = rows[0].role === "reseller" && rows[0].reseller_status !== "approved"
     ? "buyer"
     : rows[0].role;
@@ -88,11 +90,12 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   const uid = await getSessionUserId();
   if (!uid) return null;
   const rows = await query<DbUser>(
-    "SELECT id, name, email, role, admin_role, reseller_status, session_version FROM users WHERE id = ? LIMIT 1",
+    "SELECT id, name, email, role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? LIMIT 1",
     [uid]
   );
   if (rows.length === 0) return null;
   const u = rows[0];
+  if (u.account_status !== "active") return null;
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
   if (!session || session.sv !== Number(u.session_version)) return null;

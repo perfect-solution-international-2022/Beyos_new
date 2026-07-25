@@ -36,7 +36,7 @@ function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = safeInternalRedirect(searchParams.get("redirect"));
-  const { register } = useAuth();
+  const { register, logout } = useAuth();
 
   const [role, setRole] = useState<Role>("buyer");
   const [form, setForm] = useState({
@@ -55,6 +55,7 @@ function RegisterForm() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resellerPending, setResellerPending] = useState(false);
 
   const set = (key: keyof typeof form) => (v: string) =>
     setForm((f) => ({ ...f, [key]: v }));
@@ -90,6 +91,11 @@ function RegisterForm() {
           postalCode: form.postalCode,
         }),
       });
+      if (role === "reseller") {
+        await logout();
+        setResellerPending(true);
+        return;
+      }
       const dest =
         redirect !== "/" ? redirect : u.role === "reseller" ? "/reseller" : "/";
       router.push(dest);
@@ -104,6 +110,30 @@ function RegisterForm() {
   const loginHref = `/login${
     redirect !== "/" ? `?redirect=${encodeURIComponent(redirect)}` : ""
   }`;
+
+  if (resellerPending) {
+    return (
+      <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-navy-50 px-4 py-12">
+        <div className="w-full max-w-xl border border-navy-800/10 bg-white p-6 shadow-sm sm:p-10">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-2xl font-bold text-amber-700">!</div>
+          <p className="mt-6 text-sm font-semibold uppercase text-amber-700">Approval pending</p>
+          <h1 className="mt-2 font-display text-3xl font-bold text-navy-800">Your reseller application was received</h1>
+          <p className="mt-3 text-navy-800/65">
+            We created your account for <span className="font-semibold text-navy-800">{form.email}</span>. An administrator must approve it before you can access the reseller dashboard.
+          </p>
+          <ol className="mt-7 divide-y divide-navy-800/10 border-y border-navy-800/10">
+            <li className="flex gap-4 py-4"><span className="font-bold text-brand">1</span><div><p className="font-semibold text-navy-800">Application submitted</p><p className="mt-0.5 text-sm text-navy-800/55">Your reseller details are waiting for review.</p></div></li>
+            <li className="flex gap-4 py-4"><span className="font-bold text-navy-800/35">2</span><div><p className="font-semibold text-navy-800">Admin approval</p><p className="mt-0.5 text-sm text-navy-800/55">Beyos administration will approve or contact you if more information is needed.</p></div></li>
+            <li className="flex gap-4 py-4"><span className="font-bold text-navy-800/35">3</span><div><p className="font-semibold text-navy-800">Sign in to reseller portal</p><p className="mt-0.5 text-sm text-navy-800/55">After approval, sign in with the email and password you registered.</p></div></li>
+          </ol>
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <Link href="/" className="btn-outline flex-1 text-center">Return to Home</Link>
+            <Link href="/login" className="btn-primary flex-1 text-center">Go to Sign In</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center bg-navy-50 px-4 py-12">
