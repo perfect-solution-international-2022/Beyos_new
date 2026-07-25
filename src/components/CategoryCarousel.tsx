@@ -35,7 +35,7 @@ export default function CategoryCarousel({ categories }: { categories: Category[
             <div className="relative h-24 w-24 overflow-hidden rounded-full bg-navy-50 ring-1 ring-navy-800/5 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-lg min-[360px]:h-28 min-[360px]:w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36">
               <Image
                 src={category.image}
-                alt={category.name}
+                alt=""
                 fill
                 sizes="(min-width: 1024px) 144px, (min-width: 640px) 128px, (min-width: 360px) 112px, 96px"
                 className="object-cover transition-transform duration-500 group-hover:scale-105"

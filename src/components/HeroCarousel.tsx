@@ -82,7 +82,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
               href="/about"
               className="btn border border-white/40 bg-white/5 text-white backdrop-blur-sm hover:bg-white/15"
             >
-              Learn More
+              About Beyos Clothing
             </Link>
           </div>
         </div>

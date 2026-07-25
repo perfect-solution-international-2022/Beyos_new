@@ -104,7 +104,7 @@ export default function ProductCard({ product }: { product: Product }) {
         >
           {product.name}
         </Link>
-        <div className="flex items-center gap-1 text-xs text-navy-800/50">
+        <div className="flex items-center gap-1 text-xs text-navy-800/75">
           <StarIcon />
           <span>{product.rating.toFixed(1)}</span>
           <span>({product.reviews})</span>
@@ -114,7 +114,7 @@ export default function ProductCard({ product }: { product: Product }) {
             {formatPrice(product.price)}
           </span>
           {product.compareAtPrice && (
-            <span className="text-xs text-navy-800/40 line-through">
+            <span className="text-xs text-navy-800/70 line-through">
               {formatPrice(product.compareAtPrice)}
             </span>
           )}
