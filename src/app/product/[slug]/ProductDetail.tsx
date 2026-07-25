@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -40,22 +40,41 @@ export default function ProductDetail({ product }: { product: Product }) {
   const [activeImage, setActiveImage] = useState(defaultVariant?.image || product.images[0] || product.image);
   const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [added, setAdded] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const viewerImages = useMemo(
+    () => Array.from(new Set([
+      product.image,
+      ...product.images,
+      ...variants.map((variant) => variant.image).filter((image): image is string => Boolean(image)),
+    ].filter(Boolean))),
+    [product.image, product.images, variants]
+  );
+
+  const moveViewer = (direction: number) => {
+    setActiveImage((current) => {
+      const currentIndex = viewerImages.indexOf(current);
+      const startIndex = currentIndex >= 0 ? currentIndex : 0;
+      return viewerImages[(startIndex + direction + viewerImages.length) % viewerImages.length];
+    });
+  };
 
   useEffect(() => {
     if (!imageViewerOpen) return;
 
-    const closeOnEscape = (event: KeyboardEvent) => {
+    const handleViewerKeys = (event: KeyboardEvent) => {
       if (event.key === "Escape") setImageViewerOpen(false);
+      if (event.key === "ArrowLeft" && viewerImages.length > 1) moveViewer(-1);
+      if (event.key === "ArrowRight" && viewerImages.length > 1) moveViewer(1);
     };
 
-    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("keydown", handleViewerKeys);
     document.body.style.overflow = "hidden";
 
     return () => {
-      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("keydown", handleViewerKeys);
       document.body.style.overflow = "";
     };
-  }, [imageViewerOpen]);
+  }, [imageViewerOpen, viewerImages]);
 
   const addItem = useCart((s) => s.addItem);
   const selectedVariant = variants.find(
@@ -328,6 +347,15 @@ export default function ProductDetail({ product }: { product: Product }) {
           <div
             className="relative h-[calc(100%-4rem)] w-full max-w-6xl"
             onClick={(event) => event.stopPropagation()}
+            onTouchStart={(event) => {
+              touchStartX.current = event.touches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(event) => {
+              if (touchStartX.current === null || viewerImages.length < 2) return;
+              const distance = event.changedTouches[0].clientX - touchStartX.current;
+              touchStartX.current = null;
+              if (Math.abs(distance) >= 45) moveViewer(distance < 0 ? 1 : -1);
+            }}
           >
             <Image
               src={activeImage}
@@ -338,6 +366,35 @@ export default function ProductDetail({ product }: { product: Product }) {
               priority
             />
           </div>
+          {viewerImages.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  moveViewer(-1);
+                }}
+                className="absolute left-3 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-3xl text-navy-800 shadow-lg transition hover:bg-white sm:left-6 sm:h-14 sm:w-14"
+                aria-label="View previous product image"
+              >
+                <span aria-hidden="true">‹</span>
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  moveViewer(1);
+                }}
+                className="absolute right-3 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-3xl text-navy-800 shadow-lg transition hover:bg-white sm:right-6 sm:h-14 sm:w-14"
+                aria-label="View next product image"
+              >
+                <span aria-hidden="true">›</span>
+              </button>
+              <div className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-black/65 px-3 py-1.5 text-sm font-semibold text-white sm:bottom-6">
+                {Math.max(1, viewerImages.indexOf(activeImage) + 1)} / {viewerImages.length}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
