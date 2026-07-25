@@ -16,3 +16,10 @@ export async function requireAdminSection(section: AdminSection): Promise<Public
   if (!user || !canAccessSection(user.adminRole, section)) return null;
   return user;
 }
+
+/** Same as requireAdminSection, but passes if the admin has access to any of the given sections. */
+export async function requireAdminAnySection(sections: AdminSection[]): Promise<PublicUser | null> {
+  const user = await requireAdmin();
+  if (!user || !sections.some((s) => canAccessSection(user.adminRole, s))) return null;
+  return user;
+}

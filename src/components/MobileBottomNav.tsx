@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useCart } from "@/store/cart";
-import { useWishlist } from "@/context/WishlistProvider";
 import { useAuth } from "@/context/AuthProvider";
 
 export default function MobileBottomNav() {
@@ -12,7 +11,6 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
   const openCart = useCart((s) => s.openCart);
   const totalItems = useCart((s) => s.totalItems());
-  const { count: wishCount } = useWishlist();
   const { user } = useAuth();
 
   useEffect(() => setMounted(true), []);
@@ -33,20 +31,13 @@ export default function MobileBottomNav() {
       </Link>
 
       <Link
-        href="/dashboard/wishlist"
-        className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
-          isActive("/dashboard/wishlist") ? "text-brand" : "text-navy-800/60"
+        href="/shop"
+        className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
+          isActive("/shop") ? "text-brand" : "text-navy-800/60"
         }`}
       >
-        <span className="relative">
-          <HeartIcon />
-          {mounted && wishCount > 0 && (
-            <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
-              {wishCount}
-            </span>
-          )}
-        </span>
-        Wish List
+        <ShopIcon />
+        Shop
       </Link>
 
       <button
@@ -87,10 +78,13 @@ function HomeIcon() {
   );
 }
 
-function HeartIcon() {
+function ShopIcon() {
   return (
     <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z" />
+      <path d="M3 9 4 4h16l1 5" />
+      <path d="M4 9v11h16V9" />
+      <path d="M3 9h18" />
+      <path d="M9 20v-6h6v6" />
     </svg>
   );
 }
