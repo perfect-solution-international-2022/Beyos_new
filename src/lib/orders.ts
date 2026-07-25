@@ -52,6 +52,10 @@ export async function computeOrderTotals(
   let subtotal = 0;
   let totalWeightKg = 0;
   const lineItems: OrderLineItem[] = [];
+  const cartQuantity = items.reduce(
+    (sum, line) => sum + Math.max(1, Number(line.quantity) || 1),
+    0
+  );
   for (const line of items) {
     const product = await getProductBySlug(line.slug);
     if (!product) throw new Error(`Unknown product: ${line.slug}`);
@@ -66,9 +70,8 @@ export async function computeOrderTotals(
     const regularPrice = variant?.price ?? product.price;
     const salePrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
     const wholesalePrice = variant?.wholesalePrice ?? product.wholesalePrice;
-    // Buying 12+ units of a single line switches that line to the bulk/wholesale
-    // unit price, for every customer — not just resellers.
-    const unitPrice = qty >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice
+    // Mixed products and variations share one cart-wide wholesale threshold.
+    const unitPrice = cartQuantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice
       ? wholesalePrice
       : salePrice;
     const lineTotal = unitPrice * qty;

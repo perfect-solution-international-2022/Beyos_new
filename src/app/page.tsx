@@ -6,12 +6,17 @@ import CategoryCarousel from "@/components/CategoryCarousel";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
 import Newsletter from "@/components/Newsletter";
-import { getFeaturedProducts } from "@/lib/products-db";
+import { getBestSellingProducts, getFeaturedProducts, getNewArrivalProducts } from "@/lib/products-db";
 import { getHomeCategories } from "@/lib/categories-db";
 import type { Metadata } from "next";
 import { getHeroSlides } from "@/lib/hero-slides";
 import RecentlyViewed from "@/components/RecentlyViewed";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
+import { getActiveHomepagePromotion } from "@/lib/promotions";
+import ProductRail from "@/components/ProductRail";
+import LimitedOffer from "@/components/LimitedOffer";
+import ShopTheLook from "@/components/ShopTheLook";
+import FAQSection, { homepageFaqs } from "@/components/FAQSection";
 
 export const metadata: Metadata = {
   title: "Online Clothing Store Sri Lanka",
@@ -84,10 +89,13 @@ const testimonials = [
 ];
 
 export default async function HomePage() {
-  const [featured, homeCategories, heroSlides] = await Promise.all([
+  const [featured, newArrivals, bestSellers, homeCategories, heroSlides, activePromotion] = await Promise.all([
     getFeaturedProducts(),
+    getNewArrivalProducts(8),
+    getBestSellingProducts(8),
     getHomeCategories(),
     getHeroSlides(),
+    getActiveHomepagePromotion(),
   ]);
 
   return (
@@ -108,6 +116,20 @@ export default async function HomePage() {
           }).replace(/</g, "\\u003c"),
         }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: homepageFaqs.map((faq) => ({
+              "@type": "Question",
+              name: faq.question,
+              acceptedAnswer: { "@type": "Answer", text: faq.answer },
+            })),
+          }).replace(/</g, "\\u003c"),
+        }}
+      />
       <HeroCarousel slides={heroSlides} />
       <ServiceHighlights />
 
@@ -124,6 +146,8 @@ export default async function HomePage() {
         <CategoryCarousel categories={homeCategories} />
       </section>
 
+      {activePromotion && <LimitedOffer promotion={activePromotion} />}
+
       {/* Featured products */}
       <section className="container-x mt-20">
         <SectionHeader
@@ -137,6 +161,12 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      <ProductRail eyebrow="Just landed" title="New Arrivals" products={newArrivals} />
+
+      <ShopTheLook products={newArrivals} />
+
+      <ProductRail eyebrow="Customer favourites" title="Best Sellers" products={bestSellers} />
 
       <RecentlyViewed />
 
@@ -239,6 +269,8 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      <FAQSection />
 
       <Newsletter />
     </>

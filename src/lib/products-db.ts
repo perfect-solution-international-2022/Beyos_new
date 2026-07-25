@@ -101,6 +101,7 @@ const STOREFRONT_WHERE = "deleted_at IS NULL AND visibility = 'public' AND is_pu
 const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, image_alt, images,
        description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg, wholesale_price,
        payment_methods, meta_title, meta_description, meta_keywords`;
+const QUALIFIED_SELECT_FIELDS = SELECT_FIELDS.split(",").map((field) => `p.${field.trim()}`).join(", ");
 const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, sale_price, stock, image, is_default, weight_kg, wholesale_price";
 
 export async function getAllProducts(resellerOnly = false): Promise<Product[]> {
@@ -139,6 +140,47 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 export async function getFeaturedProducts(): Promise<Product[]> {
   const rows = await query<ProductRow>(
     `SELECT ${SELECT_FIELDS} FROM products WHERE featured = 1 AND ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`
+  );
+  return rows.map(mapRow);
+}
+
+export async function getNewArrivalProducts(limit = 8): Promise<Product[]> {
+  const rows = await query<ProductRow>(
+    `SELECT ${SELECT_FIELDS} FROM products WHERE ${STOREFRONT_WHERE}
+     ORDER BY created_at DESC, id DESC LIMIT ?`,
+    [Math.max(1, Math.min(20, limit))]
+  );
+  return rows.map(mapRow);
+}
+
+export async function getBestSellingProducts(limit = 8): Promise<Product[]> {
+  const rows = await query<ProductRow>(
+    `SELECT ${QUALIFIED_SELECT_FIELDS}
+     FROM products p
+     INNER JOIN (
+       SELECT product_slug, SUM(quantity) AS sold_quantity
+       FROM (
+         SELECT oi.product_slug, oi.quantity
+         FROM order_items oi
+         INNER JOIN orders o ON o.id = oi.order_id
+         WHERE o.deleted_at IS NULL AND o.status NOT IN ('cancelled', 'rejected')
+         UNION ALL
+         SELECT roi.product_slug, roi.quantity
+         FROM reseller_order_items roi
+         INNER JOIN reseller_orders ro ON ro.id = roi.order_id
+         WHERE ro.deleted_at IS NULL AND ro.status NOT IN ('cancelled', 'rejected')
+         UNION ALL
+         SELECT psi.product_slug, psi.quantity
+         FROM pos_sale_items psi
+         INNER JOIN pos_sales ps ON ps.id = psi.sale_id
+         WHERE ps.deleted_at IS NULL AND ps.status = 'completed'
+       ) sold_lines
+       GROUP BY product_slug
+     ) sales ON sales.product_slug = p.slug
+     WHERE p.deleted_at IS NULL AND p.visibility = 'public' AND p.is_publish = 1
+     ORDER BY COALESCE(sales.sold_quantity, 0) DESC, p.created_at DESC, p.id DESC
+     LIMIT ?`,
+    [Math.max(1, Math.min(20, limit))]
   );
   return rows.map(mapRow);
 }

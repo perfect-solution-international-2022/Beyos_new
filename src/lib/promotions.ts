@@ -56,6 +56,31 @@ export interface PromoValidationResult {
   freeShipping: boolean;
 }
 
+export interface HomepagePromotion extends Promotion {
+  imageUrl: string | null;
+}
+
+export async function getActiveHomepagePromotion(): Promise<HomepagePromotion | null> {
+  const rows = await query<PromotionRow & { has_image: number }>(
+    `SELECT p.*, (p.image_data IS NOT NULL) AS has_image
+     FROM promotions p
+     WHERE p.is_active = 1
+       AND (p.start_date IS NULL OR p.start_date <= NOW())
+       AND (p.end_date IS NULL OR p.end_date >= NOW())
+       AND (p.usage_limit IS NULL OR p.usage_limit > (
+         SELECT COUNT(*) FROM promotion_usages u WHERE u.promotion_id = p.id
+       ))
+     ORDER BY p.end_date IS NULL, p.end_date ASC, p.created_at DESC
+     LIMIT 1`
+  );
+  if (!rows[0]) return null;
+  const promotion = mapRow(rows[0]);
+  return {
+    ...promotion,
+    imageUrl: rows[0].has_image ? `/api/promotions/${promotion.id}/image` : null,
+  };
+}
+
 /**
  * Validates a promo code against the current subtotal and this user's usage
  * history. Always recomputed server-side — the client never gets to say how

@@ -83,12 +83,23 @@ export default function ProductCard({ product }: { product: Product }) {
           </svg>
         </button>
 
-        <button
-          onClick={() => setQuickViewOpen(true)}
-          className="absolute inset-x-2 bottom-2 rounded-full bg-navy-800 py-2.5 text-xs font-semibold text-white shadow-lg transition-all duration-300 hover:bg-brand sm:inset-x-3 sm:bottom-3 lg:translate-y-4 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100"
-        >
-          Quick View
-        </button>
+        <div className="group/quick absolute bottom-2 right-2 z-10 sm:bottom-3 sm:right-3">
+          <button
+            type="button"
+            onClick={() => setQuickViewOpen(true)}
+            aria-label="Quick view"
+            aria-haspopup="dialog"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-800 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:focus-visible:translate-y-0 lg:focus-visible:opacity-100"
+          >
+            <EyeIcon />
+          </button>
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute bottom-full right-0 mb-2 hidden whitespace-nowrap rounded-md bg-navy-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-md transition-opacity group-hover/quick:opacity-100 group-focus-within/quick:opacity-100 sm:block"
+          >
+            Quick view
+          </span>
+        </div>
       </div>
 
       <div className="mt-3 flex flex-col gap-1">
@@ -123,6 +134,25 @@ function StarIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5851f">
       <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01Z" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2.1 12s3.6-7 9.9-7 9.9 7 9.9 7-3.6 7-9.9 7-9.9-7-9.9-7Z" />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }

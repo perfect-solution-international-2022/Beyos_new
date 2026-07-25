@@ -1,0 +1,70 @@
+"use client";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import type { HomepagePromotion } from "@/lib/promotions";
+import { formatPrice } from "@/lib/utils";
+
+function offerLabel(promotion: HomepagePromotion) {
+  if (promotion.discountType === "percentage") return `${promotion.discountValue}% off`;
+  if (promotion.discountType === "fixed") return `${formatPrice(promotion.discountValue)} off`;
+  return "Free delivery";
+}
+
+function remaining(endDate: string) {
+  const milliseconds = Math.max(0, new Date(endDate).getTime() - Date.now());
+  return {
+    expired: milliseconds <= 0,
+    days: Math.floor(milliseconds / 86_400_000),
+    hours: Math.floor((milliseconds / 3_600_000) % 24),
+    minutes: Math.floor((milliseconds / 60_000) % 60),
+    seconds: Math.floor((milliseconds / 1_000) % 60),
+  };
+}
+
+export default function LimitedOffer({ promotion }: { promotion: HomepagePromotion }) {
+  const [time, setTime] = useState(() => promotion.endDate ? remaining(promotion.endDate) : null);
+
+  useEffect(() => {
+    if (!promotion.endDate) return;
+    const update = () => setTime(remaining(promotion.endDate!));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [promotion.endDate]);
+
+  if (time?.expired) return null;
+
+  return (
+    <section className="container-x mt-20" aria-labelledby="limited-offer-title">
+      <div className="relative grid min-h-[300px] overflow-hidden rounded-2xl bg-navy-900 text-white md:grid-cols-[1fr_40%]">
+        <div className="flex flex-col justify-center p-7 sm:p-10 lg:p-14">
+          <p className="text-xs font-bold uppercase text-brand sm:text-sm">Limited-time offer</p>
+          <h2 id="limited-offer-title" className="mt-2 font-display text-3xl font-bold sm:text-4xl">{offerLabel(promotion)}</h2>
+          <p className="mt-3 max-w-xl text-sm leading-6 text-white/75 sm:text-base">{promotion.description || "Save on your next Beyos order while this offer is active."}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <span className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 font-mono text-sm font-bold tracking-wide">{promotion.code}</span>
+            {promotion.minOrderAmount && <span className="text-xs text-white/60">Minimum order {formatPrice(promotion.minOrderAmount)}</span>}
+          </div>
+          {time ? (
+            <div className="mt-6 flex gap-2" aria-label={`${time.days} days ${time.hours} hours ${time.minutes} minutes remaining`}>
+              <TimePart value={time.days} label="Days" />
+              <TimePart value={time.hours} label="Hours" />
+              <TimePart value={time.minutes} label="Mins" />
+              <TimePart value={time.seconds} label="Secs" />
+            </div>
+          ) : <p className="mt-6 text-sm font-semibold text-brand">Available while the promotion is active</p>}
+          <Link href="/shop" className="btn-primary mt-7 w-fit">Shop the offer</Link>
+        </div>
+        <div className="relative min-h-[220px] bg-[#f1efec] md:min-h-full">
+          <Image src={promotion.imageUrl || "/images/about/about-image.jpeg"} alt={promotion.description || `${promotion.code} promotion`} fill sizes="(max-width: 767px) 100vw, 40vw" className="object-cover" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TimePart({ value, label }: { value: number; label: string }) {
+  return <span className="flex h-14 w-14 flex-col items-center justify-center rounded-lg border border-white/15 bg-white/10"><strong className="text-lg leading-none">{String(value).padStart(2, "0")}</strong><small className="mt-1 text-[9px] uppercase text-white/60">{label}</small></span>;
+}

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 
 interface Variant {
   id: number; sku: string; summary: string; price: number; salePrice: number | null; resellerPrice: number;
@@ -18,15 +19,24 @@ interface RProduct {
 interface PricingRules { allowPriceOverride: boolean; minMarkupPct: number; maxMarkupPct: number | null }
 interface CartLine {
   key: string; slug: string; variantId: number | null; variantSummary: string; sku: string; name: string;
-  image: string; resellerPrice: number; wholesalePrice: number | null;
+  image: string; standardResellerPrice: number; resellerPrice: number; wholesalePrice: number | null;
   sellingPrice: number; quantity: number; stock: number; weightKg: number;
 }
 interface CourierOption { id: number; name: string }
 type LocationMap = Record<string, Record<string, string[]>>;
 
-// Mirrors WHOLESALE_MIN_QTY in src/lib/reseller.ts — wholesale pricing applies at 12+ units.
-const WHOLESALE_MIN_QTY = 12;
 const VARIANT_GROUP_LABELS = ["Size", "Color"];
+
+function applyWholesalePricing(lines: CartLine[]): CartLine[] {
+  const cartQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
+  return lines.map((line) => ({
+    ...line,
+    resellerPrice:
+      cartQuantity >= WHOLESALE_MIN_QTY && line.wholesalePrice != null && line.wholesalePrice > 0
+        ? line.wholesalePrice
+        : line.standardResellerPrice,
+  }));
+}
 
 function variantOptionGroups(variants: Variant[]): string[][] {
   const groupCount = Math.max(0, ...variants.map((variant) => variant.summary.split(" / ").filter(Boolean).length));
@@ -64,10 +74,9 @@ export default function NewOrderPage() {
   const addToCart = (line: CartLine) => {
     setCart((current) => {
       const existing = current.find((item) => item.key === line.key);
-      if (!existing) return [...current, line];
+      if (!existing) return applyWholesalePricing([...current, line]);
       const quantity = Math.min(line.stock, existing.quantity + line.quantity);
-      const resellerPrice = quantity >= WHOLESALE_MIN_QTY && line.wholesalePrice != null ? line.wholesalePrice : line.resellerPrice;
-      return current.map((item) => item.key === line.key ? { ...item, quantity, resellerPrice, sellingPrice: line.sellingPrice } : item);
+      return applyWholesalePricing(current.map((item) => item.key === line.key ? { ...item, quantity, sellingPrice: line.sellingPrice } : item));
     });
     setSelected(null);
   };
@@ -97,13 +106,13 @@ export default function NewOrderPage() {
           })}
         </tbody></table>
       </div>
-      {selected && <ProductModal product={selected} rules={rules} onClose={() => setSelected(null)} onAdd={addToCart} />}
-      {showCart && <CartModal cart={cart} merchandiseTotal={cartTotal} onClose={() => setShowCart(false)} onUpdate={setCart} onCreated={() => router.push("/reseller/orders")} />}
+      {selected && <ProductModal product={selected} rules={rules} currentCartQuantity={cartCount} onClose={() => setSelected(null)} onAdd={addToCart} />}
+      {showCart && <CartModal cart={cart} merchandiseTotal={cartTotal} onClose={() => setShowCart(false)} onUpdate={(lines) => setCart(applyWholesalePricing(lines))} onCreated={() => router.push("/reseller/orders")} />}
     </div>
   );
 }
 
-function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; rules: PricingRules; onClose: () => void; onAdd: (line: CartLine) => void }) {
+function ProductModal({ product, rules, currentCartQuantity, onClose, onAdd }: { product: RProduct; rules: PricingRules; currentCartQuantity: number; onClose: () => void; onAdd: (line: CartLine) => void }) {
   const defaultVariant = product.variants.find((variant) => variant.isDefault) ?? product.variants[0] ?? null;
   const optionGroups = variantOptionGroups(product.variants);
   const [selectedOptions, setSelectedOptions] = useState<string[]>(defaultVariant?.summary.split(" / ").map((value) => value.trim()) ?? []);
@@ -116,7 +125,8 @@ function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; r
   const stock = variant?.stock ?? product.stock;
   const normalCost = variant?.resellerPrice ?? product.resellerPrice;
   const wholesaleCost = variant?.wholesalePrice ?? product.wholesalePrice;
-  const cost = quantity >= WHOLESALE_MIN_QTY && wholesaleCost != null ? wholesaleCost : normalCost;
+  const projectedCartQuantity = currentCartQuantity + quantity;
+  const cost = projectedCartQuantity >= WHOLESALE_MIN_QTY && wholesaleCost != null ? wholesaleCost : normalCost;
   const regularRetail = variant?.price ?? product.compareAtPrice ?? product.price;
   const retailPrice = variant
     ? variant.salePrice != null && variant.salePrice > 0 && variant.salePrice < regularRetail
@@ -186,11 +196,11 @@ function ProductModal({ product, rules, onClose, onAdd }: { product: RProduct; r
           <div className="flex items-center justify-between gap-4 text-sm"><span className="text-navy-800/55">Regular price</span><span className={retailPrice < regularRetail ? "text-navy-800/45 line-through" : "font-semibold text-navy-800"}>{formatPrice(regularRetail)}</span></div>
           <div className="mt-2 flex items-center justify-between gap-4 text-sm"><span className="text-navy-800/55">Normal selling price</span><span className="font-bold text-navy-800">{formatPrice(retailPrice)}</span></div>
         </div>
-        <div className="mt-4 rounded-lg border-2 border-brand/25 bg-brand/5 p-5"><p className="text-xs font-bold uppercase text-navy-800/55">Your reseller price</p><p className="mt-1 text-3xl font-extrabold text-brand">{formatPrice(cost)}</p>{wholesaleCost != null && <p className="mt-1 text-xs text-navy-800/60">{quantity >= WHOLESALE_MIN_QTY ? "Wholesale price active" : `Wholesale ${formatPrice(wholesaleCost)} from ${WHOLESALE_MIN_QTY} units`}</p>}</div>
+        <div className="mt-4 rounded-lg border-2 border-brand/25 bg-brand/5 p-5"><p className="text-xs font-bold uppercase text-navy-800/55">Your reseller price</p><p className="mt-1 text-3xl font-extrabold text-brand">{formatPrice(cost)}</p>{wholesaleCost != null && <p className="mt-1 text-xs text-navy-800/60">{projectedCartQuantity >= WHOLESALE_MIN_QTY ? "Cart-wide wholesale price active" : `Add ${WHOLESALE_MIN_QTY - projectedCartQuantity} more across the order for ${formatPrice(wholesaleCost)}/unit`}</p>}</div>
         <div className="mt-5"><label className="text-sm font-semibold text-navy-800" htmlFor="selling-price">Customer selling price</label><input id="selling-price" disabled={!rules.allowPriceOverride} value={rules.allowPriceOverride ? sellingPrice : String(retailPrice)} onChange={(e) => setSellingPrice(e.target.value.replace(/[^0-9.]/g, ""))} className="input mt-2 disabled:bg-navy-50" inputMode="decimal" />
           <p className={`mt-1 text-xs ${invalidPrice ? "text-red-600" : "text-navy-800/50"}`}>{!rules.allowPriceOverride ? "The admin has fixed the customer price." : `Allowed: from ${formatPrice(minPrice)}${maxPrice == null ? "" : ` to ${formatPrice(maxPrice)}`}`}</p></div>
         <div className="mt-4"><p className="text-sm font-semibold text-navy-800">Quantity</p><div className="mt-2 inline-flex items-center rounded-full border border-navy-800/15"><button onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="h-10 w-10">−</button><span className="w-12 text-center font-semibold">{quantity}</span><button onClick={() => setQuantity((q) => Math.min(stock, q + 1))} className="h-10 w-10">+</button></div><span className="ml-3 text-xs text-navy-800/50">{stock} available</span></div>
-        <button disabled={invalidPrice || stock < 1 || quantity > stock || (product.variants.length > 0 && !variant)} onClick={() => onAdd({ key: `${product.slug}:${variantId ?? "base"}`, slug: product.slug, variantId, variantSummary: variant?.summary || "", sku: variant?.sku || product.sku, name: product.name, image: variant?.image || product.image, resellerPrice: cost, wholesalePrice: wholesaleCost, sellingPrice: rules.allowPriceOverride ? price : retailPrice, quantity, stock, weightKg: variant?.weightKg || product.weightKg || 0 })} className="btn-primary mt-6 w-full disabled:opacity-50">Add to order</button>
+        <button disabled={invalidPrice || stock < 1 || quantity > stock || (product.variants.length > 0 && !variant)} onClick={() => onAdd({ key: `${product.slug}:${variantId ?? "base"}`, slug: product.slug, variantId, variantSummary: variant?.summary || "", sku: variant?.sku || product.sku, name: product.name, image: variant?.image || product.image, standardResellerPrice: normalCost, resellerPrice: cost, wholesalePrice: wholesaleCost, sellingPrice: rules.allowPriceOverride ? price : retailPrice, quantity, stock, weightKg: variant?.weightKg || product.weightKg || 0 })} className="btn-primary mt-6 w-full disabled:opacity-50">Add to order</button>
       </div>
     </div>
   </div>;

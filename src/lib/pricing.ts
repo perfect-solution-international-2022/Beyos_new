@@ -1,2 +1,2 @@
-/** Wholesale pricing kicks in automatically once a line's quantity reaches this — applies to both reseller and regular customer orders. */
+/** Wholesale pricing applies to eligible lines once the combined cart quantity reaches this. */
 export const WHOLESALE_MIN_QTY = 12;

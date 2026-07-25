@@ -83,6 +83,7 @@ export default function ProductDetail({ product }: { product: Product }) {
   }, [imageViewerOpen, viewerImages]);
 
   const addItem = useCart((s) => s.addItem);
+  const existingCartQuantity = useCart((s) => s.items.reduce((sum, item) => sum + item.quantity, 0));
   const selectedVariant = variants.find(
     (variant) => variant.attributeSummary === selectedOptions.join(" / ")
   );
@@ -94,7 +95,8 @@ export default function ProductDetail({ product }: { product: Product }) {
   const currentStock = selectedVariant?.stock ?? product.stock;
 
   const wholesalePrice = selectedVariant?.wholesalePrice ?? product.wholesalePrice;
-  const wholesaleActive = quantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
+  const projectedCartQuantity = existingCartQuantity + quantity;
+  const wholesaleActive = projectedCartQuantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
   const currentPrice = wholesaleActive ? wholesalePrice : salePrice;
   const discount = comparePrice
     ? Math.round((1 - currentPrice / comparePrice) * 100)
@@ -217,8 +219,8 @@ export default function ProductDetail({ product }: { product: Product }) {
         {wholesalePrice != null && wholesalePrice > 0 && (
           <p className="mt-2 text-sm text-navy-800/60">
             {wholesaleActive
-              ? `Bulk price of ${formatPrice(wholesalePrice)}/unit applied for ${WHOLESALE_MIN_QTY}+ units.`
-              : `Buy ${WHOLESALE_MIN_QTY}+ units and pay ${formatPrice(wholesalePrice)} per unit.`}
+              ? `Cart-wide bulk price of ${formatPrice(wholesalePrice)}/unit applied.`
+              : `Add ${WHOLESALE_MIN_QTY - projectedCartQuantity} more item${WHOLESALE_MIN_QTY - projectedCartQuantity === 1 ? "" : "s"} across your cart and pay ${formatPrice(wholesalePrice)} per unit.`}
           </p>
         )}
 

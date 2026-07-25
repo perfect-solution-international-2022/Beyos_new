@@ -5,9 +5,12 @@ import { persist } from "zustand/middleware";
 import { CartItem } from "@/lib/types";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 
-/** The unit price actually charged for a line, given its live quantity. */
-export function effectiveUnitPrice(item: Pick<CartItem, "price" | "wholesalePrice" | "quantity">): number {
-  return item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && item.quantity >= WHOLESALE_MIN_QTY
+/** The unit price charged for a line, based on the combined cart quantity. */
+export function effectiveUnitPrice(
+  item: Pick<CartItem, "price" | "wholesalePrice" | "quantity">,
+  cartQuantity = item.quantity
+): number {
+  return item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && cartQuantity >= WHOLESALE_MIN_QTY
     ? item.wholesalePrice
     : item.price;
 }
@@ -77,7 +80,11 @@ export const useCart = create<CartState>()(
       closeCart: () => set({ isOpen: false }),
       setPromoCode: (code) => set({ promoCode: code }),
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
-      subtotal: () => get().items.reduce((sum, i) => sum + effectiveUnitPrice(i) * i.quantity, 0),
+      subtotal: () => {
+        const items = get().items;
+        const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+        return items.reduce((sum, item) => sum + effectiveUnitPrice(item, cartQuantity) * item.quantity, 0);
+      },
     }),
     { name: "beyos-cart" }
   )

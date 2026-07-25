@@ -101,6 +101,10 @@ export async function POST(request: Request) {
     let subtotal = 0;
     let merchandiseCost = 0;
     let totalWeightKg = 0;
+    const orderQuantity = items.reduce(
+      (sum, item) => sum + Math.max(0, Math.floor(Number(item.quantity) || 0)),
+      0
+    );
 
     for (const item of items) {
       const qty = Math.floor(Number(item.quantity));
@@ -134,7 +138,7 @@ export async function POST(request: Request) {
       const standardCost = Number(variant?.reseller_price ?? product.reseller_price);
       const wholesaleRaw = variant?.wholesale_price ?? product.wholesale_price;
       const wholesale = wholesaleRaw == null ? null : Number(wholesaleRaw);
-      const unitCost = qty >= WHOLESALE_MIN_QTY && wholesale != null && wholesale > 0 ? wholesale : standardCost;
+      const unitCost = orderQuantity >= WHOLESALE_MIN_QTY && wholesale != null && wholesale > 0 ? wholesale : standardCost;
       const minPrice = Math.max(unitCost, unitCost * (1 + Number(settings.min_markup_pct || 0) / 100));
       const maxMarkup = settings.max_markup_pct == null ? null : Number(settings.max_markup_pct);
       const maxPrice = maxMarkup == null ? null : unitCost * (1 + maxMarkup / 100);

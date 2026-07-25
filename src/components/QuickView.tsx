@@ -8,6 +8,7 @@ import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/store/cart";
 import { useToast } from "@/context/ToastProvider";
 import ProductBadges from "./ProductBadges";
+import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 
 export default function QuickView({ product, onClose }: { product: Product; onClose: () => void }) {
   const variants = product.variants ?? [];
@@ -16,9 +17,13 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
   const [color, setColor] = useState(product.colors[0] || "Default");
   const [quantity, setQuantity] = useState(1);
   const addItem = useCart((state) => state.addItem);
+  const existingCartQuantity = useCart((state) => state.items.reduce((sum, item) => sum + item.quantity, 0));
   const { toast } = useToast();
   const variant = variants.find((item) => item.id === variantId);
-  const price = variant?.salePrice && variant.salePrice < variant.price ? variant.salePrice : variant?.price ?? product.price;
+  const salePrice = variant?.salePrice && variant.salePrice < variant.price ? variant.salePrice : variant?.price ?? product.price;
+  const wholesalePrice = variant?.wholesalePrice ?? product.wholesalePrice;
+  const wholesaleActive = existingCartQuantity + quantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
+  const price = wholesaleActive ? wholesalePrice : salePrice;
   const stock = variant?.stock ?? product.stock;
   const image = variant?.image || product.image;
 
@@ -37,8 +42,8 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
       productId: product.id,
       slug: product.slug,
       name: product.name,
-      price,
-      wholesalePrice: variant?.wholesalePrice ?? product.wholesalePrice,
+      price: salePrice,
+      wholesalePrice,
       image,
       size: variant?.attributeSummary || size,
       color: variant ? "" : color,
@@ -66,6 +71,7 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
             <p className="text-xs font-semibold uppercase text-[#a94700]">{product.category}</p>
             <h2 className="mt-2 font-display text-2xl font-bold text-navy-800 sm:text-3xl">{product.name}</h2>
             <p className="mt-3 text-2xl font-bold text-navy-800">{formatPrice(price)}</p>
+            {wholesaleActive && <p className="mt-1 text-xs font-semibold text-emerald-600">Cart-wide bulk price applied</p>}
             <p className="mt-4 line-clamp-3 text-sm leading-6 text-navy-800/65">{product.description}</p>
 
             {variants.length > 0 ? (
