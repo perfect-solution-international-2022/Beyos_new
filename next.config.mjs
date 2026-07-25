@@ -29,6 +29,10 @@ const securityHeaders = [
 const nextConfig = {
   compress: true,
   poweredByHeader: false,
+  experimental: {
+    cpus: 1,
+    staticGenerationMaxConcurrency: 1,
+  },
   images: {
     remotePatterns: [],
     formats: ["image/avif", "image/webp"],
