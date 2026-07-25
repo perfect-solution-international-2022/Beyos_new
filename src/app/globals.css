@@ -192,3 +192,49 @@ body {
     width: 100%;
   }
 }
+
+@keyframes service-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.service-marquee-viewport {
+  container-type: inline-size;
+}
+
+.service-marquee-track,
+.service-marquee-group {
+  display: flex;
+  width: max-content;
+}
+
+.service-marquee-track {
+  animation: service-marquee 50s linear infinite;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.service-marquee-group {
+  flex: none;
+}
+
+.service-marquee-card {
+  width: 50cqw;
+}
+
+@media (min-width: 1024px) {
+  .service-marquee-card {
+    width: 25cqw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-marquee-track {
+    animation: none;
+  }
+}

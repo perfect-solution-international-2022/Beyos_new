@@ -60,6 +60,14 @@ const viewTitle: Record<OrdersView, string> = {
   rejected: "Rejected Orders",
 };
 
+function canArchiveOrder(order: Order): boolean {
+  if (order.koombiyoStatus || order.koombiyoWaybillId) return false;
+  if (order.type === "pos") {
+    return order.fulfillmentType === "delivery" && order.deliveryStatus === "pending";
+  }
+  return order.status === "pending";
+}
+
 export default function AdminOrdersView({ view = "all" }: { view?: OrdersView }) {
   const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -325,8 +333,8 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                       >
                         {pendingOnly ? "Review order" : "View details"}
                       </Link>
-                      {pendingOnly && (
-                        <button type="button" onClick={() => setDeleteTarget(o)} title="Archive pending order" aria-label={`Archive ${o.orderRef}`} className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50">
+                      {canArchiveOrder(o) && (
+                        <button type="button" onClick={() => setDeleteTarget(o)} title="Move order to Trash" aria-label={`Move ${o.orderRef} to Trash`} className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
                         </button>
                       )}

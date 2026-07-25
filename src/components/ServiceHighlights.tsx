@@ -1,7 +1,3 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
-
 const highlights = [
   { title: "Island-wide Delivery", description: "Reliable delivery across Sri Lanka", icon: "globe" },
   { title: "Premium Quality", description: "Carefully selected fabrics for lasting comfort", icon: "quality" },
@@ -16,101 +12,45 @@ const highlights = [
 ];
 
 export default function ServiceHighlights() {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const activeIndexRef = useRef(0);
-  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [paused, setPaused] = useState(false);
-
-  const slideWidth = () => {
-    const track = trackRef.current;
-    const firstSlide = track?.firstElementChild as HTMLElement | null;
-    if (!track || !firstSlide) return 0;
-    const styles = window.getComputedStyle(track);
-    return firstSlide.getBoundingClientRect().width + Number.parseFloat(styles.columnGap || styles.gap || "0");
-  };
-
-  const goTo = (index: number, behavior: ScrollBehavior = "smooth") => {
-    const track = trackRef.current;
-    const width = slideWidth();
-    if (!track || !width) return;
-    activeIndexRef.current = index;
-    track.scrollTo({ left: index * width, behavior });
-  };
-
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (paused || reducedMotion.matches) return;
-
-    const interval = window.setInterval(() => {
-      const nextIndex = activeIndexRef.current + 1;
-      goTo(nextIndex);
-
-      if (nextIndex === highlights.length) {
-        resetTimerRef.current = setTimeout(() => goTo(0, "auto"), 650);
-      }
-    }, 3500);
-
-    return () => {
-      window.clearInterval(interval);
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-    };
-  }, [paused]);
-
-  const syncIndexAfterInteraction = () => {
-    const width = slideWidth();
-    const track = trackRef.current;
-    if (!track || !width) return;
-    const rawIndex = Math.round(track.scrollLeft / width);
-    const normalizedIndex = rawIndex % highlights.length;
-    activeIndexRef.current = normalizedIndex;
-    if (rawIndex >= highlights.length) goTo(normalizedIndex, "auto");
-  };
-
-  const carouselItems = [...highlights, ...highlights];
-
   return (
-    <section className="mx-3 mt-3 overflow-hidden rounded-2xl border border-navy-800/10 bg-[#f7f7f6] sm:mx-4 lg:mx-6" aria-label="Store services">
+    <section className="mx-2 mt-2 overflow-hidden rounded-xl border border-navy-800/10 bg-[#f7f7f6] sm:mx-4 sm:mt-3 sm:rounded-2xl lg:mx-6" aria-label="Store services">
       <div
-        ref={trackRef}
         role="region"
         aria-roledescription="carousel"
         aria-label="Beyos store services"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => {
-          syncIndexAfterInteraction();
-          setPaused(false);
-        }}
-        onTouchStart={() => setPaused(true)}
-        onTouchEnd={() => {
-          syncIndexAfterInteraction();
-          setPaused(false);
-        }}
-        onFocusCapture={() => setPaused(true)}
-        onBlurCapture={() => setPaused(false)}
-        className="flex snap-x snap-mandatory gap-0 overflow-x-auto scroll-smooth no-scrollbar"
+        className="service-marquee-viewport overflow-hidden"
       >
-          {carouselItems.map((item, index) => (
+        <div className="service-marquee-track">
+          {[false, true].map((duplicate) => (
             <div
-              key={`${item.title}-${index}`}
-              aria-hidden={index >= highlights.length}
-              className="flex min-h-[142px] w-1/2 shrink-0 snap-start flex-col items-center justify-center gap-2 border-r border-navy-800/10 px-3 py-4 text-center sm:min-h-[124px] sm:flex-row sm:justify-start sm:gap-4 sm:px-6 sm:py-5 sm:text-left lg:w-1/4 lg:px-8 lg:py-6"
+              key={duplicate ? "duplicate" : "original"}
+              className="service-marquee-group"
+              aria-hidden={duplicate || undefined}
             >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#e8e6e2] text-navy-900 sm:h-14 sm:w-14 lg:h-16 lg:w-16">
-                <HighlightIcon name={item.icon} />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-[11px] font-extrabold uppercase leading-4 text-navy-900 min-[380px]:text-xs sm:text-sm">{item.title}</h2>
-                <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-navy-800/65 min-[380px]:text-[11px] sm:text-xs lg:text-sm">{item.description}</p>
-              </div>
+              {highlights.map((item) => (
+                <div
+                  key={`${duplicate ? "duplicate" : "original"}-${item.title}`}
+                  className="service-marquee-card flex min-h-[68px] shrink-0 items-center gap-1.5 border-r border-navy-800/10 px-2 py-2 text-left sm:min-h-[82px] sm:gap-2.5 sm:px-4 sm:py-2.5 lg:min-h-[92px] lg:gap-3 lg:px-5 lg:py-3"
+                >
+                  <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#e8e6e2] text-navy-900 sm:h-10 sm:w-10 lg:h-12 lg:w-12">
+                    <HighlightIcon name={item.icon} />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="line-clamp-2 text-[9px] font-extrabold uppercase leading-3 text-navy-900 min-[380px]:text-[10px] sm:text-xs sm:leading-4 lg:text-[13px] lg:leading-[18px]">{item.title}</h2>
+                    <p className="mt-0.5 line-clamp-2 text-[8px] leading-[11px] text-navy-800/65 min-[380px]:text-[9px] sm:text-[10px] sm:leading-[14px] lg:mt-1 lg:text-[11px] lg:leading-4">{item.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           ))}
+        </div>
       </div>
     </section>
   );
 }
 
 function HighlightIcon({ name }: { name: string }) {
-  const props = { width: 31, height: 31, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const props = { className: "h-[17px] w-[17px] sm:h-5 sm:w-5 lg:h-6 lg:w-6", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (name === "globe") return <svg {...props}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>;
   if (name === "quality") return <svg {...props}><circle cx="12" cy="10" r="6" /><path d="m9.5 10 1.6 1.6 3.4-3.5M8 15.5 6.5 22l5.5-3 5.5 3-1.5-6.5" /></svg>;
   if (name === "payment") return <svg {...props}><rect x="3" y="5" width="18" height="13" rx="2" /><path d="M3 9h18M15 14h3M17 16v5M15 19h4" /></svg>;
