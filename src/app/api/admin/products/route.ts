@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
-import { requireAdminSection } from "@/lib/admin";
+import { requireAdminSection, requireAdminAnySection } from "@/lib/admin";
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 140);
@@ -77,7 +77,9 @@ async function saveLinks(productId: number, links: any[]) {
 }
 
 export async function GET() {
-  const admin = await requireAdminSection("catalog");
+  // POS needs the live product catalog to run the register, so cashiers
+  // (who only have "pos" access) can read it even though they can't edit it.
+  const admin = await requireAdminAnySection(["catalog", "pos"]);
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const rows = await query<any>(`SELECT * FROM products ORDER BY created_at DESC, id DESC`);

@@ -72,7 +72,6 @@ const sections: Section[] = [
         { label: "Sales Report", href: "/admin/reports" },
         { label: "Item Report", href: "/admin/reports/item" },
         { label: "Profit & Loss Report", href: "/admin/reports/profit-loss" },
-        { label: "Lost Profit Report", href: "/admin/reports/lost-profit" },
       ] },
     ],
   },
