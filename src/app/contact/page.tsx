@@ -10,11 +10,31 @@ const contactDetails = [
 
 export default function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSent(true);
-    event.currentTarget.reset();
+    const form = event.currentTarget;
+    setSending(true);
+    setSent(false);
+    setError("");
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to send your message.");
+      setSent(true);
+      form.reset();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to send your message.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -31,6 +51,7 @@ export default function ContactPage() {
           <section className="rounded-xl bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.1)] sm:p-8">
             <h2 className="text-2xl font-semibold text-navy-800">Send us a Message</h2>
             <form onSubmit={submit} className="mt-7 space-y-4">
+              <input name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
               <div className="grid gap-4 sm:grid-cols-2">
                 <input required name="firstName" className="input" placeholder="First Name" aria-label="First name" />
                 <input required name="lastName" className="input" placeholder="Last Name" aria-label="Last name" />
@@ -41,7 +62,10 @@ export default function ContactPage() {
               </div>
               <textarea required name="message" rows={7} className="input resize-none" placeholder="Write a message here..." aria-label="Message" />
               {sent && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Thank you. Your message has been received.</p>}
-              <button type="submit" className="btn-primary px-7 py-3">Send Message</button>
+              {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+              <button type="submit" disabled={sending} className="btn-primary px-7 py-3">
+                {sending ? "Sending..." : "Send Message"}
+              </button>
             </form>
           </section>
 

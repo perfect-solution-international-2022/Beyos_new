@@ -7,32 +7,51 @@ import nodemailer, { type Transporter } from "nodemailer";
  * instead, and finally throws so callers can no-op gracefully in dev.
  */
 let smtpTransporter: Transporter | null = null;
-function getSmtpTransporter(): Transporter | null {
+let securitySmtpTransporter: Transporter | null = null;
+type MailChannel = "default" | "security";
+
+function getSmtpTransporter(channel: MailChannel): Transporter | null {
   const host = process.env.SMTP_HOST?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const password = process.env.SMTP_PASSWORD?.trim();
+  const security = channel === "security";
+  const user = (security ? process.env.SECURITY_SMTP_USER : process.env.SMTP_USER)?.trim();
+  const password = (security ? process.env.SECURITY_SMTP_PASSWORD : process.env.SMTP_PASSWORD)?.trim();
   if (!host || !user || !password) return null;
-  if (!smtpTransporter) {
+  const existing = security ? securitySmtpTransporter : smtpTransporter;
+  if (existing) return existing;
+
+  {
     const port = Number(process.env.SMTP_PORT) || 587;
-    smtpTransporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransport({
       host,
       port,
       secure: port === 465, // 465 = implicit TLS, 587 = STARTTLS
       auth: { user, pass: password },
     });
+    if (security) securitySmtpTransporter = transporter;
+    else smtpTransporter = transporter;
+    return transporter;
   }
-  return smtpTransporter;
 }
 
-async function deliver(to: string, subject: string, html: string, text: string): Promise<void> {
-  const smtp = getSmtpTransporter();
+async function deliver(
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  replyTo?: string,
+  channel: MailChannel = "default"
+): Promise<void> {
+  const smtp = getSmtpTransporter(channel);
   if (smtp) {
     await smtp.sendMail({
-      from: process.env.MAIL_FROM || `Beyos Clothing <${process.env.SMTP_USER}>`,
+      from: channel === "security"
+        ? process.env.SECURITY_MAIL_FROM || `Beyos Security <${process.env.SECURITY_SMTP_USER}>`
+        : process.env.MAIL_FROM || `Beyos Clothing <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,
       text,
+      replyTo,
     });
     return;
   }
@@ -49,6 +68,7 @@ async function deliver(to: string, subject: string, html: string, text: string):
         to,
         subject,
         html,
+        reply_to: replyTo,
       }),
     });
     if (!res.ok) {
@@ -61,6 +81,42 @@ async function deliver(to: string, subject: string, html: string, text: string):
   throw new Error("Transactional email is not configured");
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  })[character] || character);
+}
+
+export async function sendContactEmail(details: {
+  name: string;
+  email: string;
+  phone?: string;
+  message: string;
+}): Promise<void> {
+  const name = escapeHtml(details.name);
+  const email = escapeHtml(details.email);
+  const phone = escapeHtml(details.phone || "Not provided");
+  const message = escapeHtml(details.message).replace(/\n/g, "<br />");
+
+  await deliver(
+    "support@beyosclothing.com",
+    `Website message from ${details.name}`,
+    `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+       <h2 style="color:#0f2540">New website enquiry</h2>
+       <p><strong>Name:</strong> ${name}</p>
+       <p><strong>Email:</strong> ${email}</p>
+       <p><strong>Phone:</strong> ${phone}</p>
+       <div style="margin-top:20px;padding:16px;background:#f7f8fa;border-left:4px solid #f5851f">${message}</div>
+     </div>`,
+    `New website enquiry\nName: ${details.name}\nEmail: ${details.email}\nPhone: ${details.phone || "Not provided"}\n\n${details.message}`,
+    details.email
+  );
+}
+
 export async function sendPasswordResetEmail(to: string, resetUrl: string): Promise<void> {
   await deliver(
     to,
@@ -71,7 +127,9 @@ export async function sendPasswordResetEmail(to: string, resetUrl: string): Prom
        <p><a href="${resetUrl}" style="display:inline-block;background:#f5851f;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600">Reset Password</a></p>
        <p style="color:#666;font-size:13px">If you didn't request this, you can safely ignore this email.</p>
      </div>`,
-    `Reset your password: ${resetUrl} (expires in 1 hour, ignore if you didn't request this)`
+    `Reset your password: ${resetUrl} (expires in 1 hour, ignore if you didn't request this)`,
+    undefined,
+    "security"
   );
 }
 
