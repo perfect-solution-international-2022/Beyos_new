@@ -1,4 +1,5 @@
 export type Category = "men" | "women" | "accessories";
+export type ProductPaymentMethod = "cod" | "onepay";
 
 export interface Product {
   id: string;
@@ -22,6 +23,7 @@ export interface Product {
   variants?: ProductVariant[];
   weightKg?: number;
   wholesalePrice?: number;
+  paymentMethods: ProductPaymentMethod[];
 }
 
 export interface ProductVariant {

@@ -118,6 +118,18 @@ async function main() {
     INDEX idx_product_image_product (product_id)
   ) ENGINE=InnoDB`);
 
+  await db.query(`CREATE TABLE IF NOT EXISTS hero_slides (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    image_data LONGBLOB NOT NULL,
+    image_mime VARCHAR(100) NOT NULL,
+    alt_text VARCHAR(200) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_hero_active_order (is_active, sort_order)
+  ) ENGINE=InnoDB`);
+
   // Product variants (for Variable products) and linked products.
   await db.query(`CREATE TABLE IF NOT EXISTS product_variants (
     id INT AUTO_INCREMENT PRIMARY KEY,

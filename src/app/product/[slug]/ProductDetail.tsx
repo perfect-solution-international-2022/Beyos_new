@@ -119,7 +119,7 @@ export default function ProductDetail({ product }: { product: Product }) {
           </div>
         )}
         <div className="relative flex-1 overflow-hidden rounded-3xl bg-navy-50">
-          <div className="aspect-[4/5] w-full">
+          <div className="aspect-square w-full">
             <button
               type="button"
               onClick={() => setImageViewerOpen(true)}
@@ -309,7 +309,7 @@ export default function ProductDetail({ product }: { product: Product }) {
 
       {imageViewerOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 sm:p-8"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-3 sm:p-8"
           role="dialog"
           aria-modal="true"
           aria-label={`${product.name} image viewer`}
@@ -318,13 +318,13 @@ export default function ProductDetail({ product }: { product: Product }) {
           <button
             type="button"
             onClick={() => setImageViewerOpen(false)}
-            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl text-navy-800 shadow-lg transition hover:bg-navy-50"
+            className="absolute right-3 top-3 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white text-3xl leading-none text-navy-800 shadow-lg transition hover:bg-navy-50 sm:right-5 sm:top-5"
             aria-label="Close image viewer"
           >
             ×
           </button>
           <div
-            className="relative h-full w-full max-w-6xl"
+            className="relative h-[calc(100%-4rem)] w-full max-w-6xl"
             onClick={(event) => event.stopPropagation()}
           >
             <Image

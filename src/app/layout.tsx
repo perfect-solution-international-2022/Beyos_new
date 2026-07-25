@@ -4,15 +4,48 @@ import SiteFrame from "@/components/SiteFrame";
 import { AuthProvider } from "@/context/AuthProvider";
 import { WishlistProvider } from "@/context/WishlistProvider";
 import { ToastProvider } from "@/context/ToastProvider";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: SITE_URL,
   title: {
-    default: "Beyos Clothing — Style Is Forever",
-    template: "%s | Beyos Clothing",
+    default: "Beyos Clothing - Style Is Forever",
+    template: `%s | ${SITE_NAME}`,
   },
   description:
-    "Beyos Clothing — timeless fashion for men and women. Shop premium tees, dresses, hoodies and accessories. Style Is Forever.",
-  keywords: ["Beyos", "clothing", "fashion", "men", "women", "accessories"],
+    "Shop premium clothing, oversized T-shirts and custom apparel from Beyos Clothing with island-wide delivery across Sri Lanka.",
+  keywords: ["Beyos Clothing", "Sri Lanka clothing", "oversized T-shirts", "custom clothing", "online clothing store"],
+  applicationName: SITE_NAME,
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  openGraph: {
+    type: "website",
+    locale: "en_LK",
+    url: "/",
+    siteName: SITE_NAME,
+    title: "Beyos Clothing - Style Is Forever",
+    description: "Premium clothing and custom apparel with island-wide delivery across Sri Lanka.",
+    images: [{ url: "/images/hero-images/hero1.webp", width: 1200, height: 900, alt: "Beyos Clothing collection" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Beyos Clothing - Style Is Forever",
+    description: "Premium clothing and custom apparel with island-wide delivery across Sri Lanka.",
+    images: ["/images/hero-images/hero1.webp"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  icons: { icon: "/images/logo.png", apple: "/images/logo.png" },
 };
 
 export default function RootLayout({
@@ -21,6 +54,24 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex min-h-screen flex-col">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: SITE_NAME,
+              url: SITE_URL.toString(),
+              logo: new URL("/images/logo.png", SITE_URL).toString(),
+              contactPoint: {
+                "@type": "ContactPoint",
+                telephone: "+94-74-319-1200",
+                contactType: "customer service",
+                areaServed: "LK",
+              },
+            }).replace(/</g, "\\u003c"),
+          }}
+        />
         <ToastProvider>
           <AuthProvider>
             <WishlistProvider>

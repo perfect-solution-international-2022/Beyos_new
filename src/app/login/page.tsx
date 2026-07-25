@@ -35,8 +35,7 @@ function LoginForm() {
             : u.role === "reseller"
               ? "/reseller"
               : "/";
-      router.push(dest);
-      router.refresh();
+      router.replace(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

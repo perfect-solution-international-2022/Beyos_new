@@ -6,6 +6,12 @@ import SectionHeader from "@/components/SectionHeader";
 import Newsletter from "@/components/Newsletter";
 import { getFeaturedProducts } from "@/lib/products-db";
 import { getHomeCategories } from "@/lib/categories-db";
+import type { Metadata } from "next";
+import { getHeroSlides } from "@/lib/hero-slides";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 // Featured products come from MySQL (admin-managed). ISR keeps the page
 // cached and fast, while admin writes call revalidatePath("/") for instant
@@ -57,14 +63,15 @@ const testimonials = [
 ];
 
 export default async function HomePage() {
-  const [featured, homeCategories] = await Promise.all([
+  const [featured, homeCategories, heroSlides] = await Promise.all([
     getFeaturedProducts(),
     getHomeCategories(),
+    getHeroSlides(),
   ]);
 
   return (
     <>
-      <HeroCarousel />
+      <HeroCarousel slides={heroSlides} />
 
       {/* Categories */}
       <section className="container-x mt-14">

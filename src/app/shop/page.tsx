@@ -6,7 +6,13 @@ import { getShopCategories } from "@/lib/categories-db";
 
 export const metadata: Metadata = {
   title: "Shop",
-  description: "Browse the full Beyos Clothing collection for men and women.",
+  description: "Shop Beyos Clothing oversized T-shirts, premium fashion and custom apparel online with island-wide delivery in Sri Lanka.",
+  alternates: { canonical: "/shop" },
+  openGraph: {
+    title: "Shop Clothing Online",
+    description: "Explore premium clothing and custom apparel from Beyos Clothing.",
+    url: "/shop",
+  },
 };
 
 // ISR: cached for speed, refreshed instantly on admin writes via

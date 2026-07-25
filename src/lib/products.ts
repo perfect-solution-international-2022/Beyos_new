@@ -27,7 +27,7 @@ export const products: Product[] = [
     reviews: 128,
     badge: "Bestseller",
     featured: true,
-    stock: 42,
+    stock: 42, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "2",
@@ -45,7 +45,7 @@ export const products: Product[] = [
     reviews: 76,
     badge: "New",
     featured: true,
-    stock: 30,
+    stock: 30, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "3",
@@ -62,7 +62,7 @@ export const products: Product[] = [
     rating: 4.7,
     reviews: 54,
     featured: true,
-    stock: 25,
+    stock: 25, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "4",
@@ -81,7 +81,7 @@ export const products: Product[] = [
     reviews: 203,
     badge: "Sale",
     featured: true,
-    stock: 18,
+    stock: 18, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "5",
@@ -99,7 +99,7 @@ export const products: Product[] = [
     reviews: 167,
     badge: "Bestseller",
     featured: true,
-    stock: 22,
+    stock: 22, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "6",
@@ -118,7 +118,7 @@ export const products: Product[] = [
     reviews: 89,
     badge: "Sale",
     featured: true,
-    stock: 31,
+    stock: 31, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "7",
@@ -135,7 +135,7 @@ export const products: Product[] = [
     rating: 4.3,
     reviews: 61,
     badge: "New",
-    stock: 40,
+    stock: 40, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "8",
@@ -153,7 +153,7 @@ export const products: Product[] = [
     reviews: 142,
     badge: "Bestseller",
     featured: true,
-    stock: 15,
+    stock: 15, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "9",
@@ -171,7 +171,7 @@ export const products: Product[] = [
     rating: 4.8,
     reviews: 98,
     badge: "Sale",
-    stock: 12,
+    stock: 12, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "10",
@@ -187,7 +187,7 @@ export const products: Product[] = [
     colors: ["Gold", "Gunmetal"],
     rating: 4.4,
     reviews: 73,
-    stock: 50,
+    stock: 50, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "11",
@@ -203,7 +203,7 @@ export const products: Product[] = [
     colors: ["Brown", "Black"],
     rating: 4.6,
     reviews: 57,
-    stock: 34,
+    stock: 34, paymentMethods: ["cod", "onepay"],
   },
   {
     id: "12",
@@ -219,7 +219,7 @@ export const products: Product[] = [
     colors: ["White", "Black", "Sage"],
     rating: 4.5,
     reviews: 44,
-    stock: 28,
+    stock: 28, paymentMethods: ["cod", "onepay"],
   },
 ];
 

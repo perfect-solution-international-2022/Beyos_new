@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import type { HeroSlide } from "@/lib/hero-slides";
 
 const SLIDE_MS = 6000;
 
@@ -15,14 +16,7 @@ const content = {
   href: "/shop",
 };
 
-// Background images that cycle behind the fixed text.
-const images = [
-  "/images/hero-images/hero1.webp",
-  "/images/hero-images/hero2.webp",
-  "/images/hero-images/hero3.webp",
-];
-
-export default function HeroCarousel() {
+export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -30,11 +24,11 @@ export default function HeroCarousel() {
   useEffect(() => {
     if (paused) return;
     const id = setTimeout(
-      () => setCurrent((c) => (c + 1) % images.length),
+      () => setCurrent((c) => (c + 1) % slides.length),
       SLIDE_MS
     );
     return () => clearTimeout(id);
-  }, [current, paused]);
+  }, [current, paused, slides.length]);
 
   return (
     <section
@@ -43,18 +37,19 @@ export default function HeroCarousel() {
       onMouseLeave={() => setPaused(false)}
     >
       {/* Rotating background images with a slow drift on the active one */}
-      {images.map((src, i) => (
+      {slides.map((slide, i) => (
         <div
-          key={src}
+          key={slide.id}
           className={`absolute inset-0 transition-opacity duration-1000 ${
             i === current ? "opacity-100" : "opacity-0"
           }`}
         >
           <Image
-            src={src}
-            alt=""
+            src={slide.image}
+            alt={slide.alt}
             fill
             priority={i === 0}
+            quality={72}
             className={`object-cover ${i === current ? "hero-kenburns" : ""}`}
             sizes="100vw"
           />
@@ -92,9 +87,9 @@ export default function HeroCarousel() {
 
       {/* Slide indicators — the active one fills up over the slide's duration */}
       <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 gap-2">
-        {images.map((_, i) => (
+        {slides.map((slide, i) => (
           <button
-            key={i}
+            key={slide.id}
             onClick={() => setCurrent(i)}
             aria-label={`Show image ${i + 1}`}
             className={`h-1.5 overflow-hidden rounded-full transition-all duration-300 ${

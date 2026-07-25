@@ -57,6 +57,7 @@ export default function ProductCard({ product }: { product: Product }) {
               alt={product.name}
               width={1500}
               height={1500}
+              sizes="(max-width: 359px) calc(100vw - 32px), (max-width: 767px) calc(50vw - 26px), (max-width: 1023px) 33vw, 25vw"
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           </div>

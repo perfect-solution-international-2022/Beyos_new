@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCart, effectiveUnitPrice } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import { useAuth } from "@/context/AuthProvider";
+import type { ProductPaymentMethod } from "@/lib/types";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -20,7 +21,10 @@ export default function CheckoutPage() {
   const [discount, setDiscount] = useState(0);
   const [freeShippingPromo, setFreeShippingPromo] = useState(false);
   const [shipping, setShipping] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"onepay" | "cod">("onepay");
+  const [paymentMethod, setPaymentMethod] = useState<ProductPaymentMethod>("onepay");
+  const [availablePaymentMethods, setAvailablePaymentMethods] = useState<ProductPaymentMethod[]>([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(true);
+  const [paymentMethodsError, setPaymentMethodsError] = useState("");
 
   const [promoInput, setPromoInput] = useState("");
   const [applyingPromo, setApplyingPromo] = useState(false);
@@ -36,6 +40,50 @@ export default function CheckoutPage() {
   });
 
   useEffect(() => setMounted(true), []);
+
+  // A mixed cart can use a payment method only when every product allows it.
+  // Load the live product settings so persisted carts also follow admin changes.
+  useEffect(() => {
+    if (items.length === 0) {
+      setAvailablePaymentMethods([]);
+      setPaymentMethodsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPaymentMethodsLoading(true);
+    setPaymentMethodsError("");
+    fetch("/api/products", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load payment methods");
+        return response.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const products = Array.isArray(data.products) ? data.products : [];
+        const allowed = (["onepay", "cod"] as ProductPaymentMethod[]).filter((method) =>
+          items.every((item) => {
+            const product = products.find((candidate: { slug?: string }) => candidate.slug === item.slug);
+            return Array.isArray(product?.paymentMethods) && product.paymentMethods.includes(method);
+          })
+        );
+        setAvailablePaymentMethods(allowed);
+        setPaymentMethod((current) => allowed.includes(current) ? current : allowed[0] ?? "onepay");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAvailablePaymentMethods([]);
+          setPaymentMethodsError("Payment methods could not be loaded. Please refresh and try again.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentMethodsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
 
   // Auth guard — only logged-in users can check out.
   useEffect(() => {
@@ -147,6 +195,10 @@ export default function CheckoutPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!availablePaymentMethods.includes(paymentMethod)) {
+      setError("Choose an available payment method.");
+      return;
+    }
     setSubmitting(true);
     try {
       const body = JSON.stringify({
@@ -306,54 +358,31 @@ export default function CheckoutPage() {
 
           <h2 className="mt-10 text-lg font-bold text-navy-800">Payment</h2>
           <div className="mt-4 space-y-3">
-            <label
-              className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm transition ${
-                paymentMethod === "onepay" ? "border-brand bg-brand-50" : "border-navy-800/10 hover:border-navy-800/20"
-              }`}
-            >
-              <input
-                type="radio"
-                name="paymentMethod"
-                checked={paymentMethod === "onepay"}
-                onChange={() => setPaymentMethod("onepay")}
-                className="mt-1 shrink-0 accent-brand"
-              />
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
-                <rect x="1" y="5" width="22" height="15" rx="2" />
-                <line x1="1" y1="10" x2="23" y2="10" />
-                <path d="M6 15h4" />
-              </svg>
-              <div>
-                <div className="font-semibold text-navy-800">Pay by Card</div>
-                <p className="mt-1 text-navy-800/60">
-                  Secure card payment via OnePay. You&apos;ll be redirected to complete payment.
-                </p>
-              </div>
-            </label>
-
-            <label
-              className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm transition ${
-                paymentMethod === "cod" ? "border-brand bg-brand-50" : "border-navy-800/10 hover:border-navy-800/20"
-              }`}
-            >
-              <input
-                type="radio"
-                name="paymentMethod"
-                checked={paymentMethod === "cod"}
-                onChange={() => setPaymentMethod("cod")}
-                className="mt-1 shrink-0 accent-brand"
-              />
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
-                <rect x="2" y="6" width="20" height="12" rx="2" />
-                <circle cx="12" cy="12" r="2.5" />
-              </svg>
-              <div>
-                <div className="font-semibold text-navy-800">Cash on Delivery</div>
-                <p className="mt-1 text-navy-800/60">
-                  Pay in cash when your order arrives.
-                </p>
-              </div>
-            </label>
+            {paymentMethodsLoading ? (
+              <p className="rounded-lg bg-navy-50 px-4 py-3 text-sm text-navy-800/60">Loading payment methods…</p>
+            ) : (
+              <>
+                {availablePaymentMethods.includes("onepay") && (
+                  <PaymentOption
+                    method="onepay"
+                    selected={paymentMethod}
+                    onSelect={setPaymentMethod}
+                  />
+                )}
+                {availablePaymentMethods.includes("cod") && (
+                  <PaymentOption
+                    method="cod"
+                    selected={paymentMethod}
+                    onSelect={setPaymentMethod}
+                  />
+                )}
+                {availablePaymentMethods.length === 0 && (
+                  <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">
+                    {paymentMethodsError || "The products in your cart do not share an available payment method."}
+                  </p>
+                )}
+              </>
+            )}
           </div>
 
           {error && (
@@ -466,8 +495,8 @@ export default function CheckoutPage() {
 
           <button
             type="submit"
-            disabled={submitting}
-            className="btn-primary mt-6 w-full"
+            disabled={submitting || paymentMethodsLoading || availablePaymentMethods.length === 0}
+            className="btn-primary mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting
               ? paymentMethod === "cod"
@@ -483,5 +512,52 @@ export default function CheckoutPage() {
         </aside>
       </form>
     </div>
+  );
+}
+
+function PaymentOption({
+  method,
+  selected,
+  onSelect,
+}: {
+  method: ProductPaymentMethod;
+  selected: ProductPaymentMethod;
+  onSelect: (method: ProductPaymentMethod) => void;
+}) {
+  const isOnepay = method === "onepay";
+  return (
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm transition ${
+        selected === method ? "border-brand bg-brand-50" : "border-navy-800/10 hover:border-navy-800/20"
+      }`}
+    >
+      <input
+        type="radio"
+        name="paymentMethod"
+        checked={selected === method}
+        onChange={() => onSelect(method)}
+        className="mt-1 shrink-0 accent-brand"
+      />
+      {isOnepay ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
+          <rect x="1" y="5" width="22" height="15" rx="2" />
+          <line x1="1" y1="10" x2="23" y2="10" />
+          <path d="M6 15h4" />
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-0.5 shrink-0">
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <circle cx="12" cy="12" r="2.5" />
+        </svg>
+      )}
+      <div>
+        <div className="font-semibold text-navy-800">{isOnepay ? "Pay by Card" : "Cash on Delivery"}</div>
+        <p className="mt-1 text-navy-800/60">
+          {isOnepay
+            ? "Secure card payment via OnePay. You'll be redirected to complete payment."
+            : "Pay in cash when your order arrives."}
+        </p>
+      </div>
+    </label>
   );
 }

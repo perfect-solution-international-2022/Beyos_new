@@ -5,6 +5,12 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "About Us",
   description: "Learn about Beyos Clothing, our vision, mission, and commitment to premium custom T-shirt printing.",
+  alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About Beyos Clothing",
+    description: "Learn about our premium fabrics, DTF printing and commitment to quality custom clothing.",
+    url: "/about",
+  },
 };
 
 const stats = [

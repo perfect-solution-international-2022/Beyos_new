@@ -4,6 +4,7 @@ import { validatePromoCode, recordPromotionUsage, Promotion } from "@/lib/promot
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 import type { PoolConnection } from "mysql2/promise";
+import type { ProductPaymentMethod } from "@/lib/types";
 
 export interface CheckoutLine {
   slug: string;
@@ -42,7 +43,8 @@ const FREE_SHIPPING_THRESHOLD = 10000;
 export async function computeOrderTotals(
   items: CheckoutLine[],
   promoCode?: string,
-  userId?: number
+  userId?: number,
+  paymentMethod?: ProductPaymentMethod
 ) {
   let subtotal = 0;
   let totalWeightKg = 0;
@@ -50,6 +52,10 @@ export async function computeOrderTotals(
   for (const line of items) {
     const product = await getProductBySlug(line.slug);
     if (!product) throw new Error(`Unknown product: ${line.slug}`);
+    if (paymentMethod && !product.paymentMethods.includes(paymentMethod)) {
+      const label = paymentMethod === "cod" ? "Cash on Delivery" : "OnePay card payment";
+      throw new Error(`${label} is not available for ${product.name}`);
+    }
     const variant = line.variantId ? product.variants?.find((item) => item.id === Number(line.variantId)) : undefined;
     if (line.variantId && !variant) throw new Error(`Unknown product variation for ${product.name}`);
     const qty = Math.max(1, Number(line.quantity) || 1);

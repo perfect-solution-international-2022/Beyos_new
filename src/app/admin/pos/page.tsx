@@ -89,7 +89,7 @@ export default function AdminPosRegisterPage() {
 
 function AdminPosRegister() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const editReceipt = searchParams.get("edit");
@@ -271,6 +271,17 @@ function AdminPosRegister() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      await logout();
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      toast("Could not sign out. Please try again.", "error");
+    }
+  };
+
   const saveDeliveryDetails = () => {
     if (!deliveryDetailsComplete) {
       toast("Enter the customer, phone, province, district, city and address");
@@ -449,6 +460,15 @@ function AdminPosRegister() {
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1f2937] text-xs font-bold text-white">
             {(user?.name || "Admin").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
           </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 transition hover:bg-red-100"
+          >
+            <LogoutIcon />
+          </button>
         </div>
       </div>
 
@@ -844,6 +864,15 @@ function FullscreenIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
       <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5M21 12H9" />
     </svg>
   );
 }

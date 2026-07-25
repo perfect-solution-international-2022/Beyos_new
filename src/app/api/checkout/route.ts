@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
   let totals;
   try {
-    totals = await computeOrderTotals(items, promoCode, user.id);
+    totals = await computeOrderTotals(items, promoCode, user.id, "cod");
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Invalid item in cart" },

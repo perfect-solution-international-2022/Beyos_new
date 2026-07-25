@@ -1,5 +1,5 @@
 import { query } from "@/lib/db";
-import type { Product, ProductVariant } from "./types";
+import type { Product, ProductPaymentMethod, ProductVariant } from "./types";
 
 // mysql2 returns JSON columns already parsed as arrays; be defensive if a
 // driver/version ever hands back a raw string instead.
@@ -37,6 +37,15 @@ interface ProductRow {
   product_type: "simple" | "variable";
   weight_kg: string | null;
   wholesale_price: string | null;
+  payment_methods: string | null;
+}
+
+function paymentMethods(value: string | null): ProductPaymentMethod[] {
+  const methods = String(value || "").split(",").map((method) => method.trim().toLowerCase());
+  return [
+    ...(methods.includes("cash on delivery") ? ["cod" as const] : []),
+    ...(methods.includes("onepay") ? ["onepay" as const] : []),
+  ];
 }
 
 function mapRow(r: ProductRow): Product {
@@ -61,6 +70,7 @@ function mapRow(r: ProductRow): Product {
     productType: r.product_type,
     weightKg: r.weight_kg ? Number(r.weight_kg) : undefined,
     wholesalePrice: r.wholesale_price ? Number(r.wholesale_price) : undefined,
+    paymentMethods: paymentMethods(r.payment_methods),
   };
 }
 
@@ -81,7 +91,8 @@ const mapVariant = (row: VariantRow): ProductVariant => ({
 // Only products the admin has published and made public are visible to buyers.
 const STOREFRONT_WHERE = "visibility = 'public' AND is_publish = 1";
 const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, images,
-       description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg, wholesale_price`;
+       description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg, wholesale_price,
+       payment_methods`;
 const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, sale_price, stock, image, is_default, weight_kg, wholesale_price";
 
 export async function getAllProducts(): Promise<Product[]> {
