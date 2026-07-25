@@ -7,12 +7,22 @@ import { getCurrentUser } from "@/lib/auth";
 import RecentlyViewed from "@/components/RecentlyViewed";
 
 export const metadata: Metadata = {
-  title: "Shop",
-  description: "Shop Beyos Clothing oversized T-shirts, premium fashion and custom apparel online with island-wide delivery in Sri Lanka.",
+  title: "Oversized & Graphic T-Shirts Sri Lanka",
+  description:
+    "Buy premium oversized, graphic and printed T-shirts online in Sri Lanka from Beyos Clothing, with island-wide delivery and secure checkout.",
+  keywords: [
+    "buy oversized t shirts online Sri Lanka",
+    "oversized t shirt price Sri Lanka",
+    "graphic t shirts Sri Lanka",
+    "printed t shirts online Sri Lanka",
+    "mens oversized t shirts Sri Lanka",
+    "unisex oversized t shirts Sri Lanka",
+    "streetwear clothing Sri Lanka",
+  ],
   alternates: { canonical: "/shop" },
   openGraph: {
-    title: "Shop Clothing Online",
-    description: "Explore premium clothing and custom apparel from Beyos Clothing.",
+    title: "Oversized & Graphic T-Shirts Sri Lanka | Beyos Clothing",
+    description: "Buy premium oversized and graphic T-shirts online with island-wide delivery across Sri Lanka.",
     url: "/shop",
   },
 };

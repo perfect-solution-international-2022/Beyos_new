@@ -11,9 +11,29 @@ import { getHomeCategories } from "@/lib/categories-db";
 import type { Metadata } from "next";
 import { getHeroSlides } from "@/lib/hero-slides";
 import RecentlyViewed from "@/components/RecentlyViewed";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  title: "Online Clothing Store Sri Lanka",
+  description:
+    "Shop premium oversized and graphic T-shirts online in Sri Lanka. Enjoy secure payments, cash on delivery and island-wide delivery from Beyos Clothing.",
+  keywords: [
+    "online clothing store Sri Lanka",
+    "oversized t shirts Sri Lanka",
+    "graphic t shirts Sri Lanka",
+    "premium t shirts Sri Lanka",
+    "Sri Lankan clothing brand",
+    "Beyos Clothing",
+  ],
   alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    title: "Online Clothing Store Sri Lanka | Beyos Clothing",
+    description:
+      "Shop premium oversized and graphic T-shirts with secure payments and island-wide delivery across Sri Lanka.",
+    url: "/",
+    siteName: SITE_NAME,
+  },
 };
 
 // Featured products come from MySQL (admin-managed). ISR keeps the page
@@ -74,6 +94,22 @@ export default async function HomePage() {
 
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "OnlineStore",
+            name: SITE_NAME,
+            url: SITE_URL.toString(),
+            description:
+              "Sri Lankan online clothing store for premium oversized, graphic and custom printed T-shirts.",
+            areaServed: { "@type": "Country", name: "Sri Lanka" },
+            currenciesAccepted: "LKR",
+            paymentAccepted: ["Cash on Delivery", "Card Payment"],
+          }).replace(/</g, "\\u003c"),
+        }}
+      />
       <HeroCarousel slides={heroSlides} />
       <ServiceHighlights />
 

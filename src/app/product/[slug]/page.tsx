@@ -27,10 +27,16 @@ export async function generateMetadata({
   const title = product.metaTitle?.trim() || product.name;
   const description = seoDescription(product.metaDescription?.trim() || product.description);
   const keywords = product.metaKeywords?.split(",").map((keyword) => keyword.trim()).filter(Boolean);
+  const fallbackKeywords = [
+    `${product.name} Sri Lanka`,
+    `${product.category} t shirts Sri Lanka`,
+    "oversized t shirts Sri Lanka",
+    "graphic t shirts Sri Lanka",
+  ];
   return {
     title,
     description,
-    keywords: keywords?.length ? keywords : undefined,
+    keywords: keywords?.length ? keywords : fallbackKeywords,
     alternates: { canonical: `/product/${product.slug}` },
     openGraph: {
       type: "website",
