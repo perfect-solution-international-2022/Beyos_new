@@ -7,6 +7,7 @@ import { useWishlist } from "@/context/WishlistProvider";
 import { useCart } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/types";
+import { ListLoadingSkeleton } from "@/components/LoadingSkeleton";
 
 export default function WishlistPage() {
   const { slugs, remove, loading } = useWishlist();
@@ -29,7 +30,7 @@ export default function WishlistPage() {
       <h1 className="text-2xl font-bold text-navy-800">My Wishlist</h1>
 
       {isLoading ? (
-        <p className="mt-6 text-navy-800/50">Loading…</p>
+        <div className="mt-6"><ListLoadingSkeleton /></div>
       ) : items.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-4 rounded-2xl border border-navy-800/5 bg-white py-16 text-center shadow-sm">
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-400">

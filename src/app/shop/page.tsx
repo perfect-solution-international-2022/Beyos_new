@@ -4,6 +4,7 @@ import ShopClient from "./ShopClient";
 import { getAllProducts } from "@/lib/products-db";
 import { getShopCategories } from "@/lib/categories-db";
 import { getCurrentUser } from "@/lib/auth";
+import RecentlyViewed from "@/components/RecentlyViewed";
 
 export const metadata: Metadata = {
   title: "Shop",
@@ -28,7 +29,7 @@ export default async function ShopPage() {
     getShopCategories(),
   ]);
 
-  return (
+  return <>
     <Suspense
       fallback={
         <div className="container-x py-20 text-center text-navy-800/50">
@@ -38,5 +39,6 @@ export default async function ShopPage() {
     >
       <ShopClient products={products} categories={categories} />
     </Suspense>
-  );
+    <RecentlyViewed />
+  </>;
 }

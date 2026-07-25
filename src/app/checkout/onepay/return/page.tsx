@@ -5,6 +5,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
+import CheckoutProgress from "@/components/CheckoutProgress";
 
 interface OrderStatus {
   orderRef: string;
@@ -94,7 +95,7 @@ function ReturnContent() {
   const isPaid = order.paymentStatus === "paid";
 
   return (
-    <div className="mx-auto max-w-lg rounded-3xl border border-navy-800/10 bg-white p-10 text-center shadow-sm">
+    <><CheckoutProgress current={3} /><div className="mx-auto max-w-lg rounded-3xl border border-navy-800/10 bg-white p-10 text-center shadow-sm">
       <div
         className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${
           isPaid ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
@@ -152,7 +153,7 @@ function ReturnContent() {
           Paid but still shows pending? Contact us with your Order ID and we&apos;ll confirm it right away.
         </p>
       )}
-    </div>
+    </div></>
   );
 }
 

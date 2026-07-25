@@ -10,6 +10,7 @@ export interface Product {
   price: number;
   compareAtPrice?: number;
   image: string;
+  imageAlt?: string;
   images: string[];
   description: string;
   sizes: string[];
@@ -24,6 +25,9 @@ export interface Product {
   weightKg?: number;
   wholesalePrice?: number;
   paymentMethods: ProductPaymentMethod[];
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
 }
 
 export interface ProductVariant {

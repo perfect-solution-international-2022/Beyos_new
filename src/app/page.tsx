@@ -10,6 +10,7 @@ import { getFeaturedProducts } from "@/lib/products-db";
 import { getHomeCategories } from "@/lib/categories-db";
 import type { Metadata } from "next";
 import { getHeroSlides } from "@/lib/hero-slides";
+import RecentlyViewed from "@/components/RecentlyViewed";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -102,6 +103,8 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      <RecentlyViewed />
 
       {/* Custom printing banner */}
       <section className="container-x mt-20">

@@ -25,6 +25,7 @@ interface ProductRow {
   price: string;
   compare_at_price: string | null;
   image: string;
+  image_alt: string | null;
   images: unknown;
   description: string;
   sizes: unknown;
@@ -38,6 +39,9 @@ interface ProductRow {
   weight_kg: string | null;
   wholesale_price: string | null;
   payment_methods: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  meta_keywords: string | null;
 }
 
 function paymentMethods(value: string | null): ProductPaymentMethod[] {
@@ -58,6 +62,7 @@ function mapRow(r: ProductRow): Product {
     price: Number(r.price),
     compareAtPrice: r.compare_at_price ? Number(r.compare_at_price) : undefined,
     image: r.image,
+    imageAlt: r.image_alt || undefined,
     images: asArray(r.images),
     description: r.description,
     sizes: asArray(r.sizes),
@@ -71,6 +76,9 @@ function mapRow(r: ProductRow): Product {
     weightKg: r.weight_kg ? Number(r.weight_kg) : undefined,
     wholesalePrice: r.wholesale_price ? Number(r.wholesale_price) : undefined,
     paymentMethods: paymentMethods(r.payment_methods),
+    metaTitle: r.meta_title || undefined,
+    metaDescription: r.meta_description || undefined,
+    metaKeywords: r.meta_keywords || undefined,
   };
 }
 
@@ -90,9 +98,9 @@ const mapVariant = (row: VariantRow): ProductVariant => ({
 
 // Only products the admin has published and made public are visible to buyers.
 const STOREFRONT_WHERE = "deleted_at IS NULL AND visibility = 'public' AND is_publish = 1";
-const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, images,
+const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, image_alt, images,
        description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg, wholesale_price,
-       payment_methods`;
+       payment_methods, meta_title, meta_description, meta_keywords`;
 const VARIANT_FIELDS = "id, product_id, sku, attribute_summary, price, sale_price, stock, image, is_default, weight_kg, wholesale_price";
 
 export async function getAllProducts(resellerOnly = false): Promise<Product[]> {

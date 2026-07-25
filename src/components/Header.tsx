@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/store/cart";
 import { useAuth } from "@/context/AuthProvider";
+import { Product } from "@/lib/types";
+import { formatPrice } from "@/lib/utils";
 
 const nav = [
   { href: "/", label: "Home" },
@@ -21,6 +23,9 @@ export default function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const openCart = useCart((s) => s.openCart);
@@ -50,6 +55,31 @@ export default function Header() {
       document.body.style.overflow = "";
     };
   }, [menuOpen]);
+  useEffect(() => {
+    const query = search.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSuggestionsLoading(true);
+      try {
+        const response = await fetch(`/api/products?search=${encodeURIComponent(query)}`, { signal: controller.signal });
+        const data = await response.json();
+        setSuggestions(response.ok && Array.isArray(data.products) ? data.products.slice(0, 5) : []);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setSuggestions([]);
+      } finally {
+        if (!controller.signal.aborted) setSuggestionsLoading(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -94,19 +124,23 @@ export default function Header() {
         </Link>
 
         {/* Desktop search */}
-        <form onSubmit={handleSearch} className="mx-auto hidden max-w-xl flex-1 items-center overflow-hidden rounded-lg border-2 border-navy-800/10 bg-white lg:flex">
-          <SearchIcon />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="What are you looking for?"
-            aria-label="Search products"
-            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-navy-800 outline-none placeholder:text-navy-800/40"
-          />
-          <button type="submit" className="m-1 rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-white transition hover:bg-brand">
-            Search
-          </button>
-        </form>
+        <div className="relative mx-auto hidden max-w-xl flex-1 lg:block">
+          <form onSubmit={handleSearch} className="flex items-center overflow-hidden rounded-lg border-2 border-navy-800/10 bg-white">
+            <SearchIcon />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              placeholder="What are you looking for?"
+              aria-label="Search products"
+              autoComplete="off"
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-navy-800 outline-none placeholder:text-navy-800/40"
+            />
+            <button type="submit" className="m-1 rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-white transition hover:bg-brand">Search</button>
+          </form>
+          <SearchSuggestions query={search} open={searchFocused && search.trim().length >= 2} loading={suggestionsLoading} products={suggestions} onSelect={() => setSearchFocused(false)} />
+        </div>
 
         <div className="hidden shrink-0 items-center gap-2.5 xl:flex">
           <PhoneIcon />
@@ -225,17 +259,23 @@ export default function Header() {
       </div>
 
       {/* Mobile search */}
-      <form onSubmit={handleSearch} className="container-x mb-3 flex items-center overflow-hidden rounded-lg border-2 border-navy-800/10 bg-white lg:hidden">
-        <SearchIcon />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search products..."
-          aria-label="Search products"
-          className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-navy-800 outline-none placeholder:text-navy-800/40"
-        />
-        <button type="submit" className="m-1 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white min-[360px]:px-4">Search</button>
-      </form>
+      <div className="container-x relative mb-3 lg:hidden">
+        <form onSubmit={handleSearch} className="flex items-center overflow-hidden rounded-lg border-2 border-navy-800/10 bg-white">
+          <SearchIcon />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+            placeholder="Search products..."
+            aria-label="Search products"
+            autoComplete="off"
+            className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-navy-800 outline-none placeholder:text-navy-800/40"
+          />
+          <button type="submit" className="m-1 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white min-[360px]:px-4">Search</button>
+        </form>
+        <SearchSuggestions query={search} open={searchFocused && search.trim().length >= 2} loading={suggestionsLoading} products={suggestions} onSelect={() => setSearchFocused(false)} />
+      </div>
 
       {/* Desktop navigation */}
       <nav className="hidden border-t border-navy-800/5 lg:block">
@@ -357,5 +397,32 @@ function BagIcon() {
       <path d="M3 6h18" />
       <path d="M16 10a4 4 0 0 1-8 0" />
     </svg>
+  );
+}
+
+function SearchSuggestions({ query, open, loading, products, onSelect }: { query: string; open: boolean; loading: boolean; products: Product[]; onSelect: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="absolute inset-x-0 top-[calc(100%+0.4rem)] z-50 overflow-hidden rounded-lg border border-navy-800/10 bg-white shadow-2xl">
+      {loading ? (
+        <p className="px-4 py-5 text-center text-sm text-navy-800/50">Searching...</p>
+      ) : products.length ? (
+        <div className="max-h-[min(24rem,60dvh)] overflow-y-auto py-1">
+          {products.map((product) => (
+            <Link key={product.id} href={`/product/${product.slug}`} onClick={onSelect} className="flex items-center gap-3 border-b border-navy-800/5 px-3 py-2.5 transition last:border-0 hover:bg-navy-50">
+              <Image src={product.image} alt="" width={48} height={48} sizes="48px" className="h-12 w-12 shrink-0 rounded-md object-cover" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-navy-800">{product.name}</span>
+                <span className="mt-0.5 block text-xs font-bold text-[#a94700]">{formatPrice(product.price)}</span>
+              </span>
+              <span aria-hidden="true" className="text-navy-800/30">→</span>
+            </Link>
+          ))}
+          <Link href={`/shop?search=${encodeURIComponent(query)}`} onClick={onSelect} className="block px-4 py-3 text-center text-sm font-semibold text-navy-800 hover:text-brand">View all results</Link>
+        </div>
+      ) : (
+        <p className="px-4 py-5 text-center text-sm text-navy-800/50">No matching products</p>
+      )}
+    </div>
   );
 }

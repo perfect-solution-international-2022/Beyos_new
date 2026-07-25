@@ -39,7 +39,7 @@ const blank = {
   regularPrice: "", salePrice: "", resellerPrice: "", wholesalePrice: "",
   productionCost: "", saleStart: "", saleEnd: "",
   stock: "", lowStockThreshold: "10", stockStatus: "in_stock", allowBackorder: false, soldIndividually: false,
-  sizes: "", colors: "", image: "", images: "",
+  sizes: "", colors: "", image: "", imageAlt: "", images: "",
   badge: "", featured: true, isPublish: true, visibility: "public", isResellerProduct: true,
   paymentMethods: [] as string[], tags: "",
   weightKg: "", lengthCm: "", widthCm: "", heightCm: "",
@@ -116,7 +116,7 @@ export default function AdminProductsPage() {
     const str = (v: unknown) => (v === null || v === undefined || v === "" ? "" : String(v));
     setEditing({
       ...blank, ...p,
-      slug: "", // regenerated server-side; leave blank on edit
+      slug: p.slug || "",
       regularPrice: str(p.regularPrice), salePrice: str(p.salePrice),
       resellerPrice: str(p.resellerPrice), wholesalePrice: str(p.wholesalePrice),
       productionCost: str(p.productionCost), saleStart: p.saleStart || "", saleEnd: p.saleEnd || "",
@@ -272,11 +272,11 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
   const isVariable = form.productType === "variable";
   const tabs = isVariable
-    ? ["general", "attributes", "variations", "linked", "payments"]
-    : ["general", "inventory", "linked", "payments"];
+    ? ["general", "attributes", "variations", "linked", "seo", "payments"]
+    : ["general", "inventory", "linked", "seo", "payments"];
   const tabLabels: Record<string, string> = {
     general: "General", inventory: "Inventory", attributes: "Attributes",
-    variations: "Variations", linked: "Linked Products", payments: "Payments and Others",
+    variations: "Variations", linked: "Linked Products", seo: "SEO", payments: "Payments and Others",
   };
   useEffect(() => { if (!tabs.includes(tab)) setTab(tabs[0]); }, [isVariable]); // eslint-disable-line
 
@@ -346,6 +346,8 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
         metaTitle: form.metaTitle.trim(),
         metaDescription: form.metaDescription.trim(),
         metaKeywords: form.metaKeywords.trim(),
+        imageAlt: form.imageAlt.trim(),
+        slug: form.slug.trim(),
       };
       const res = await fetch("/api/admin/products", {
         method: isEdit ? "PATCH" : "POST",
@@ -606,6 +608,46 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                 <LinkPicker label="Upsells" type="upsell" form={form} setForm={setForm} allProducts={allProducts} />
                 <LinkPicker label="Cross-sells" type="cross_sell" form={form} setForm={setForm} allProducts={allProducts} />
                 <LinkPicker label="Related Products" type="related" form={form} setForm={setForm} allProducts={allProducts} />
+              </div>
+            )}
+
+            {/* SEO */}
+            {tab === "seo" && (
+              <div className="space-y-6">
+                <div className="rounded-lg border border-navy-800/10 bg-navy-50/45 p-4">
+                  <p className="text-xs font-semibold uppercase text-[#a94700]">Google Preview</p>
+                  <p className="mt-2 truncate text-lg text-[#1a0dab]">{form.metaTitle.trim() || form.name.trim() || "Product title"}</p>
+                  <p className="truncate text-sm text-emerald-700">beyosclothing.com/product/{form.slug.trim() || "product-url"}</p>
+                  <p className="mt-1 line-clamp-2 text-sm leading-5 text-[#4d5156]">{form.metaDescription.trim() || form.shortDescription.trim() || form.description.trim() || "Add a concise description that explains this product to shoppers."}</p>
+                </div>
+
+                <F label="SEO Title">
+                  <input value={form.metaTitle} onChange={(event) => set("metaTitle")(event.target.value)} className="input" maxLength={255} placeholder={form.name || "Product title for Google"} />
+                  <p className={`mt-1 text-xs ${form.metaTitle.length > 60 ? "text-amber-700" : "text-navy-800/45"}`}>{form.metaTitle.length}/60 recommended characters</p>
+                </F>
+
+                <F label="Meta Description">
+                  <textarea value={form.metaDescription} onChange={(event) => set("metaDescription")(event.target.value)} className="input resize-none" rows={3} maxLength={500} placeholder="Describe the product benefit, material, fit and delivery in Sri Lanka." />
+                  <p className={`mt-1 text-xs ${form.metaDescription.length > 160 ? "text-amber-700" : "text-navy-800/45"}`}>{form.metaDescription.length}/160 recommended characters</p>
+                </F>
+
+                <F label="URL Slug">
+                  <div className="flex overflow-hidden rounded-lg border border-navy-800/15 bg-white focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
+                    <span className="hidden shrink-0 items-center border-r border-navy-800/10 bg-navy-50 px-3 text-sm text-navy-800/45 sm:flex">/product/</span>
+                    <input value={form.slug} onChange={(event) => set("slug")(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-"))} className="min-w-0 flex-1 px-3 py-3 text-sm text-navy-800 outline-none" maxLength={160} placeholder="product-name" />
+                  </div>
+                  <p className="mt-1 text-xs text-navy-800/45">Changing an existing URL can affect old links. Keep it short and descriptive.</p>
+                </F>
+
+                <F label="Focus Keywords">
+                  <input value={form.metaKeywords} onChange={(event) => set("metaKeywords")(event.target.value)} className="input" maxLength={255} placeholder="oversized t-shirt, Sri Lanka clothing" />
+                  <p className="mt-1 text-xs text-navy-800/45">Separate related search phrases with commas.</p>
+                </F>
+
+                <F label="Featured Image Alt Text">
+                  <input value={form.imageAlt} onChange={(event) => set("imageAlt")(event.target.value)} className="input" maxLength={255} placeholder={form.name ? `${form.name} product image` : "Describe what is visible in the product image"} />
+                  <p className="mt-1 text-xs text-navy-800/45">Describe the actual product image for accessibility and Google Images.</p>
+                </F>
               </div>
             )}
 

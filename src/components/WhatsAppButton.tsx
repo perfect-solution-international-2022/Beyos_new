@@ -7,6 +7,7 @@ const WHATSAPP_URL =
 
 export default function WhatsAppButton() {
   const pathname = usePathname();
+  const isProduct = pathname.startsWith("/product/");
   const isPortal =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/reseller") ||
@@ -21,7 +22,7 @@ export default function WhatsAppButton() {
       rel="noopener noreferrer"
       aria-label="Chat with Beyos Clothing on WhatsApp"
       title="Chat on WhatsApp"
-      className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_8px_28px_rgba(15,37,64,0.25)] ring-4 ring-white transition hover:scale-105 hover:bg-[#1fbd5a] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-navy-800/30 sm:right-6 lg:bottom-6"
+      className={`fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#25d366] text-white shadow-[0_8px_28px_rgba(15,37,64,0.25)] ring-4 ring-white transition hover:scale-105 hover:bg-[#1fbd5a] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-navy-800/30 sm:right-6 lg:bottom-6 ${isProduct ? "bottom-[calc(9.5rem+env(safe-area-inset-bottom))]" : "bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"}`}
     >
       <svg
         aria-hidden="true"

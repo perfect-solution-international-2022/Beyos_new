@@ -8,6 +8,8 @@ import { useCart, effectiveUnitPrice } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import { useAuth } from "@/context/AuthProvider";
 import type { ProductPaymentMethod } from "@/lib/types";
+import CheckoutProgress from "@/components/CheckoutProgress";
+import { PageLoadingSkeleton } from "@/components/LoadingSkeleton";
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -218,6 +220,7 @@ export default function CheckoutPage() {
   }, [items, subtotal, discountedSubtotal, freeShippingPromo]);
 
   const total = discountedSubtotal + shipping;
+  const deliveryComplete = Boolean(form.name && form.email && form.phone && form.address && form.districtId && form.cityId);
 
   const update = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -274,9 +277,7 @@ export default function CheckoutPage() {
 
   if (!mounted || authLoading || !user) {
     return (
-      <div className="container-x py-20 text-center text-navy-800/50">
-        Loading checkout…
-      </div>
+      <div className="container-x py-10"><PageLoadingSkeleton rows={2} /></div>
     );
   }
 
@@ -301,10 +302,11 @@ export default function CheckoutPage() {
   return (
     <div className="container-x py-10">
       <h1 className="font-display text-3xl font-bold text-navy-800 sm:text-4xl">Checkout</h1>
+      <CheckoutProgress current={submitting || deliveryComplete ? 2 : 1} />
 
       <form
         onSubmit={submit}
-        className="mt-8 grid gap-10 lg:grid-cols-[1fr_380px]"
+        className="grid gap-10 lg:grid-cols-[1fr_380px]"
       >
         {/* Details */}
         <div>

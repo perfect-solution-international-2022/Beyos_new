@@ -6,6 +6,8 @@ import { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/store/cart";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
+import { trackRecentlyViewed } from "@/lib/recentlyViewed";
+import ProductBadges from "@/components/ProductBadges";
 
 // Matches the admin's attribute order (Size, then Color) — see
 // src/app/admin/products/page.tsx's generateVariations().
@@ -57,6 +59,10 @@ export default function ProductDetail({ product }: { product: Product }) {
       return viewerImages[(startIndex + direction + viewerImages.length) % viewerImages.length];
     });
   };
+
+  useEffect(() => {
+    trackRecentlyViewed(product);
+  }, [product]);
 
   useEffect(() => {
     if (!imageViewerOpen) return;
@@ -128,7 +134,7 @@ export default function ProductDetail({ product }: { product: Product }) {
               >
                 <Image
                   src={img}
-                  alt={product.name}
+                  alt={img === product.image ? product.imageAlt || product.name : `${product.name} gallery view`}
                   width={64}
                   height={80}
                   className="h-full w-full object-cover"
@@ -147,7 +153,7 @@ export default function ProductDetail({ product }: { product: Product }) {
             >
               <Image
                 src={activeImage}
-                alt={product.name}
+                alt={activeImage === product.image ? product.imageAlt || product.name : `${product.name} alternate view`}
                 width={640}
                 height={800}
                 className="h-full w-full object-cover"
@@ -155,11 +161,7 @@ export default function ProductDetail({ product }: { product: Product }) {
               />
             </button>
           </div>
-          {product.badge && (
-            <span className="badge absolute left-4 top-4 bg-brand text-white">
-              {product.badge}
-            </span>
-          )}
+          <ProductBadges product={product} />
         </div>
       </div>
 
@@ -328,6 +330,18 @@ export default function ProductDetail({ product }: { product: Product }) {
         </ul>
       </div>
 
+      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t border-navy-800/10 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,37,64,0.12)] backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs text-navy-800/55">{selectedVariant?.attributeSummary || product.name}</p>
+            <p className="text-lg font-bold text-navy-800">{formatPrice(currentPrice)}</p>
+          </div>
+          <button onClick={handleAdd} disabled={currentStock < 1 || (product.productType === "variable" && !selectedVariant)} className="btn-primary min-h-11 shrink-0 px-5 py-2.5">
+            {currentStock < 1 ? "Out of Stock" : added ? "Added" : "Add to Cart"}
+          </button>
+        </div>
+      </div>
+
       {imageViewerOpen && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-3 sm:p-8"
@@ -359,7 +373,7 @@ export default function ProductDetail({ product }: { product: Product }) {
           >
             <Image
               src={activeImage}
-              alt={product.name}
+              alt={activeImage === product.image ? product.imageAlt || product.name : `${product.name} enlarged product view`}
               fill
               sizes="100vw"
               className="object-contain"

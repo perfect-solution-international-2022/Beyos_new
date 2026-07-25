@@ -24,22 +24,25 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return { title: "Product not found" };
-  const description = seoDescription(product.description);
+  const title = product.metaTitle?.trim() || product.name;
+  const description = seoDescription(product.metaDescription?.trim() || product.description);
+  const keywords = product.metaKeywords?.split(",").map((keyword) => keyword.trim()).filter(Boolean);
   return {
-    title: product.name,
+    title,
     description,
+    keywords: keywords?.length ? keywords : undefined,
     alternates: { canonical: `/product/${product.slug}` },
     openGraph: {
       type: "website",
-      title: product.name,
+      title,
       description,
       url: `/product/${product.slug}`,
       siteName: SITE_NAME,
-      images: [{ url: product.image, alt: product.name }],
+      images: [{ url: product.image, alt: product.imageAlt || product.name }],
     },
     twitter: {
       card: "summary_large_image",
-      title: product.name,
+      title,
       description,
       images: [product.image],
     },
@@ -65,6 +68,7 @@ export default async function ProductPage({
     description: product.description,
     sku: product.sku,
     image: [product.image, ...product.images].map((image) => new URL(image, SITE_URL).toString()),
+    keywords: product.metaKeywords || undefined,
     brand: { "@type": "Brand", name: SITE_NAME },
     offers: {
       "@type": "Offer",

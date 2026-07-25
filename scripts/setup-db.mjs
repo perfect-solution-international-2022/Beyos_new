@@ -87,6 +87,7 @@ async function main() {
     ["wholesale_min_qty", "INT NOT NULL DEFAULT 50 AFTER wholesale_price"],
     // Extended admin product fields.
     ["short_description", "VARCHAR(500) NULL"],
+    ["image_alt", "VARCHAR(255) NULL"],
     ["production_cost", "DECIMAL(10,2) NULL"],
     ["visibility", "VARCHAR(20) NOT NULL DEFAULT 'public'"],
     ["is_reseller_product", "TINYINT(1) NOT NULL DEFAULT 1"],

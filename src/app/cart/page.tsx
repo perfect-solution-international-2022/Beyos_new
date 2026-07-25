@@ -7,6 +7,8 @@ import { useCart, effectiveUnitPrice } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 import CheckoutButton from "@/components/CheckoutButton";
+import CheckoutProgress from "@/components/CheckoutProgress";
+import { PageLoadingSkeleton } from "@/components/LoadingSkeleton";
 
 export default function CartPage() {
   const [mounted, setMounted] = useState(false);
@@ -122,9 +124,7 @@ export default function CartPage() {
 
   if (!mounted) {
     return (
-      <div className="container-x py-20 text-center text-navy-800/50">
-        Loading cart…
-      </div>
+      <div className="container-x py-10"><PageLoadingSkeleton rows={2} /></div>
     );
   }
 
@@ -133,6 +133,7 @@ export default function CartPage() {
       <h1 className="font-display text-3xl font-bold text-navy-800 sm:text-4xl">
         Shopping Cart
       </h1>
+      <CheckoutProgress current={0} />
 
       {items.length === 0 ? (
         <div className="mt-12 flex flex-col items-center gap-5 rounded-3xl bg-navy-50 py-20 text-center">

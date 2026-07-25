@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS products (
   price            DECIMAL(10,2) NOT NULL,
   compare_at_price DECIMAL(10,2) NULL,
   image            VARCHAR(255) NOT NULL,
+  image_alt        VARCHAR(255) NULL,
   images           JSON NOT NULL,
   description      TEXT NOT NULL,
   sizes            JSON NOT NULL,

@@ -19,6 +19,7 @@
     "db:migrate:courier-locations": "node --env-file=.env.local scripts/migrate-courier-locations.mjs",
     "db:migrate:stock-movements": "node --env-file=.env.local scripts/migrate-stock-movements.mjs",
     "db:migrate:soft-delete": "node --env-file=.env.local scripts/migrate-soft-delete.mjs",
+    "db:migrate:product-seo": "node --env-file=.env.local scripts/migrate-product-seo.mjs",
     "db:seed:gen": "node --experimental-strip-types -e \"import('./src/lib/products.ts').then(m=>require('fs').writeFileSync('db/products.seed.json',JSON.stringify(m.products,null,2)))\""
   },
   "dependencies": {

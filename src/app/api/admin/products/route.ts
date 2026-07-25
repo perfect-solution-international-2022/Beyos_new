@@ -110,7 +110,7 @@ export async function GET() {
           stockStatus: r.stock_status ?? "in_stock", allowBackorder: !!r.allow_backorder,
           soldIndividually: !!r.sold_individually,
           sizes: asArray(r.sizes), colors: asArray(r.colors),
-          image: r.image, images: asArray(r.images),
+          image: r.image, imageAlt: r.image_alt ?? "", images: asArray(r.images),
           badge: r.badge, featured: !!r.featured, isPublish: !!r.is_publish,
           visibility: r.visibility ?? "public", isResellerProduct: !!r.is_reseller_product,
           paymentMethods: csv(r.payment_methods), tags: csv(r.tags),
@@ -145,6 +145,7 @@ const productTextLimits: Record<string, [string, number]> = {
   name: ["Product name", 200], shortDescription: ["Short description", 500], description: ["Description", 10000],
   sku: ["SKU", 60], sizes: ["Sizes", 500], colors: ["Colors", 500], tags: ["Tags", 500],
   metaTitle: ["Meta title", 255], metaDescription: ["Meta description", 500], metaKeywords: ["Meta keywords", 255],
+  imageAlt: ["Image alt text", 255], slug: ["URL slug", 160],
 };
 
 function productTextError(b: any, requireName: boolean): string | null {
@@ -191,7 +192,9 @@ export async function POST(request: Request) {
   const { price, compare } = pricePair(pricingSource);
   if (!name || price <= 0) return NextResponse.json({ error: "Name and a valid regular price are required" }, { status: 400 });
 
-  const slug = ((b.slug ?? "").trim() ? slugify(b.slug) : slugify(name)) + "-" + Math.random().toString(36).slice(2, 5);
+  const requestedSlug = slugify((b.slug ?? "").trim() || name);
+  const existingSlug = await query<{ id: number }>("SELECT id FROM products WHERE slug = ? LIMIT 1", [requestedSlug]);
+  const slug = existingSlug.length ? `${requestedSlug}-${Math.random().toString(36).slice(2, 5)}` : requestedSlug;
   const skuSource = b.productType === "variable" && defaultVariant ? defaultVariant.sku : b.sku;
   const sku = (skuSource ?? "").trim() || "BEY-" + Math.floor(1000 + Math.random() * 8999);
   const image = (b.image ?? "").trim() || "/images/placeholder.svg";
@@ -207,17 +210,17 @@ export async function POST(request: Request) {
       `INSERT INTO products
         (slug, sku, name, category, product_type, short_description, description, price, compare_at_price,
          production_cost, reseller_price, wholesale_price, sale_start, sale_end,
-         image, images, sizes, colors, rating, reviews, badge, featured, is_publish, visibility,
+         image, image_alt, images, sizes, colors, rating, reviews, badge, featured, is_publish, visibility,
          is_reseller_product, stock, low_stock_threshold, stock_status, allow_backorder, sold_individually,
          payment_methods, tags, weight_kg, length_cm, width_cm, height_cm, meta_title, meta_description, meta_keywords)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         slug, sku, name, category, b.productType === "variable" ? "variable" : "simple",
         (b.shortDescription ?? "").trim() || null, (b.description ?? "").trim() || "A quality Beyos garment.",
         price, compare, num(b.productionCost),
         num(b.resellerPrice), num(b.wholesalePrice),
         b.saleStart || null, b.saleEnd || null,
-        image, images, sizes, colors,
+        image, (b.imageAlt ?? "").trim() || null, images, sizes, colors,
         b.badge || null, b.featured ? 1 : 0, b.isPublish === false ? 0 : 1, b.visibility || "public",
         b.isResellerProduct === false ? 0 : 1,
         b.productType === "variable" ? variants.reduce((sum: number, variant: any) => sum + (Number(variant.stock) || 0), 0) : Number(b.stock) || 0,
@@ -264,12 +267,19 @@ export async function PATCH(request: Request) {
     productionCost: "production_cost", resellerPrice: "reseller_price", wholesalePrice: "wholesale_price",
     saleStart: "sale_start", saleEnd: "sale_end",
     lowStockThreshold: "low_stock_threshold", stockStatus: "stock_status",
-    badge: "badge", image: "image", visibility: "visibility",
+    badge: "badge", image: "image", imageAlt: "image_alt", visibility: "visibility",
     weightKg: "weight_kg", lengthCm: "length_cm", widthCm: "width_cm", heightCm: "height_cm",
     metaTitle: "meta_title", metaDescription: "meta_description", metaKeywords: "meta_keywords",
   };
   const sets: string[] = [];
   const params: unknown[] = [];
+  if (b.slug !== undefined) {
+    const nextSlug = slugify(String(b.slug));
+    if (!nextSlug) return NextResponse.json({ error: "Enter a valid URL slug" }, { status: 400 });
+    const duplicate = await query<{ id: number }>("SELECT id FROM products WHERE slug = ? AND id <> ? LIMIT 1", [nextSlug, b.id]);
+    if (duplicate.length) return NextResponse.json({ error: "That URL slug is already used by another product" }, { status: 409 });
+    sets.push("slug = ?"); params.push(nextSlug);
+  }
   for (const [key, col] of Object.entries(scalar)) {
     if (b[key] !== undefined) { sets.push(`${col} = ?`); params.push(b[key] === "" ? null : b[key]); }
   }

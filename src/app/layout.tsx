@@ -16,6 +16,8 @@ export const metadata: Metadata = {
     "Shop premium clothing, oversized T-shirts and custom apparel from Beyos Clothing with island-wide delivery across Sri Lanka.",
   keywords: ["Beyos Clothing", "Sri Lanka clothing", "oversized T-shirts", "custom clothing", "online clothing store"],
   applicationName: SITE_NAME,
+  category: "shopping",
+  manifest: "/manifest.webmanifest",
   authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
@@ -45,7 +47,9 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
-  icons: { icon: "/images/logo.png", apple: "/images/logo.png" },
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
 };
 
 export default function RootLayout({

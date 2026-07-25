@@ -3,48 +3,36 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
-import { useCart } from "@/store/cart";
 import { useWishlist } from "@/context/WishlistProvider";
 import { useAuth } from "@/context/AuthProvider";
-
-const badgeStyles: Record<string, string> = {
-  New: "bg-navy-800 text-white",
-  Sale: "bg-brand text-white",
-  Bestseller: "bg-brand-100 text-brand-700",
-};
+import { useToast } from "@/context/ToastProvider";
+import ProductBadges from "./ProductBadges";
+import QuickView from "./QuickView";
 
 export default function ProductCard({ product }: { product: Product }) {
   const router = useRouter();
-  const addItem = useCart((s) => s.addItem);
   const { has, toggle } = useWishlist();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [quickViewOpen, setQuickViewOpen] = useState(false);
+  const [heartBurst, setHeartBurst] = useState(false);
   const wished = has(product.slug);
+  const hoverImage = product.images.find((image) => image !== product.image);
 
   const onWishlist = async () => {
     if (!user) {
       router.push(`/login?redirect=/product/${product.slug}`);
       return;
     }
-    await toggle(product.slug);
-  };
-
-  const quickAdd = () => {
-    if (product.productType === "variable") {
-      router.push(`/product/${product.slug}`);
-      return;
+    const toggled = await toggle(product.slug);
+    if (toggled) {
+      setHeartBurst(true);
+      setTimeout(() => setHeartBurst(false), 450);
+      toast(wished ? "Removed from wishlist" : "Saved to wishlist", wished ? "info" : "success");
     }
-    addItem({
-      productId: product.id,
-      slug: product.slug,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      size: product.sizes[0],
-      color: product.colors[0],
-      quantity: 1,
-    });
   };
 
   return (
@@ -54,26 +42,32 @@ export default function ProductCard({ product }: { product: Product }) {
           <div className="aspect-square w-full">
             <Image
               src={product.image}
-              alt={product.name}
+              alt={product.imageAlt || product.name}
               width={1500}
               height={1500}
               sizes="(max-width: 359px) calc(100vw - 32px), (max-width: 767px) calc(50vw - 26px), (max-width: 1023px) 33vw, 25vw"
               quality={60}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className={`h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${hoverImage ? "group-hover:opacity-0" : ""}`}
             />
+            {hoverImage && (
+              <Image
+                src={hoverImage}
+                alt={`${product.name} alternate view`}
+                fill
+                sizes="(max-width: 359px) calc(100vw - 32px), (max-width: 767px) calc(50vw - 26px), (max-width: 1023px) 33vw, 25vw"
+                quality={60}
+                className="absolute inset-0 h-full w-full scale-100 object-cover opacity-0 transition-all duration-500 group-hover:scale-105 group-hover:opacity-100"
+              />
+            )}
           </div>
         </Link>
 
-        {product.badge && (
-          <span className={`badge absolute left-3 top-3 ${badgeStyles[product.badge]}`}>
-            {product.badge}
-          </span>
-        )}
+        <ProductBadges product={product} />
 
         <button
           onClick={onWishlist}
           aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
-          className="absolute right-2 top-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-110 sm:right-3 sm:top-3"
+          className={`absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:scale-110 sm:right-3 sm:top-3 ${heartBurst ? "scale-125" : ""}`}
         >
           <svg
             width="16"
@@ -90,10 +84,10 @@ export default function ProductCard({ product }: { product: Product }) {
         </button>
 
         <button
-          onClick={quickAdd}
+          onClick={() => setQuickViewOpen(true)}
           className="absolute inset-x-2 bottom-2 rounded-full bg-navy-800 py-2.5 text-xs font-semibold text-white shadow-lg transition-all duration-300 hover:bg-brand sm:inset-x-3 sm:bottom-3 lg:translate-y-4 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100"
         >
-          Quick Add
+          Quick View
         </button>
       </div>
 
@@ -120,6 +114,7 @@ export default function ProductCard({ product }: { product: Product }) {
           )}
         </div>
       </div>
+      {quickViewOpen && <QuickView product={product} onClose={() => setQuickViewOpen(false)} />}
     </div>
   );
 }
