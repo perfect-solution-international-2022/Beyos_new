@@ -231,6 +231,10 @@ body {
   .service-marquee-card {
     width: 25cqw;
   }
+
+  .service-marquee-track {
+    animation-duration: 60s;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
