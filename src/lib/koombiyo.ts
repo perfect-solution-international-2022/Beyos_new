@@ -42,6 +42,18 @@ async function postForm(path: string, fields: Record<string, string | number>) {
 export interface KoombiyoDistrict { id: number; name: string }
 export interface KoombiyoCity { id: number; name: string }
 
+function cleanLocationName(value: unknown): string {
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function locationKey(name: string): string {
+  return name.toLocaleLowerCase("en-US");
+}
+
 export async function getDistricts(): Promise<KoombiyoDistrict[]> {
   const raw = await postForm("Districts/users", {});
   const list = Array.isArray(raw) ? raw : [];
@@ -49,10 +61,10 @@ export async function getDistricts(): Promise<KoombiyoDistrict[]> {
     if (!item || typeof item !== "object") return [];
     const row = item as JsonObject;
     const id = Number(row.district_id);
-    const name = String(row.district_name || "").trim();
+    const name = cleanLocationName(row.district_name);
     return id && name ? [{ id, name }] : [];
   });
-  return [...new Map(parsed.map((item) => [item.name.toLowerCase(), item])).values()]
+  return [...new Map(parsed.map((item) => [locationKey(item.name), item])).values()]
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -63,10 +75,10 @@ export async function getCities(districtId: number): Promise<KoombiyoCity[]> {
     if (!item || typeof item !== "object") return [];
     const row = item as JsonObject;
     const id = Number(row.city_id);
-    const name = String(row.city_name || "").trim();
+    const name = cleanLocationName(row.city_name);
     return id && name && name.length <= 100 ? [{ id, name }] : [];
   });
-  return [...new Map(parsed.map((item) => [item.name.toLowerCase(), item])).values()]
+  return [...new Map(parsed.map((item) => [locationKey(item.name), item])).values()]
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 

@@ -30,6 +30,7 @@ const sections: Section[] = [
       { label: "Attributes", icon: "sliders", href: "/admin/attributes" },
       { label: "Inventory", icon: "box", children: [
         { label: "Product Stock", href: "/admin/inventory" },
+        { label: "Movement History", href: "/admin/inventory/movements" },
         { label: "Low Stock Alerts", href: "/admin/inventory/low-stock" },
       ] },
     ],

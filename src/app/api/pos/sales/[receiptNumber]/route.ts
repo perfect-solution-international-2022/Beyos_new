@@ -160,7 +160,10 @@ export async function PUT(
     amountTendered?: number;
     fulfillmentType?: "pickup" | "delivery";
     deliveryAddress?: string;
+    deliveryDistrict?: string;
+    deliveryDistrictId?: number;
     deliveryCity?: string;
+    deliveryCityId?: number;
   };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
 
@@ -170,9 +173,12 @@ export async function PUT(
   const paymentMethod = b.paymentMethod === "card" ? "card" : "cash";
   const fulfillmentType = b.fulfillmentType === "delivery" ? "delivery" : "pickup";
   const deliveryAddress = (b.deliveryAddress ?? "").trim();
+  const deliveryDistrict = (b.deliveryDistrict ?? "").trim();
+  const deliveryDistrictId = Number(b.deliveryDistrictId) || 0;
   const deliveryCity = (b.deliveryCity ?? "").trim();
-  if (fulfillmentType === "delivery" && !deliveryAddress) {
-    return NextResponse.json({ error: "Delivery address is required" }, { status: 400 });
+  const deliveryCityId = Number(b.deliveryCityId) || 0;
+  if (fulfillmentType === "delivery" && (!deliveryAddress || !deliveryDistrictId || !deliveryCityId)) {
+    return NextResponse.json({ error: "Courier district, city and delivery address are required" }, { status: 400 });
   }
 
   let conn: PoolConnection | null = null;
@@ -277,12 +283,13 @@ export async function PUT(
       `UPDATE pos_sales SET
         customer_name = ?, customer_phone = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
         total = ?, payment_method = ?, amount_tendered = ?, change_due = ?,
-        fulfillment_type = ?, delivery_address = ?, delivery_city = ?, delivery_status = ?, delivery_fee = ?
+        fulfillment_type = ?, delivery_address = ?, delivery_district = ?, delivery_district_id = ?, delivery_city = ?, delivery_city_id = ?, delivery_status = ?, delivery_fee = ?
        WHERE id = ?`,
       [
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
-        fulfillmentType, deliveryAddress || null, deliveryCity || null, deliveryStatus, deliveryFee,
+        fulfillmentType, deliveryAddress || null, deliveryDistrict || null, deliveryDistrictId || null,
+        deliveryCity || null, deliveryCityId || null, deliveryStatus, deliveryFee,
         sale.id,
       ]
     );

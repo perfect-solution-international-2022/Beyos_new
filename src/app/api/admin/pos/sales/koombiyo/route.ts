@@ -10,7 +10,9 @@ interface PosSaleRow {
   total: string;
   fulfillment_type: string | null;
   delivery_address: string | null;
+  delivery_district_id: number | null;
   delivery_city: string | null;
+  delivery_city_id: number | null;
   koombiyo_waybill_id: string | null;
 }
 
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
   try {
     const rows = await query<PosSaleRow>(
       `SELECT receipt_number, customer_name, customer_phone, total, fulfillment_type,
-              delivery_address, delivery_city, koombiyo_waybill_id
+              delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id
        FROM pos_sales WHERE receipt_number = ? LIMIT 1`,
       [body.receiptNumber]
     );
@@ -61,6 +63,8 @@ export async function POST(request: Request) {
       receiverName: sale.customer_name || "Walk-in Customer",
       receiverStreet: `${sale.delivery_address}${sale.delivery_city ? `, ${sale.delivery_city}` : ""}`,
       receiverPhone: sale.customer_phone,
+      districtId: sale.delivery_district_id ?? undefined,
+      cityId: sale.delivery_city_id ?? undefined,
       codAmount: 0,
       specialNote: body.specialNote,
     });

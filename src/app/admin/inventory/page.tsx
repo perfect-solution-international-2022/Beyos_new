@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useToast } from "@/context/ToastProvider";
 
 interface Variant {
   id: number;
@@ -30,10 +32,12 @@ const simpleKey = (productId: number): RowKey => `p:${productId}`;
 const variantKey = (variantId: number): RowKey => `v:${variantId}`;
 
 export default function AdminInventoryPage() {
+  const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [drafts, setDrafts] = useState<Record<RowKey, string>>({});
+  const [reasons, setReasons] = useState<Record<RowKey, string>>({});
   const [saving, setSaving] = useState<RowKey | "">("");
 
   useEffect(() => {
@@ -51,16 +55,22 @@ export default function AdminInventoryPage() {
   const saveSimple = async (product: Product) => {
     const key = simpleKey(product.id);
     const val = Number(drafts[key]);
-    if (Number.isNaN(val)) return;
+    if (Number.isNaN(val) || !reasons[key]?.trim()) { toast("Enter an adjustment reason", "error"); return; }
     setSaving(key);
     try {
-      await fetch("/api/admin/products", {
-        method: "PATCH",
+      const response = await fetch("/api/admin/inventory/movements", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: product.id, stock: val }),
+        body: JSON.stringify({ productId: product.id, stock: val, reason: reasons[key] }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not adjust stock");
       setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, stock: val } : p)));
       setDrafts((d) => { const n = { ...d }; delete n[key]; return n; });
+      setReasons((d) => { const n = { ...d }; delete n[key]; return n; });
+      toast("Stock adjustment saved");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not adjust stock", "error");
     } finally {
       setSaving("");
     }
@@ -69,13 +79,13 @@ export default function AdminInventoryPage() {
   const saveVariant = async (product: Product, variant: Variant) => {
     const key = variantKey(variant.id);
     const val = Number(drafts[key]);
-    if (Number.isNaN(val)) return;
+    if (Number.isNaN(val) || !reasons[key]?.trim()) { toast("Enter an adjustment reason", "error"); return; }
     setSaving(key);
     try {
-      const res = await fetch("/api/admin/products/variants", {
-        method: "PATCH",
+      const res = await fetch("/api/admin/inventory/movements", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variantId: variant.id, stock: val }),
+        body: JSON.stringify({ productId: product.id, variantId: variant.id, stock: val, reason: reasons[key] }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not update stock");
@@ -85,6 +95,10 @@ export default function AdminInventoryPage() {
         variants: p.variants.map((v) => v.id === variant.id ? { ...v, stock: val } : v),
       }));
       setDrafts((d) => { const n = { ...d }; delete n[key]; return n; });
+      setReasons((d) => { const n = { ...d }; delete n[key]; return n; });
+      toast("Stock adjustment saved");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not adjust stock", "error");
     } finally {
       setSaving("");
     }
@@ -101,7 +115,8 @@ export default function AdminInventoryPage() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-navy-800">Inventory</h1>
+        <div><h1 className="text-2xl font-bold text-navy-800">Inventory</h1><p className="mt-1 text-sm text-navy-800/50">Adjust stock with a reason for a complete audit trail.</p></div>
+        <Link href="/admin/inventory/movements" className="rounded-lg border border-navy-800/15 px-4 py-2 text-sm font-semibold text-navy-800 hover:border-brand hover:text-brand">Movement history</Link>
         {lowStock > 0 && (
           <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700">
             {lowStock} item(s) low on stock
@@ -121,7 +136,7 @@ export default function AdminInventoryPage() {
               <th className="px-6 py-4">Variation</th>
               <th className="px-6 py-4">SKU</th>
               <th className="px-6 py-4">Current Stock</th>
-              <th className="px-6 py-4">Update</th>
+              <th className="px-6 py-4">Adjustment</th>
             </tr>
           </thead>
           <tbody>
@@ -161,8 +176,9 @@ export default function AdminInventoryPage() {
                               className="w-24 rounded-lg border border-navy-800/15 px-3 py-1.5 text-sm outline-none focus:border-brand"
                               inputMode="numeric"
                             />
+                            <input value={reasons[key] ?? ""} onChange={(e) => setReasons((d) => ({ ...d, [key]: e.target.value }))} placeholder="Reason" maxLength={255} className="w-44 rounded-lg border border-navy-800/15 px-3 py-1.5 text-sm outline-none focus:border-brand" />
                             <button
-                              disabled={saving === key || drafts[key] === undefined || drafts[key] === ""}
+                              disabled={saving === key || drafts[key] === undefined || drafts[key] === "" || !reasons[key]?.trim()}
                               onClick={() => saveVariant(p, v)}
                               className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-40"
                             >
@@ -201,8 +217,9 @@ export default function AdminInventoryPage() {
                           className="w-24 rounded-lg border border-navy-800/15 px-3 py-1.5 text-sm outline-none focus:border-brand"
                           inputMode="numeric"
                         />
+                        <input value={reasons[key] ?? ""} onChange={(e) => setReasons((d) => ({ ...d, [key]: e.target.value }))} placeholder="Reason" maxLength={255} className="w-44 rounded-lg border border-navy-800/15 px-3 py-1.5 text-sm outline-none focus:border-brand" />
                         <button
-                          disabled={saving === key || drafts[key] === undefined || drafts[key] === ""}
+                          disabled={saving === key || drafts[key] === undefined || drafts[key] === "" || !reasons[key]?.trim()}
                           onClick={() => saveSimple(p)}
                           className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-40"
                         >

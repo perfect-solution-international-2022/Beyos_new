@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import HeroCarousel from "@/components/HeroCarousel";
+import ServiceHighlights from "@/components/ServiceHighlights";
 import CategoryCarousel from "@/components/CategoryCarousel";
 import ProductCard from "@/components/ProductCard";
 import SectionHeader from "@/components/SectionHeader";
@@ -73,6 +74,7 @@ export default async function HomePage() {
   return (
     <>
       <HeroCarousel slides={heroSlides} />
+      <ServiceHighlights />
 
       {/* Categories */}
       <section className="container-x mt-14">

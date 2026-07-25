@@ -49,7 +49,10 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             alt={slide.alt}
             fill
             priority={i === 0}
-            quality={72}
+            loading={i === 0 ? "eager" : "lazy"}
+            fetchPriority={i === 0 ? "high" : "low"}
+            decoding="async"
+            quality={68}
             className={`object-cover ${i === current ? "hero-kenburns" : ""}`}
             sizes="100vw"
           />

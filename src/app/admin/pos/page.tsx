@@ -50,6 +50,8 @@ interface Customer {
   city: string; district: string; province: string; postalCode: string;
 }
 
+interface CourierOption { id: number; name: string; }
+
 interface Receipt {
   receiptNumber: string;
   items: { slug?: string; variantId?: number | null; name: string; sku?: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
@@ -113,6 +115,12 @@ function AdminPosRegister() {
   const [deliveryCity, setDeliveryCity] = useState("");
   const [deliveryProvince, setDeliveryProvince] = useState("");
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
+  const [deliveryDistrictId, setDeliveryDistrictId] = useState(0);
+  const [deliveryCityId, setDeliveryCityId] = useState(0);
+  const [courierDistricts, setCourierDistricts] = useState<CourierOption[]>([]);
+  const [deliveryCities, setDeliveryCities] = useState<CourierOption[]>([]);
+  const [newCustomerDistrictId, setNewCustomerDistrictId] = useState(0);
+  const [newCustomerCities, setNewCustomerCities] = useState<CourierOption[]>([]);
   const [deliveryPostalCode, setDeliveryPostalCode] = useState("");
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -126,6 +134,17 @@ function AdminPosRegister() {
       .then((d) => setProducts((d.products ?? []).map(mapProduct)));
 
   useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    fetch("/api/locations", { cache: "no-store" }).then((r) => r.json()).then((data) => setCourierDistricts(data.districts ?? [])).catch(() => toast("Courier locations could not be loaded", "error"));
+  }, [toast]);
+
+  const loadCourierCities = async (districtId: number, target: "delivery" | "customer") => {
+    const response = await fetch(`/api/locations?districtId=${districtId}`, { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) { toast(data.error || "Cities could not be loaded", "error"); return; }
+    if (target === "delivery") setDeliveryCities(data.cities ?? []);
+    else setNewCustomerCities(data.cities ?? []);
+  };
 
   // Load an existing sale for editing (e.g. a cashier fixing a mistake) once
   // the live product catalog is available, so cart lines get real stock/sizes/colors.
@@ -197,7 +216,7 @@ function AdminPosRegister() {
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [customerSearch, customerMenuOpen, selectedCustomerId]);
 
-  const selectCustomer = (customer: Customer) => {
+  const selectCustomer = async (customer: Customer) => {
     setSelectedCustomerId(customer.id);
     setCustomerSearch(customer.name);
     setCustomerName(customer.name);
@@ -209,6 +228,15 @@ function AdminPosRegister() {
     setDeliveryPostalCode(customer.postalCode);
     setCustomerResults([]);
     setCustomerMenuOpen(false);
+    const district = courierDistricts.find((item) => item.name.toLowerCase() === customer.district.toLowerCase());
+    if (district) {
+      setDeliveryDistrictId(district.id);
+      const response = await fetch(`/api/locations?districtId=${district.id}`, { cache: "no-store" });
+      const data = await response.json();
+      const loadedCities: CourierOption[] = data.cities ?? [];
+      setDeliveryCities(loadedCities);
+      setDeliveryCityId(loadedCities.find((item) => item.name.toLowerCase() === customer.city.toLowerCase())?.id ?? 0);
+    }
   };
 
   const saveNewCustomer = async () => {
@@ -219,7 +247,7 @@ function AdminPosRegister() {
       });
       const data = await response.json();
       if (!response.ok) { toast(data.error || "Could not add customer"); return; }
-      selectCustomer(data.customer);
+      await selectCustomer(data.customer);
       setNewCustomer({ name: "", phone: "", address: "", province: "", district: "", city: "", postalCode: "" });
       setAddCustomerOpen(false);
       toast("Customer added");
@@ -359,6 +387,9 @@ function AdminPosRegister() {
     setDeliveryCity("");
     setDeliveryProvince("");
     setDeliveryDistrict("");
+    setDeliveryDistrictId(0);
+    setDeliveryCityId(0);
+    setDeliveryCities([]);
     setDeliveryPostalCode("");
     setDeliveryModalOpen(false);
   };
@@ -373,7 +404,7 @@ function AdminPosRegister() {
         body: JSON.stringify({
           items: cart.map((l) => ({ slug: l.slug, variantId: l.variantId, size: l.size, color: l.color, quantity: l.quantity })),
           customerName, customerPhone, discountAmount: discount, taxRate: rate,
-          fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryCity,
+          fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryDistrict, deliveryDistrictId, deliveryCity, deliveryCityId,
         }),
       });
       const d = await res.json();
@@ -666,9 +697,9 @@ function AdminPosRegister() {
               </DeliveryField>
               <div className="grid gap-4 sm:grid-cols-2">
                 <DeliveryField label="City">
-                  <select value={newCustomer.city} disabled={!newCustomer.district} onChange={(event) => setNewCustomer((customer) => ({ ...customer, city: event.target.value }))} className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
+                  <select value={newCustomer.city} disabled={!newCustomerDistrictId} onChange={(event) => setNewCustomer((customer) => ({ ...customer, city: event.target.value }))} className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
                     <option value="">{newCustomer.district ? "Select City" : "Select district first"}</option>
-                    {newCustomer.province && newCustomer.district && SRI_LANKA_LOCATIONS[newCustomer.province][newCustomer.district].map((city) => <option key={city} value={city}>{city}</option>)}
+                    {newCustomerCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}
                   </select>
                 </DeliveryField>
                 <DeliveryField label="Province">
@@ -678,9 +709,9 @@ function AdminPosRegister() {
                   </select>
                 </DeliveryField>
                 <DeliveryField label="District">
-                  <select value={newCustomer.district} disabled={!newCustomer.province} onChange={(event) => setNewCustomer((customer) => ({ ...customer, district: event.target.value, city: "" }))} className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
+                  <select value={newCustomerDistrictId} onChange={(event) => { const id = Number(event.target.value); const district = courierDistricts.find((item) => item.id === id); setNewCustomerDistrictId(id); setNewCustomer((customer) => ({ ...customer, district: district?.name ?? "", city: "" })); setNewCustomerCities([]); if (id) loadCourierCities(id, "customer"); }} className="delivery-input">
                     <option value="">{newCustomer.province ? "Select District" : "Select province first"}</option>
-                    {newCustomer.province && Object.keys(SRI_LANKA_LOCATIONS[newCustomer.province]).map((district) => <option key={district} value={district}>{district}</option>)}
+                    {courierDistricts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
                   </select>
                 </DeliveryField>
                 <DeliveryField label="ZIP Code">
@@ -758,27 +789,32 @@ function AdminPosRegister() {
                 </DeliveryField>
                 <DeliveryField label="District">
                   <select
-                    value={deliveryDistrict}
-                    disabled={!deliveryProvince}
+                    value={deliveryDistrictId}
                     onChange={(e) => {
-                      setDeliveryDistrict(e.target.value);
+                      const id = Number(e.target.value);
+                      const district = courierDistricts.find((item) => item.id === id);
+                      setDeliveryDistrictId(id);
+                      setDeliveryDistrict(district?.name ?? "");
                       setDeliveryCity("");
+                      setDeliveryCityId(0);
+                      setDeliveryCities([]);
+                      if (id) loadCourierCities(id, "delivery");
                     }}
                     className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f3f4f6] disabled:text-[#9ca3af]"
                   >
-                    <option value="">{deliveryProvince ? "Select District" : "Select province first"}</option>
-                    {deliveryProvince && Object.keys(SRI_LANKA_LOCATIONS[deliveryProvince]).map((district) => <option key={district} value={district}>{district}</option>)}
+                    <option value={0}>Select District</option>
+                    {courierDistricts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
                   </select>
                 </DeliveryField>
                 <DeliveryField label="City">
                   <select
-                    value={deliveryCity}
-                    disabled={!deliveryDistrict}
-                    onChange={(e) => setDeliveryCity(e.target.value)}
+                    value={deliveryCityId}
+                    disabled={!deliveryDistrictId}
+                    onChange={(e) => { const id = Number(e.target.value); setDeliveryCityId(id); setDeliveryCity(deliveryCities.find((item) => item.id === id)?.name ?? ""); }}
                     className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f3f4f6] disabled:text-[#9ca3af]"
                   >
-                    <option value="">{deliveryDistrict ? "Select City" : "Select district first"}</option>
-                    {deliveryProvince && deliveryDistrict && SRI_LANKA_LOCATIONS[deliveryProvince][deliveryDistrict].map((city) => <option key={city} value={city}>{city}</option>)}
+                    <option value={0}>{deliveryDistrictId ? "Select City" : "Select district first"}</option>
+                    {deliveryCities.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
                   </select>
                 </DeliveryField>
                 <DeliveryField label="Postal Code (Optional)">

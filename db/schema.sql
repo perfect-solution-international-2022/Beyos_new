@@ -92,7 +92,10 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_email     VARCHAR(190) NOT NULL,
   customer_phone     VARCHAR(40) NOT NULL,
   address            VARCHAR(255) NOT NULL,
+  district           VARCHAR(120) NULL,
+  district_id        INT NULL,
   city               VARCHAR(120) NOT NULL,
+  city_id             INT NULL,
   postal_code        VARCHAR(30) NULL,
   subtotal           DECIMAL(10,2) NOT NULL,
   shipping           DECIMAL(10,2) NOT NULL,
@@ -275,7 +278,10 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   status          VARCHAR(20) NOT NULL DEFAULT 'completed',
   fulfillment_type VARCHAR(20) NOT NULL DEFAULT 'pickup',
   delivery_address VARCHAR(255) NULL,
+  delivery_district VARCHAR(120) NULL,
+  delivery_district_id INT NULL,
   delivery_city    VARCHAR(120) NULL,
+  delivery_city_id INT NULL,
   delivery_status  VARCHAR(20) NULL,
   delivery_fee     DECIMAL(10,2) NOT NULL DEFAULT 0,
   inventory_reverted_at TIMESTAMP NULL,
@@ -368,6 +374,29 @@ CREATE TABLE IF NOT EXISTS wishlist_items (
   CONSTRAINT fk_wishlist_user FOREIGN KEY (user_id)
     REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_wishlist_user (user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS stock_movements (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  product_id INT NULL,
+  variant_id INT NULL,
+  product_name VARCHAR(200) NOT NULL,
+  sku VARCHAR(60) NOT NULL DEFAULT '',
+  movement_type VARCHAR(40) NOT NULL DEFAULT 'system',
+  quantity_before INT NOT NULL,
+  quantity_change INT NOT NULL,
+  quantity_after INT NOT NULL,
+  reference_type VARCHAR(40) NULL,
+  reference_id VARCHAR(80) NULL,
+  note VARCHAR(255) NULL,
+  created_by INT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_stock_movement_created (created_at),
+  INDEX idx_stock_movement_product (product_id, variant_id),
+  INDEX idx_stock_movement_reference (reference_type, reference_id),
+  CONSTRAINT fk_stock_movement_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL,
+  CONSTRAINT fk_stock_movement_variant FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL,
+  CONSTRAINT fk_stock_movement_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS order_items (

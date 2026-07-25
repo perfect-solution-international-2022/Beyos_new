@@ -35,11 +35,41 @@ export default function CheckoutPage() {
     email: "",
     phone: "",
     address: "",
+    district: "",
+    districtId: 0,
     city: "",
+    cityId: 0,
     postalCode: "",
   });
+  const [districts, setDistricts] = useState<{ id: number; name: string }[]>([]);
+  const [cities, setCities] = useState<{ id: number; name: string }[]>([]);
+  const [locationsError, setLocationsError] = useState("");
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/locations", { cache: "no-store" }).then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setDistricts(data.districts ?? []);
+    }).catch(() => setLocationsError("Delivery locations could not be loaded. Please refresh and try again."));
+  }, [user]);
+
+  const selectDistrict = async (value: string) => {
+    const districtId = Number(value);
+    const district = districts.find((item) => item.id === districtId);
+    setForm((current) => ({ ...current, district: district?.name ?? "", districtId, city: "", cityId: 0 }));
+    setCities([]);
+    setLocationsError("");
+    if (!districtId) return;
+    try {
+      const response = await fetch(`/api/locations?districtId=${districtId}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setCities(data.cities ?? []);
+    } catch { setLocationsError("Cities could not be loaded. Please select the district again."); }
+  };
 
   // A mixed cart can use a payment method only when every product allows it.
   // Load the live product settings so persisted carts also follow admin changes.
@@ -332,16 +362,20 @@ export default function CheckoutPage() {
               />
             </div>
             <div>
+              <label className="mb-1.5 block text-sm font-medium text-navy-800">District</label>
+              <select required value={form.districtId} onChange={(event) => selectDistrict(event.target.value)} className="input">
+                <option value={0}>Select district</option>
+                {districts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
+              </select>
+            </div>
+            <div>
               <label className="mb-1.5 block text-sm font-medium text-navy-800">
                 City
               </label>
-              <input
-                required
-                value={form.city}
-                onChange={update("city")}
-                className="input"
-                placeholder="City"
-              />
+              <select required disabled={!form.districtId} value={form.cityId} onChange={(event) => { const cityId = Number(event.target.value); const city = cities.find((item) => item.id === cityId); setForm((current) => ({ ...current, city: city?.name ?? "", cityId })); }} className="input disabled:cursor-not-allowed disabled:opacity-60">
+                <option value={0}>{form.districtId ? "Select city" : "Select district first"}</option>
+                {cities.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
+              </select>
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-navy-800">
@@ -355,6 +389,7 @@ export default function CheckoutPage() {
               />
             </div>
           </div>
+          {locationsError && <p className="mt-3 text-sm text-red-600">{locationsError}</p>}
 
           <h2 className="mt-10 text-lg font-bold text-navy-800">Payment</h2>
           <div className="mt-4 space-y-3">

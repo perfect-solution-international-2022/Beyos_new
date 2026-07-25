@@ -19,7 +19,10 @@ export interface CustomerInfo {
   email: string;
   phone: string;
   address: string;
+  district: string;
+  districtId: number;
   city: string;
+  cityId: number;
   postalCode: string;
 }
 
@@ -133,9 +136,9 @@ export async function createPendingOrder(opts: {
     const [orderResult] = await conn.execute(
       `INSERT INTO orders
         (order_ref, user_id, customer_name, customer_email, customer_phone,
-         address, city, postal_code, subtotal, shipping, total, status,
+         address, district, district_id, city, city_id, postal_code, subtotal, shipping, total, status,
          payment_method, payment_status, promo_code, discount)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,'unpaid',?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,'unpaid',?,?)`,
       [
         orderRef,
         opts.userId,
@@ -143,7 +146,10 @@ export async function createPendingOrder(opts: {
         opts.customer.email,
         opts.customer.phone || "",
         opts.customer.address,
+        opts.customer.district,
+        opts.customer.districtId,
         opts.customer.city || "",
+        opts.customer.cityId,
         opts.customer.postalCode || null,
         opts.subtotal,
         opts.shipping,

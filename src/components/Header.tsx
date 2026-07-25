@@ -81,8 +81,10 @@ export default function Header() {
           <Image
             src="/images/logo.png"
             alt="Beyos Clothing"
-            width={140}
-            height={140}
+            width={56}
+            height={56}
+            sizes="56px"
+            quality={60}
             className="h-14 w-14 object-contain"
             priority
           />
@@ -257,7 +259,7 @@ export default function Header() {
           <nav className="absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col bg-white shadow-2xl" aria-label="Mobile navigation">
             <div className="flex h-20 items-center justify-between border-b border-navy-800/10 px-5">
               <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
-                <Image src="/images/logo.png" alt="Beyos Clothing" width={48} height={48} className="h-12 w-12 object-contain" />
+                <Image src="/images/logo.png" alt="Beyos Clothing" width={48} height={48} sizes="48px" quality={60} className="h-12 w-12 object-contain" />
                 <span className="text-lg font-bold text-navy-800">Beyos <span className="text-brand">Clothing</span></span>
               </Link>
               <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" title="Close menu" className="flex h-10 w-10 items-center justify-center rounded-lg text-navy-800 hover:bg-navy-50">

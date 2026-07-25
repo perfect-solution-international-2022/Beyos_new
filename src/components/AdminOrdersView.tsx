@@ -68,6 +68,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
   const [typeFilter, setTypeFilter] = useState("all");
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [saving, setSaving] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const pendingOnly = view === "pending";
 
   const load = () => {
@@ -136,6 +137,28 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
       toast(`Marked ${o.orderRef} as paid`);
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : "Could not update payment", "error");
+    } finally {
+      setSaving("");
+    }
+  };
+
+  const deletePendingOrder = async () => {
+    if (!deleteTarget) return;
+    const order = deleteTarget;
+    setSaving(order.orderRef + ":delete");
+    try {
+      const response = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: order.type, orderRef: order.orderRef }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not delete order");
+      setOrders((current) => current.filter((item) => item.orderRef !== order.orderRef));
+      setDeleteTarget(null);
+      toast(`Deleted ${order.orderRef}`);
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not delete order", "error");
     } finally {
       setSaving("");
     }
@@ -295,14 +318,19 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link
-                      href={`/admin/orders/${encodeURIComponent(o.orderRef)}`}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                        pendingOnly ? "bg-brand text-white hover:bg-brand/90" : "bg-navy-50 text-navy-800 hover:bg-navy-100"
-                      }`}
-                    >
-                      {pendingOnly ? "Review order" : "View details"}
-                    </Link>
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/admin/orders/${encodeURIComponent(o.orderRef)}`}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${pendingOnly ? "bg-brand text-white hover:bg-brand/90" : "bg-navy-50 text-navy-800 hover:bg-navy-100"}`}
+                      >
+                        {pendingOnly ? "Review order" : "View details"}
+                      </Link>
+                      {pendingOnly && (
+                        <button type="button" onClick={() => setDeleteTarget(o)} title="Delete pending order" aria-label={`Delete ${o.orderRef}`} className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50">
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -310,6 +338,16 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
           </tbody>
         </table>
       </div>
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/55 p-4" onClick={() => setDeleteTarget(null)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-order-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></div>
+            <h2 id="delete-order-title" className="mt-4 text-lg font-bold text-navy-800">Delete pending order?</h2>
+            <p className="mt-2 text-sm leading-6 text-navy-800/60">Order <strong>#{deleteTarget.orderRef}</strong> will be permanently deleted. Reserved stock will be returned where applicable.</p>
+            <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg border border-navy-800/15 px-4 py-2 text-sm font-semibold text-navy-800">Cancel</button><button type="button" disabled={saving === deleteTarget.orderRef + ":delete"} onClick={deletePendingOrder} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">{saving === deleteTarget.orderRef + ":delete" ? "Deleting..." : "Delete order"}</button></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

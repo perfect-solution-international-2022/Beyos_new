@@ -271,3 +271,84 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Could not update order" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  const admin = await requireAdminSection("sales");
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  let body: { type?: string; orderRef?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+  if (!body.orderRef || !["customer", "reseller", "pos"].includes(body.type || "")) {
+    return NextResponse.json({ error: "Order type and reference are required" }, { status: 400 });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    if (body.type === "customer") {
+      const [rows] = await conn.execute(
+        "SELECT id, status, koombiyo_status FROM orders WHERE order_ref = ? LIMIT 1 FOR UPDATE",
+        [body.orderRef]
+      );
+      const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
+      if (!order) throw new Error("Order not found");
+      if (order.status !== "pending") throw new Error("Only pending orders can be deleted");
+      if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
+      await conn.execute("DELETE FROM orders WHERE id = ?", [order.id]);
+    } else if (body.type === "reseller") {
+      const [rows] = await conn.execute(
+        "SELECT id, status, koombiyo_status FROM reseller_orders WHERE order_ref = ? LIMIT 1 FOR UPDATE",
+        [body.orderRef]
+      );
+      const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
+      if (!order) throw new Error("Order not found");
+      if (order.status !== "pending") throw new Error("Only pending orders can be deleted");
+      if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
+      const [items] = await conn.execute(
+        "SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?",
+        [order.id]
+      );
+      for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
+        if (item.variant_id) {
+          await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+        } else if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+        else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+      }
+      await conn.execute("DELETE FROM reseller_orders WHERE id = ?", [order.id]);
+    } else {
+      const [rows] = await conn.execute(
+        `SELECT id, fulfillment_type, delivery_status, koombiyo_status
+         FROM pos_sales WHERE receipt_number = ? LIMIT 1 FOR UPDATE`,
+        [body.orderRef]
+      );
+      const order = (rows as { id: number; fulfillment_type: string; delivery_status: string | null; koombiyo_status: string | null }[])[0];
+      if (!order) throw new Error("Order not found");
+      if (order.fulfillment_type !== "delivery" || order.delivery_status !== "pending") throw new Error("Only pending POS delivery orders can be deleted");
+      if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
+      const [items] = await conn.execute("SELECT product_slug, variant_id, quantity FROM pos_sale_items WHERE sale_id = ?", [order.id]);
+      for (const item of items as { product_slug: string; variant_id: number | null; quantity: number }[]) {
+        if (item.variant_id) {
+          await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+          await conn.execute("UPDATE products p JOIN product_variants v ON v.product_id = p.id SET p.stock = p.stock + ? WHERE v.id = ?", [item.quantity, item.variant_id]);
+        } else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+      }
+      await conn.execute("DELETE FROM pos_sales WHERE id = ?", [order.id]);
+    }
+
+    await conn.commit();
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    const message = error instanceof Error ? error.message : "Could not delete order";
+    const status = message === "Order not found" ? 404 : message.startsWith("Only") || message.includes("cannot") ? 409 : 500;
+    console.error("admin pending order DELETE error:", error);
+    return NextResponse.json({ error: message }, { status });
+  } finally {
+    conn.release();
+  }
+}

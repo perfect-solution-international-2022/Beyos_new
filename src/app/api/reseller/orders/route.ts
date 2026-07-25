@@ -88,6 +88,11 @@ export async function POST(request: Request) {
     );
     const settings = (settingRows as { allow_price_override: number; min_markup_pct: string; max_markup_pct: string | null; credit_limit: string; email: string; phone: string }[])[0];
     if (!settings) throw new OrderValidationError("Your reseller account is not active");
+    const orderRef = makeRef("ORD");
+    await conn.query(
+      "SET @stock_movement_type = 'reseller_order', @stock_reference_type = 'reseller_order', @stock_reference_id = ?",
+      [orderRef]
+    );
 
     const lineItems: Array<{
       slug: string; productId: number; variantId: number | null; variantSummary: string | null;
@@ -165,7 +170,6 @@ export async function POST(request: Request) {
     const amount = subtotal + deliveryFee;
     const cost = merchandiseCost + deliveryFee;
     const profit = subtotal - merchandiseCost;
-    const orderRef = makeRef("ORD");
     const fullAddress = [customer.addressLine1, customer.addressLine2, customer.city, customer.district, customer.province, customer.postalCode].filter(Boolean).join(", ");
     const [result] = await conn.execute(
       `INSERT INTO reseller_orders
@@ -218,5 +222,10 @@ export async function POST(request: Request) {
     if (error instanceof OrderValidationError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("reseller order POST error:", error);
     return NextResponse.json({ error: "Could not create order" }, { status: 500 });
-  } finally { conn?.release(); }
+  } finally {
+    if (conn) {
+      await conn.query("SET @stock_movement_type = NULL, @stock_reference_type = NULL, @stock_reference_id = NULL").catch(() => {});
+      conn.release();
+    }
+  }
 }

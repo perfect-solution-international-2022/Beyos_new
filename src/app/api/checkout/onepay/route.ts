@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const { customer, items, promoCode } = payload;
 
-  if (!customer?.name || !customer?.email || !customer?.address || !customer?.phone) {
+  if (!customer?.name || !customer?.email || !customer?.address || !customer?.phone || !customer?.districtId || !customer?.cityId) {
     return NextResponse.json(
       { error: "Missing required customer details" },
       { status: 400 }

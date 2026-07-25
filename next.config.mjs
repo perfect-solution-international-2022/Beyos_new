@@ -32,6 +32,7 @@ const nextConfig = {
   images: {
     remotePatterns: [],
     formats: ["image/avif", "image/webp"],
+    qualities: [60, 68, 75],
     minimumCacheTTL: 31536000,
   },
   async headers() {

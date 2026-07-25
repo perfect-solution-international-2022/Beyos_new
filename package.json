@@ -16,6 +16,8 @@
     "db:migrate:product-variants": "node --env-file=.env.local scripts/migrate-product-variants.mjs",
     "db:migrate:pos-customers": "node --env-file=.env.local scripts/migrate-pos-customers.mjs",
     "db:migrate:expenses": "node --env-file=.env.local scripts/migrate-expenses.mjs",
+    "db:migrate:courier-locations": "node --env-file=.env.local scripts/migrate-courier-locations.mjs",
+    "db:migrate:stock-movements": "node --env-file=.env.local scripts/migrate-stock-movements.mjs",
     "db:seed:gen": "node --experimental-strip-types -e \"import('./src/lib/products.ts').then(m=>require('fs').writeFileSync('db/products.seed.json',JSON.stringify(m.products,null,2)))\""
   },
   "dependencies": {
