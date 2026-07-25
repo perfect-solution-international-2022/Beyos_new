@@ -21,7 +21,7 @@ export async function GET(
     created_at: string;
   }>(
     `SELECT order_ref, status, payment_method, payment_status, total, created_at
-     FROM orders WHERE order_ref = ? AND user_id = ? LIMIT 1`,
+     FROM orders WHERE order_ref = ? AND user_id = ? AND deleted_at IS NULL LIMIT 1`,
     [ref, user.id]
   );
 

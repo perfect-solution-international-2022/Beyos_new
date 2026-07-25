@@ -15,7 +15,7 @@ const sections: Section[] = [
   {
     title: "Overview",
     section: "sales",
-    items: [{ label: "Dashboard", icon: "grid", href: "/admin" }],
+    items: [{ label: "Dashboard", icon: "grid", href: "/admin" }, { label: "Trash", icon: "folder", href: "/admin/trash" }],
   },
   {
     title: "Catalog",

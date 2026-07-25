@@ -11,7 +11,7 @@ export async function GET(
 
   const { ref } = await params;
 
-  const buyerRows = await query<any>(`SELECT * FROM orders WHERE order_ref = ? LIMIT 1`, [ref]);
+  const buyerRows = await query<any>(`SELECT * FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [ref]);
   if (buyerRows[0]) {
     const o = buyerRows[0];
     const items = await query<any>(`SELECT * FROM order_items WHERE order_id = ?`, [o.id]);
@@ -47,7 +47,7 @@ export async function GET(
   const resellerRows = await query<any>(
     `SELECT ro.*, u.name AS reseller_name, u.email AS reseller_email
      FROM reseller_orders ro JOIN users u ON u.id = ro.reseller_id
-     WHERE ro.order_ref = ? LIMIT 1`,
+     WHERE ro.order_ref = ? AND ro.deleted_at IS NULL LIMIT 1`,
     [ref]
   );
   if (resellerRows[0]) {

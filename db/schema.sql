@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
   district      VARCHAR(120) NULL,
   province      VARCHAR(120) NULL,
   postal_code   VARCHAR(30)  NULL,
+  deleted_at    TIMESTAMP NULL,
   created_at    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS products (
   badge            VARCHAR(30) NULL,
   featured         TINYINT(1) NOT NULL DEFAULT 0,
   stock            INT NOT NULL DEFAULT 0,
+  deleted_at       TIMESTAMP NULL,
   created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_category (category),
   INDEX idx_featured (featured)
@@ -109,6 +111,7 @@ CREATE TABLE IF NOT EXISTS orders (
   koombiyo_status     VARCHAR(100) NULL,
   koombiyo_response   JSON NULL,
   koombiyo_updated_at TIMESTAMP NULL,
+  deleted_at         TIMESTAMP NULL,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_user FOREIGN KEY (user_id)
     REFERENCES users(id) ON DELETE SET NULL,
@@ -184,6 +187,7 @@ CREATE TABLE IF NOT EXISTS reseller_orders (
   koombiyo_updated_at TIMESTAMP NULL,
   inventory_reverted_at TIMESTAMP NULL,
   wallet_credited_at TIMESTAMP NULL,
+  deleted_at     TIMESTAMP NULL,
   created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_rorder_user FOREIGN KEY (reseller_id)
     REFERENCES users(id) ON DELETE CASCADE,
@@ -289,6 +293,7 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   koombiyo_status     VARCHAR(100) NULL,
   koombiyo_response   JSON NULL,
   koombiyo_updated_at TIMESTAMP NULL,
+  deleted_at      TIMESTAMP NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_possale_shift FOREIGN KEY (shift_id) REFERENCES pos_shifts(id) ON DELETE CASCADE,
   CONSTRAINT fk_possale_cashier FOREIGN KEY (cashier_id) REFERENCES pos_cashiers(id) ON DELETE CASCADE,

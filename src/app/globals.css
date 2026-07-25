@@ -5,6 +5,10 @@
 :root {
   --font-sans: "Inter", system-ui, sans-serif;
   --font-display: "Playfair Display", Georgia, serif;
+  --color-theme-ink: #0f2540;
+  --color-theme-accent: #f5851f;
+  --color-theme-action: #a94700;
+  --color-theme-surface: #f7f8fa;
 }
 
 html {
@@ -13,6 +17,15 @@ html {
 
 body {
   @apply bg-white text-navy-800 antialiased;
+}
+
+::selection {
+  background: rgb(245 133 31 / 24%);
+  color: var(--color-theme-ink);
+}
+
+:focus-visible {
+  outline-color: var(--color-theme-accent);
 }
 
 @layer components {
@@ -25,7 +38,7 @@ body {
   }
 
   .btn-primary {
-    @apply btn bg-brand text-white hover:bg-brand-600 active:scale-[0.98] shadow-sm hover:shadow-md;
+    @apply btn bg-[#a94700] text-white hover:bg-[#843800] active:scale-[0.98] shadow-sm hover:shadow-md;
   }
 
   .btn-dark {

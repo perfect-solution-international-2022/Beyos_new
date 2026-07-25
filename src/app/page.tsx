@@ -107,7 +107,7 @@ export default async function HomePage() {
       <section className="container-x mt-20">
         <div className="grid overflow-hidden rounded-3xl bg-navy-50 lg:grid-cols-2">
           <div className="flex flex-col justify-center p-6 sm:p-14">
-            <p className="text-sm font-semibold uppercase tracking-wider text-brand">
+            <p className="text-sm font-semibold uppercase tracking-wider text-[#a94700]">
               Custom Clothing
             </p>
             <h2 className="mt-2 font-display text-3xl font-bold text-navy-800 sm:text-4xl">
@@ -156,7 +156,7 @@ export default async function HomePage() {
               <h3 className="mt-4 text-base font-bold text-navy-800">
                 {f.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-navy-800/60">
+              <p className="mt-2 text-sm leading-relaxed text-navy-800/70">
                 {f.desc}
               </p>
             </div>
@@ -170,7 +170,7 @@ export default async function HomePage() {
           eyebrow="Testimonials"
           title="What People Are Saying"
         />
-        <p className="-mt-4 mb-8 text-navy-800/60">
+        <p className="-mt-4 mb-8 text-navy-800/70">
           Trusted by more than 15,000+ customers and businesses.
         </p>
         <div className="grid gap-5 lg:grid-cols-3">
@@ -195,7 +195,7 @@ export default async function HomePage() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-navy-800">{t.name}</p>
-                  <p className="text-xs text-navy-800/50">{t.role}</p>
+                  <p className="text-xs text-navy-800/75">{t.role}</p>
                 </div>
               </figcaption>
             </figure>

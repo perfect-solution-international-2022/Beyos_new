@@ -46,7 +46,7 @@ export function verifyPassword(
 
 export async function createSession(userId: number): Promise<void> {
   const rows = await query<Pick<DbUser, "role" | "admin_role" | "reseller_status" | "account_status" | "session_version">>(
-    "SELECT role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? LIMIT 1",
+    "SELECT role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
     [userId]
   );
   if (!rows[0]) throw new Error("Cannot create a session for an unknown user");
@@ -90,7 +90,7 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   const uid = await getSessionUserId();
   if (!uid) return null;
   const rows = await query<DbUser>(
-    "SELECT id, name, email, role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? LIMIT 1",
+    "SELECT id, name, email, role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
     [uid]
   );
   if (rows.length === 0) return null;
@@ -111,5 +111,5 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
 }
 
 export function findUserByEmail(email: string): Promise<DbUser[]> {
-  return query<DbUser>("SELECT * FROM users WHERE email = ? LIMIT 1", [email]);
+  return query<DbUser>("SELECT * FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1", [email]);
 }

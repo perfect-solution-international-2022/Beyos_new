@@ -32,7 +32,7 @@ export async function GET() {
       `SELECT id, slug, sku, name, category, price, reseller_price, wholesale_price,
               compare_at_price, image, description, rating, reviews, stock, product_type, weight_kg
        FROM products
-       WHERE is_reseller_product = 1 AND is_publish = 1 AND reseller_price IS NOT NULL
+       WHERE deleted_at IS NULL AND is_reseller_product = 1 AND is_publish = 1 AND reseller_price IS NOT NULL
        ORDER BY name ASC`
       ),
       query<{ id: number; product_id: number; sku: string; attribute_summary: string; price: string; sale_price: string | null; reseller_price: string | null; wholesale_price: string | null; stock: number; image: string | null; is_default: number; weight_kg: string | null }>(

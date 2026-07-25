@@ -7,7 +7,7 @@ const highlights = [
 
 export default function ServiceHighlights() {
   return (
-    <section className="border-y border-navy-800/10 bg-[#f7f7f6]" aria-label="Store services">
+    <section className="mx-3 mt-3 overflow-hidden rounded-2xl border border-navy-800/10 bg-[#f7f7f6] sm:mx-4 lg:mx-6" aria-label="Store services">
       <div className="container-x overflow-x-auto no-scrollbar">
         <div className="flex min-w-max py-5 sm:py-6 lg:grid lg:min-w-0 lg:grid-cols-4">
           {highlights.map((item, index) => (

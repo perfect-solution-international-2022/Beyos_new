@@ -37,7 +37,7 @@ export async function GET() {
     const orders = await query<OrderRow>(
       `SELECT id, order_ref, subtotal, shipping, total, status, customer_phone,
               koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
-       FROM orders WHERE user_id = ? ORDER BY created_at DESC`,
+       FROM orders WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`,
       [user.id]
     );
 

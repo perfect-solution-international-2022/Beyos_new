@@ -23,7 +23,7 @@ export default function MobileBottomNav() {
       <Link
         href="/"
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
-          isActive("/") ? "text-brand" : "text-navy-800/60"
+          isActive("/") ? "text-[#a94700]" : "text-navy-800/75"
         }`}
       >
         <HomeIcon />
@@ -33,7 +33,7 @@ export default function MobileBottomNav() {
       <Link
         href="/shop"
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
-          isActive("/shop") ? "text-brand" : "text-navy-800/60"
+          isActive("/shop") ? "text-[#a94700]" : "text-navy-800/75"
         }`}
       >
         <ShopIcon />
@@ -42,7 +42,7 @@ export default function MobileBottomNav() {
 
       <button
         onClick={openCart}
-        className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium text-navy-800/60"
+        className="relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium text-navy-800/75"
       >
         <span className="relative">
           <BagIcon />
@@ -59,8 +59,8 @@ export default function MobileBottomNav() {
         href={user ? "/dashboard" : "/login"}
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
           isActive("/dashboard") || isActive("/login")
-            ? "text-brand"
-            : "text-navy-800/60"
+            ? "text-[#a94700]"
+            : "text-navy-800/75"
         }`}
       >
         <UserIcon />

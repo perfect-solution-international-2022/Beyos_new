@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const role = searchParams.get("role");
 
   try {
-    const conditions: string[] = [];
+    const conditions: string[] = ["deleted_at IS NULL"];
     const params: unknown[] = [];
     if (role && role !== "all") {
       conditions.push("role = ?");
@@ -118,7 +118,7 @@ export async function DELETE(request: Request) {
   if (!b.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   if (Number(b.id) === admin.id) return NextResponse.json({ error: "You cannot delete your own account" }, { status: 400 });
   try {
-    await query("DELETE FROM users WHERE id = ?", [b.id]);
+    await query("UPDATE users SET deleted_at = NOW(), account_status = 'disabled', session_version = session_version + 1 WHERE id = ? AND deleted_at IS NULL", [b.id]);
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin users DELETE error:", err);

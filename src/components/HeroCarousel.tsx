@@ -32,7 +32,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   return (
     <section
-      className={`relative mx-3 mt-3 h-[56vh] min-h-[420px] overflow-hidden rounded-3xl bg-navy-900 sm:mx-0 sm:mt-0 sm:h-[70vh] sm:min-h-[520px] sm:rounded-none ${paused ? "hero-paused" : ""}`}
+      className={`relative mx-3 mt-3 h-[56vh] min-h-[420px] overflow-hidden rounded-2xl bg-navy-900 sm:mx-4 sm:h-[70vh] sm:min-h-[520px] lg:mx-6 ${paused ? "hero-paused" : ""}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -53,7 +53,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             fetchPriority={i === 0 ? "high" : "low"}
             decoding="async"
             quality={68}
-            className={`object-cover ${i === current ? "hero-kenburns" : ""}`}
+            className="object-cover"
             sizes="100vw"
           />
         </div>
@@ -65,16 +65,16 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
       <div className="container-x relative flex h-full items-center">
         <div className="max-w-xl">
-          <span className="badge animate-fade-up bg-brand text-white">
+          <span className="badge bg-[#a94700] text-white">
             {content.eyebrow}
           </span>
-          <h1 className="animate-fade-up mt-4 font-display text-5xl font-bold leading-tight text-white [animation-delay:100ms] sm:text-6xl md:text-7xl">
+          <h1 className="mt-4 font-display text-5xl font-bold leading-tight text-white sm:text-6xl md:text-7xl">
             Style Is <span className="italic text-brand">Forever</span>
           </h1>
-          <p className="animate-fade-up mt-4 text-base text-white/80 [animation-delay:200ms] sm:text-lg">
+          <p className="mt-4 text-base text-white/80 sm:text-lg">
             {content.subtitle}
           </p>
-          <div className="animate-fade-up mt-8 flex gap-4 [animation-delay:300ms]">
+          <div className="mt-8 flex gap-4">
             <Link href={content.href} className="btn-primary">
               {content.cta}
             </Link>
@@ -105,23 +105,11 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       </div>
 
       <style jsx>{`
-        :global(.hero-kenburns) {
-          animation: heroKenburns 7s linear forwards;
-        }
         .hero-progress {
           animation: heroProgress ${SLIDE_MS}ms linear forwards;
         }
-        .hero-paused :global(.hero-kenburns),
         .hero-paused .hero-progress {
           animation-play-state: paused;
-        }
-        @keyframes heroKenburns {
-          from {
-            transform: scale(1);
-          }
-          to {
-            transform: scale(1.08);
-          }
         }
         @keyframes heroProgress {
           from {

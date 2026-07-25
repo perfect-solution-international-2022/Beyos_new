@@ -82,7 +82,7 @@ export async function GET() {
   const admin = await requireAdminAnySection(["catalog", "pos"]);
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
-    const rows = await query<any>(`SELECT * FROM products ORDER BY created_at DESC, id DESC`);
+    const rows = await query<any>(`SELECT * FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC`);
     const variants = await query<any>(`SELECT * FROM product_variants ORDER BY id ASC`);
     const links = await query<any>(`SELECT * FROM product_links`);
     const vByP = new Map<number, any[]>();
@@ -338,7 +338,7 @@ export async function DELETE(request: Request) {
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
   if (!b.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   try {
-    await query("DELETE FROM products WHERE id = ?", [b.id]);
+    await query("UPDATE products SET deleted_at = NOW(), is_publish = 0 WHERE id = ? AND deleted_at IS NULL", [b.id]);
     revalidatePath("/");
     revalidatePath("/shop");
     return NextResponse.json({ ok: true });

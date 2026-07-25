@@ -104,7 +104,7 @@ export default function AdminProductsPage() {
   const filtered = useMemo(() => products.filter((p) => !search || `${p.sku} ${p.name}`.toLowerCase().includes(search.toLowerCase())), [products, search]);
 
   const del = async (p: Product) => {
-    const ok = await confirm({ title: "Delete product?", message: `Permanently delete “${p.name}”? This cannot be undone.`, confirmText: "Delete", danger: true });
+    const ok = await confirm({ title: "Archive product?", message: `Move “${p.name}” to Trash? You can restore it later.`, confirmText: "Archive", danger: true });
     if (!ok) return;
     setProducts((prev) => prev.filter((x) => x.id !== p.id));
     await fetch("/api/admin/products", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: p.id }) });

@@ -256,8 +256,8 @@ export default function Header() {
       {menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="Close menu" className="absolute inset-0 bg-navy-900/45 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
-          <nav className="absolute inset-y-0 left-0 flex w-[86%] max-w-sm flex-col bg-white shadow-2xl" aria-label="Mobile navigation">
-            <div className="flex h-20 items-center justify-between border-b border-navy-800/10 px-5">
+          <nav className="absolute inset-y-0 left-0 flex h-[100dvh] w-[86%] max-w-sm flex-col overflow-hidden bg-white shadow-2xl" aria-label="Mobile navigation">
+            <div className="flex h-20 shrink-0 items-center justify-between border-b border-navy-800/10 px-5">
               <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
                 <Image src="/images/logo.png" alt="Beyos Clothing" width={48} height={48} sizes="48px" quality={60} className="h-12 w-12 object-contain" />
                 <span className="text-lg font-bold text-navy-800">Beyos <span className="text-brand">Clothing</span></span>
@@ -282,7 +282,7 @@ export default function Header() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4">
               {nav.map((item, index) => (
                 <Link key={item.label} href={item.href} onClick={() => setMenuOpen(false)} className={`flex items-center justify-between border-b border-navy-800/5 px-3 py-4 text-base font-semibold transition ${pathname === item.href ? "text-brand" : "text-navy-800 hover:text-brand"}`}>
                   <span>{item.label}</span>
@@ -294,7 +294,7 @@ export default function Header() {
               </Link>
             </div>
 
-            <div className="border-t border-navy-800/10 px-5 py-4">
+            <div className="shrink-0 border-t border-navy-800/10 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
               <a href="tel:+94743191200" className="block text-sm font-semibold text-navy-800">Hotline: +94 74 319 1200</a>
               {mounted && user && <button type="button" onClick={async () => { await logout(); setMenuOpen(false); }} className="mt-3 text-sm font-semibold text-red-600">Sign out</button>}
             </div>

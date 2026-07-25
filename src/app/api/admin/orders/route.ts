@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     }>(
       `SELECT order_ref, customer_name, customer_phone, total, status, payment_method, payment_status,
               payment_ref, koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
-       FROM orders ORDER BY created_at DESC`
+       FROM orders WHERE deleted_at IS NULL ORDER BY created_at DESC`
     );
     const reseller = await query<{
       order_ref: string;
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     }>(
       `SELECT order_ref, customer_name, customer_phone, amount, status, payment_status,
               koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
-       FROM reseller_orders ORDER BY created_at DESC`
+       FROM reseller_orders WHERE deleted_at IS NULL ORDER BY created_at DESC`
     );
     const pos = await query<{
       receipt_number: string;
@@ -68,6 +68,7 @@ export async function GET(request: Request) {
               c.name AS cashier_name, s.created_at
        FROM pos_sales s
        JOIN pos_cashiers c ON c.id = s.cashier_id
+       WHERE s.deleted_at IS NULL
        ORDER BY s.created_at DESC`
     );
 
@@ -299,7 +300,7 @@ export async function DELETE(request: Request) {
       if (!order) throw new Error("Order not found");
       if (order.status !== "pending") throw new Error("Only pending orders can be deleted");
       if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
-      await conn.execute("DELETE FROM orders WHERE id = ?", [order.id]);
+      await conn.execute("UPDATE orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
     } else if (body.type === "reseller") {
       const [rows] = await conn.execute(
         "SELECT id, status, koombiyo_status FROM reseller_orders WHERE order_ref = ? LIMIT 1 FOR UPDATE",
@@ -319,7 +320,7 @@ export async function DELETE(request: Request) {
         } else if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
         else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
       }
-      await conn.execute("DELETE FROM reseller_orders WHERE id = ?", [order.id]);
+      await conn.execute("UPDATE reseller_orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
     } else {
       const [rows] = await conn.execute(
         `SELECT id, fulfillment_type, delivery_status, koombiyo_status
@@ -337,7 +338,7 @@ export async function DELETE(request: Request) {
           await conn.execute("UPDATE products p JOIN product_variants v ON v.product_id = p.id SET p.stock = p.stock + ? WHERE v.id = ?", [item.quantity, item.variant_id]);
         } else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
       }
-      await conn.execute("DELETE FROM pos_sales WHERE id = ?", [order.id]);
+      await conn.execute("UPDATE pos_sales SET deleted_at = NOW() WHERE id = ?", [order.id]);
     }
 
     await conn.commit();

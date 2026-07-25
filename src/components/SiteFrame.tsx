@@ -5,6 +5,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import CartDrawer from "./CartDrawer";
 import MobileBottomNav from "./MobileBottomNav";
+import WhatsAppButton from "./WhatsAppButton";
 
 // Storefront chrome (header/footer/cart) — hidden inside the /dashboard portal,
 // which supplies its own sidebar + topbar layout.
@@ -24,6 +25,7 @@ export default function SiteFrame({ children }: { children: React.ReactNode }) {
       <Footer />
       <CartDrawer />
       <MobileBottomNav />
+      <WhatsAppButton />
     </>
   );
 }

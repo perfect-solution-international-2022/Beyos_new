@@ -143,7 +143,7 @@ export async function POST(request: Request) {
 
     for (const line of b.items) {
       const [rows] = await conn.execute(
-        "SELECT id, slug, sku, name, price, stock, weight_kg FROM products WHERE slug = ? LIMIT 1 FOR UPDATE",
+        "SELECT id, slug, sku, name, price, stock, weight_kg FROM products WHERE slug = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [line.slug]
       );
       const product = (rows as any[])[0];

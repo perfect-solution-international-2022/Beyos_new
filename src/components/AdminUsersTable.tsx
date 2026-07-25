@@ -160,9 +160,9 @@ export default function AdminUsersTable({
 
   const del = async (u: AdminUser) => {
     const ok = await confirm({
-      title: "Delete user?",
-      message: `Permanently delete ${u.name} (${u.email})? This cannot be undone.`,
-      confirmText: "Delete",
+      title: "Archive user?",
+      message: `Move ${u.name} (${u.email}) to Trash? You can restore this account later.`,
+      confirmText: "Archive",
       danger: true,
     });
     if (!ok) return;
@@ -171,11 +171,11 @@ export default function AdminUsersTable({
         method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: u.id }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not delete user");
+      if (!response.ok) throw new Error(data.error || "Could not archive user");
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
-      toast(`Deleted ${u.name}`);
+      toast(`Archived ${u.name}`);
     } catch (error) {
-      toast(error instanceof Error ? error.message : "Could not delete user", "error");
+      toast(error instanceof Error ? error.message : "Could not archive user", "error");
     }
   };
 
@@ -461,7 +461,7 @@ function UserDetailModal({
             {user.accountStatus !== "disabled" && <button type="button" disabled={saving} onClick={() => onChangeAccountStatus("disabled")} className="rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Disable</button>}
           </div>
         </div>
-        <div className="border-t border-red-100 px-5 py-4 text-right sm:px-7"><button type="button" onClick={onDelete} className="text-sm font-semibold text-red-600 hover:underline">Delete user permanently</button></div>
+        <div className="border-t border-red-100 px-5 py-4 text-right sm:px-7"><button type="button" onClick={onDelete} className="text-sm font-semibold text-red-600 hover:underline">Archive user</button></div>
       </div>
     </div>
   );

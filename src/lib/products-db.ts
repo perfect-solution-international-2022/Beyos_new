@@ -89,7 +89,7 @@ const mapVariant = (row: VariantRow): ProductVariant => ({
 });
 
 // Only products the admin has published and made public are visible to buyers.
-const STOREFRONT_WHERE = "visibility = 'public' AND is_publish = 1";
+const STOREFRONT_WHERE = "deleted_at IS NULL AND visibility = 'public' AND is_publish = 1";
 const SELECT_FIELDS = `id, slug, sku, name, category, price, compare_at_price, image, images,
        description, sizes, colors, rating, reviews, badge, featured, stock, product_type, weight_kg, wholesale_price,
        payment_methods`;
