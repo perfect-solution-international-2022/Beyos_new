@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAllProducts } from "@/lib/products-db";
 import { SITE_URL } from "@/lib/site";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();

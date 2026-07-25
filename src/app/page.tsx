@@ -36,10 +36,8 @@ export const metadata: Metadata = {
   },
 };
 
-// Featured products come from MySQL (admin-managed). ISR keeps the page
-// cached and fast, while admin writes call revalidatePath("/") for instant
-// updates — a 60s revalidate is just the safety-net upper bound.
-export const revalidate = 60;
+// Product, category and hero data are database-managed and must be read at request time.
+export const dynamic = "force-dynamic";
 
 const features = [
   {
