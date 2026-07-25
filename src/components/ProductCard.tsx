@@ -51,12 +51,12 @@ export default function ProductCard({ product }: { product: Product }) {
     <div className="group flex flex-col">
       <div className="relative overflow-hidden rounded-2xl bg-navy-50">
         <Link href={`/product/${product.slug}`} className="block">
-          <div className="aspect-[4/5] w-full">
+          <div className="aspect-square w-full">
             <Image
               src={product.image}
               alt={product.name}
-              width={400}
-              height={500}
+              width={1500}
+              height={1500}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
@@ -38,7 +38,24 @@ export default function ProductDetail({ product }: { product: Product }) {
   const [color, setColor] = useState(product.colors[0]);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(defaultVariant?.image || product.images[0] || product.image);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
   const [added, setAdded] = useState(false);
+
+  useEffect(() => {
+    if (!imageViewerOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImageViewerOpen(false);
+    };
+
+    document.addEventListener("keydown", closeOnEscape);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow = "";
+    };
+  }, [imageViewerOpen]);
 
   const addItem = useCart((s) => s.addItem);
   const selectedVariant = variants.find(
@@ -103,14 +120,21 @@ export default function ProductDetail({ product }: { product: Product }) {
         )}
         <div className="relative flex-1 overflow-hidden rounded-3xl bg-navy-50">
           <div className="aspect-[4/5] w-full">
-            <Image
-              src={activeImage}
-              alt={product.name}
-              width={640}
-              height={800}
-              className="h-full w-full object-cover"
-              priority
-            />
+            <button
+              type="button"
+              onClick={() => setImageViewerOpen(true)}
+              className="block h-full w-full cursor-zoom-in"
+              aria-label={`View ${product.name} image full screen`}
+            >
+              <Image
+                src={activeImage}
+                alt={product.name}
+                width={640}
+                height={800}
+                className="h-full w-full object-cover"
+                priority
+              />
+            </button>
           </div>
           {product.badge && (
             <span className="badge absolute left-4 top-4 bg-brand text-white">
@@ -282,6 +306,38 @@ export default function ProductDetail({ product }: { product: Product }) {
           </li>
         </ul>
       </div>
+
+      {imageViewerOpen && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4 sm:p-8"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${product.name} image viewer`}
+          onClick={() => setImageViewerOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setImageViewerOpen(false)}
+            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white text-2xl text-navy-800 shadow-lg transition hover:bg-navy-50"
+            aria-label="Close image viewer"
+          >
+            ×
+          </button>
+          <div
+            className="relative h-full w-full max-w-6xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Image
+              src={activeImage}
+              alt={product.name}
+              fill
+              sizes="100vw"
+              className="object-contain"
+              priority
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
