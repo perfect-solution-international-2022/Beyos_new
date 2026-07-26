@@ -684,15 +684,38 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
                 <section className="border-t border-[#e5e7eb] pt-8">
                   <h3 className="mb-5 text-[15px] font-semibold text-[#374151]">Others</h3>
-                  <label className="flex cursor-pointer items-center gap-3">
-                    <input
-                      type="checkbox"
-                      checked={form.isResellerProduct}
-                      onChange={(event) => set("isResellerProduct")(event.target.checked)}
-                      className="h-5 w-5 rounded border-[#d1d5db] text-brand focus:ring-brand"
-                    />
-                    <span className="text-sm text-[#374151]">Reseller Order</span>
-                  </label>
+                  <div className="space-y-4">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[#e5e7eb] p-4 transition hover:border-brand/40">
+                      <input
+                        type="checkbox"
+                        checked={form.visibility === "pos_only"}
+                        onChange={(event) => setForm((current) => ({
+                          ...current,
+                          visibility: event.target.checked ? "pos_only" : "public",
+                          isResellerProduct: event.target.checked ? false : current.isResellerProduct,
+                        }))}
+                        className="mt-0.5 h-5 w-5 rounded border-[#d1d5db] text-brand focus:ring-brand"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-[#374151]">POS only</span>
+                        <span className="mt-1 block text-xs leading-5 text-[#6b7280]">Show this product only in the POS register. It will be hidden from the online shop and reseller ordering.</span>
+                      </span>
+                    </label>
+
+                    <label className={`flex items-start gap-3 rounded-lg border border-[#e5e7eb] p-4 transition ${form.visibility === "pos_only" ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-brand/40"}`}>
+                      <input
+                        type="checkbox"
+                        checked={form.isResellerProduct}
+                        disabled={form.visibility === "pos_only"}
+                        onChange={(event) => set("isResellerProduct")(event.target.checked)}
+                        className="mt-0.5 h-5 w-5 rounded border-[#d1d5db] text-brand focus:ring-brand"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-[#374151]">Reseller Order</span>
+                        <span className="mt-1 block text-xs text-[#6b7280]">Allow approved resellers to include this product in delivery orders.</span>
+                      </span>
+                    </label>
+                  </div>
                 </section>
               </div>
             )}

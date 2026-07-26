@@ -209,6 +209,10 @@ function productTextError(b: any, requireName: boolean): string | null {
   return null;
 }
 
+function productVisibility(value: unknown): "public" | "pos_only" {
+  return value === "pos_only" ? "pos_only" : "public";
+}
+
 export async function POST(request: Request) {
   const admin = await requireAdminSection("catalog");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -267,8 +271,8 @@ export async function POST(request: Request) {
         num(b.resellerPrice), num(b.wholesalePrice),
         b.saleStart || null, b.saleEnd || null,
         image, (b.imageAlt ?? "").trim() || null, images, sizes, colors,
-        b.badge || null, b.featured ? 1 : 0, b.isPublish === false ? 0 : 1, b.visibility || "public",
-        b.isResellerProduct === false ? 0 : 1,
+        b.badge || null, b.featured ? 1 : 0, b.isPublish === false ? 0 : 1, productVisibility(b.visibility),
+        productVisibility(b.visibility) === "pos_only" ? 0 : (b.isResellerProduct === false ? 0 : 1),
         b.productType === "variable" ? variants.reduce((sum: number, variant: any) => sum + (Number(variant.stock) || 0), 0) : Number(b.stock) || 0,
         Number(b.lowStockThreshold) || 10,
         b.stockStatus || "in_stock", b.allowBackorder ? 1 : 0, b.soldIndividually ? 1 : 0,
@@ -327,7 +331,10 @@ export async function PATCH(request: Request) {
     sets.push("slug = ?"); params.push(nextSlug);
   }
   for (const [key, col] of Object.entries(scalar)) {
-    if (b[key] !== undefined) { sets.push(`${col} = ?`); params.push(b[key] === "" ? null : b[key]); }
+    if (b[key] !== undefined) {
+      sets.push(`${col} = ?`);
+      params.push(key === "visibility" ? productVisibility(b[key]) : (b[key] === "" ? null : b[key]));
+    }
   }
   // Variable products' total stock and SKU are derived from their
   // variations, never trusted from the client's (hidden, stale) top-level
@@ -362,7 +369,7 @@ export async function PATCH(request: Request) {
     allowBackorder: "allow_backorder", soldIndividually: "sold_individually",
   };
   for (const [key, col] of Object.entries(bools)) {
-    if (b[key] !== undefined) { sets.push(`${col} = ?`); params.push(b[key] ? 1 : 0); }
+    if (b[key] !== undefined) { sets.push(`${col} = ?`); params.push(key === "isResellerProduct" && productVisibility(b.visibility) === "pos_only" ? 0 : (b[key] ? 1 : 0)); }
   }
   if (b.sizes !== undefined) { sets.push("sizes = ?"); params.push(JSON.stringify(csv(b.sizes))); }
   if (b.colors !== undefined) { sets.push("colors = ?"); params.push(JSON.stringify(csv(b.colors))); }

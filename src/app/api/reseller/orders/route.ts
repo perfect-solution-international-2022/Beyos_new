@@ -112,7 +112,8 @@ export async function POST(request: Request) {
       const [productRows] = await conn.execute(
         `SELECT id, slug, sku, name, price, reseller_price, wholesale_price,
                 stock, product_type, allow_backorder, weight_kg FROM products
-         WHERE slug = ? AND deleted_at IS NULL AND is_reseller_product = 1 AND is_publish = 1 LIMIT 1 FOR UPDATE`, [item.slug]
+         WHERE slug = ? AND deleted_at IS NULL AND visibility = 'public'
+           AND is_reseller_product = 1 AND is_publish = 1 LIMIT 1 FOR UPDATE`, [item.slug]
       );
       const product = (productRows as any[])[0];
       if (!product) throw new OrderValidationError(`Unknown product: ${item.slug}`);
