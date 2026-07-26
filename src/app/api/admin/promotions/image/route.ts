@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
 
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
       "UPDATE promotions SET image_data = ?, image_mime = ? WHERE id = ?",
       [Buffer.from(bytes), image.type, promotionId]
     );
+    revalidatePath("/");
     return NextResponse.json({
       ok: true,
       imageUrl: `/api/promotions/${promotionId}/image?v=${Date.now()}`,
@@ -65,5 +67,6 @@ export async function DELETE(request: Request) {
   if (!Number.isInteger(promotionId) || promotionId <= 0)
     return NextResponse.json({ error: "Invalid promotion" }, { status: 400 });
   await query("UPDATE promotions SET image_data = NULL, image_mime = NULL WHERE id = ?", [promotionId]);
+  revalidatePath("/");
   return NextResponse.json({ ok: true });
 }

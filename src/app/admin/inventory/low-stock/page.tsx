@@ -37,7 +37,7 @@ export default function LowStockPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/products", { cache: "no-store" })
+    fetch("/api/admin/products?view=inventory", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setProducts(d.products ?? []))
       .finally(() => setLoading(false));

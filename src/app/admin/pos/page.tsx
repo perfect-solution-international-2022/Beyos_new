@@ -129,7 +129,7 @@ function AdminPosRegister() {
   const [loadingEdit, setLoadingEdit] = useState(Boolean(editReceipt));
 
   const loadProducts = () =>
-    fetch("/api/admin/products", { cache: "no-store" })
+    fetch("/api/admin/products?view=pos", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setProducts((d.products ?? []).map(mapProduct)));
 

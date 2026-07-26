@@ -76,15 +76,61 @@ async function saveLinks(productId: number, links: any[]) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   // POS needs the live product catalog to run the register, so cashiers
   // (who only have "pos" access) can read it even though they can't edit it.
   const admin = await requireAdminAnySection(["catalog", "pos"]);
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
-    const rows = await query<any>(`SELECT * FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC`);
-    const variants = await query<any>(`SELECT * FROM product_variants ORDER BY id ASC`);
-    const links = await query<any>(`SELECT * FROM product_links`);
+    const view = new URL(request.url).searchParams.get("view");
+    const compact = view === "pos" || view === "inventory";
+
+    if (compact) {
+      const [rows, variants] = await Promise.all([
+        query<any>(`SELECT id, slug, sku, name, category, price, stock, low_stock_threshold,
+                           image, sizes, colors, weight_kg, product_type
+                    FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC`),
+        query<any>(`SELECT id, product_id, sku, attribute_summary, price, stock, low_stock_threshold
+                    FROM product_variants ORDER BY id ASC`),
+      ]);
+      const vByP = new Map<number, any[]>();
+      for (const variant of variants) {
+        const list = vByP.get(variant.product_id) ?? [];
+        list.push({
+          id: variant.id,
+          sku: variant.sku,
+          attributeSummary: variant.attribute_summary,
+          price: Number(variant.price),
+          stock: Number(variant.stock),
+          lowStockThreshold: Number(variant.low_stock_threshold) || 10,
+        });
+        vByP.set(variant.product_id, list);
+      }
+      return NextResponse.json({
+        products: rows.map((row) => ({
+          id: row.id,
+          slug: row.slug,
+          sku: row.sku,
+          name: row.name,
+          category: row.category,
+          price: Number(row.price),
+          stock: Number(row.stock),
+          lowStockThreshold: Number(row.low_stock_threshold) || 10,
+          image: row.image,
+          sizes: asArray(row.sizes),
+          colors: asArray(row.colors),
+          weightKg: num(row.weight_kg),
+          productType: row.product_type ?? "simple",
+          variants: vByP.get(row.id) ?? [],
+        })),
+      });
+    }
+
+    const [rows, variants, links] = await Promise.all([
+      query<any>(`SELECT * FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC`),
+      query<any>(`SELECT * FROM product_variants ORDER BY id ASC`),
+      query<any>(`SELECT * FROM product_links`),
+    ]);
     const vByP = new Map<number, any[]>();
     for (const v of variants) { (vByP.get(v.product_id) ?? vByP.set(v.product_id, []).get(v.product_id))!.push(v); }
     const lByP = new Map<number, any[]>();

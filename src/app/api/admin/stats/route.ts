@@ -7,59 +7,56 @@ export async function GET() {
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    // Revenue combines buyer orders (total) and reseller orders (amount).
-    const [buyerAgg] = await query<{
-      count: number;
-      daily: string | null;
-      monthly: string | null;
-    }>(
-      `SELECT COUNT(*) AS count,
-              COALESCE(SUM(CASE WHEN DATE(created_at)=CURDATE() THEN total ELSE 0 END),0) AS daily,
-              COALESCE(SUM(CASE WHEN YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE()) THEN total ELSE 0 END),0) AS monthly
-       FROM orders`
-    );
-    const [resellerAgg] = await query<{
-      count: number;
-      daily: string | null;
-      monthly: string | null;
-    }>(
-      `SELECT COUNT(*) AS count,
-              COALESCE(SUM(CASE WHEN DATE(created_at)=CURDATE() THEN amount ELSE 0 END),0) AS daily,
-              COALESCE(SUM(CASE WHEN YEAR(created_at)=YEAR(CURDATE()) AND MONTH(created_at)=MONTH(CURDATE()) THEN amount ELSE 0 END),0) AS monthly
-       FROM reseller_orders`
-    );
-    const [cust] = await query<{ count: number }>(
-      "SELECT COUNT(*) AS count FROM users WHERE role = 'buyer'"
-    );
-    const [[pendingBuyer], [pendingReseller], [pendingUsers], [lowProducts], [lowVariants]] = await Promise.all([
-      query<{ count: number }>("SELECT COUNT(*) AS count FROM orders WHERE status = 'pending'"),
-      query<{ count: number }>("SELECT COUNT(*) AS count FROM reseller_orders WHERE status = 'pending'"),
-      query<{ count: number }>("SELECT COUNT(*) AS count FROM users WHERE role = 'reseller' AND reseller_status = 'pending'"),
-      query<{ count: number }>("SELECT COUNT(*) AS count FROM products WHERE product_type <> 'variable' AND stock <= low_stock_threshold AND is_publish = 1"),
-      query<{ count: number }>("SELECT COUNT(*) AS count FROM product_variants WHERE stock <= low_stock_threshold"),
+    // Three parallel round trips replace the former ten sequential dashboard
+    // queries while preserving the same figures.
+    const [[revenue], [counts], weeklyRows] = await Promise.all([
+      query<{ count: number; daily: string | null; monthly: string | null }>(
+        `SELECT COUNT(*) AS count,
+                COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() THEN amount ELSE 0 END), 0) AS daily,
+                COALESCE(SUM(CASE WHEN YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END), 0) AS monthly
+         FROM (
+           SELECT created_at, total AS amount FROM orders
+           UNION ALL
+           SELECT created_at, amount FROM reseller_orders
+         ) combined_orders`
+      ),
+      query<{
+        customers: number;
+        pending_orders: number;
+        pending_resellers: number;
+        low_stock: number;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM users WHERE role = 'buyer') AS customers,
+           (SELECT COUNT(*) FROM orders WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM reseller_orders WHERE status = 'pending') AS pending_orders,
+           (SELECT COUNT(*) FROM users WHERE role = 'reseller' AND reseller_status = 'pending') AS pending_resellers,
+           (SELECT COUNT(*) FROM products WHERE product_type <> 'variable' AND stock <= low_stock_threshold AND is_publish = 1) +
+             (SELECT COUNT(*) FROM product_variants WHERE stock <= low_stock_threshold) AS low_stock`
+      ),
+      query<{ dow: number; c: number }>(
+        `SELECT dow, SUM(c) AS c FROM (
+           SELECT DAYOFWEEK(created_at) AS dow, COUNT(*) AS c FROM orders
+           WHERE YEARWEEK(created_at, 0) = YEARWEEK(CURDATE(), 0) GROUP BY dow
+           UNION ALL
+           SELECT DAYOFWEEK(created_at) AS dow, COUNT(*) AS c FROM reseller_orders
+           WHERE YEARWEEK(created_at, 0) = YEARWEEK(CURDATE(), 0) GROUP BY dow
+         ) weekly GROUP BY dow`
+      ),
     ]);
 
-    // Weekly order counts (this week, Sun–Sat) from both tables.
-    const weekBuyer = await query<{ dow: number; c: number }>(
-      `SELECT DAYOFWEEK(created_at) AS dow, COUNT(*) AS c FROM orders
-       WHERE YEARWEEK(created_at, 0) = YEARWEEK(CURDATE(), 0) GROUP BY dow`
-    );
-    const weekReseller = await query<{ dow: number; c: number }>(
-      `SELECT DAYOFWEEK(created_at) AS dow, COUNT(*) AS c FROM reseller_orders
-       WHERE YEARWEEK(created_at, 0) = YEARWEEK(CURDATE(), 0) GROUP BY dow`
-    );
     const week = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
-    for (const r of [...weekBuyer, ...weekReseller]) week[Number(r.dow) - 1] += Number(r.c);
+    for (const row of weeklyRows) week[Number(row.dow) - 1] = Number(row.c);
 
     return NextResponse.json({
       stats: {
-        dailyRevenue: Number(buyerAgg.daily) + Number(resellerAgg.daily),
-        totalOrders: Number(buyerAgg.count) + Number(resellerAgg.count),
-        totalCustomers: Number(cust.count),
-        monthlyRevenue: Number(buyerAgg.monthly) + Number(resellerAgg.monthly),
-        pendingOrders: Number(pendingBuyer.count) + Number(pendingReseller.count),
-        pendingResellers: Number(pendingUsers.count),
-        lowStockItems: Number(lowProducts.count) + Number(lowVariants.count),
+        dailyRevenue: Number(revenue.daily),
+        totalOrders: Number(revenue.count),
+        totalCustomers: Number(counts.customers),
+        monthlyRevenue: Number(revenue.monthly),
+        pendingOrders: Number(counts.pending_orders),
+        pendingResellers: Number(counts.pending_resellers),
+        lowStockItems: Number(counts.low_stock),
       },
       weeklyOrders: week,
     });

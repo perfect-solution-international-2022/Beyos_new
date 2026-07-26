@@ -139,9 +139,40 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 
 export async function getFeaturedProducts(): Promise<Product[]> {
   const rows = await query<ProductRow>(
-    `SELECT ${SELECT_FIELDS} FROM products WHERE featured = 1 AND ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`
+    `SELECT ${SELECT_FIELDS} FROM products WHERE featured = 1 AND ${STOREFRONT_WHERE}
+     ORDER BY created_at DESC, id DESC LIMIT 8`
   );
   return rows.map(mapRow);
+}
+
+export interface ProductSearchSuggestion {
+  id: string;
+  slug: string;
+  name: string;
+  price: number;
+  image: string;
+}
+
+export async function getProductSearchSuggestions(
+  search: string,
+  resellerOnly = false,
+  limit = 5
+): Promise<ProductSearchSuggestion[]> {
+  const where = resellerOnly ? `${STOREFRONT_WHERE} AND is_reseller_product = 1` : STOREFRONT_WHERE;
+  const term = `%${search.trim().slice(0, 100)}%`;
+  const rows = await query<{ id: number; slug: string; name: string; price: string; image: string }>(
+    `SELECT id, slug, name, price, image FROM products
+     WHERE ${where} AND (name LIKE ? OR sku LIKE ? OR category LIKE ?)
+     ORDER BY featured DESC, created_at DESC, id DESC LIMIT ?`,
+    [term, term, term, Math.max(1, Math.min(10, limit))]
+  );
+  return rows.map((row) => ({
+    id: String(row.id),
+    slug: row.slug,
+    name: row.name,
+    price: Number(row.price),
+    image: row.image,
+  }));
 }
 
 export async function getNewArrivalProducts(limit = 8): Promise<Product[]> {

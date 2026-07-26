@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/store/cart";
 import { useAuth } from "@/context/AuthProvider";
-import { Product } from "@/lib/types";
+import type { ProductSearchSuggestion } from "@/lib/products-db";
 import { formatPrice } from "@/lib/utils";
 
 const nav = [
@@ -24,7 +24,7 @@ export default function Header() {
   const [accountOpen, setAccountOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [suggestions, setSuggestions] = useState<ProductSearchSuggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -400,7 +400,7 @@ function BagIcon() {
   );
 }
 
-function SearchSuggestions({ query, open, loading, products, onSelect }: { query: string; open: boolean; loading: boolean; products: Product[]; onSelect: () => void }) {
+function SearchSuggestions({ query, open, loading, products, onSelect }: { query: string; open: boolean; loading: boolean; products: ProductSearchSuggestion[]; onSelect: () => void }) {
   if (!open) return null;
   return (
     <div className="absolute inset-x-0 top-[calc(100%+0.4rem)] z-50 overflow-hidden rounded-lg border border-navy-800/10 bg-white shadow-2xl">

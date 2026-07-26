@@ -16,13 +16,16 @@ export const pool =
     waitForConnections: true,
     connectionLimit: 20,
     queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
     namedPlaceholders: true,
     dateStrings: true,
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.beyosPool = pool;
-}
+// Next.js route bundles can evaluate this module independently. Keep one pool
+// per Node process in production too, avoiding needless connections and TLS/
+// socket setup while moving between storefront and admin APIs.
+globalForDb.beyosPool = pool;
 
 export async function query<T = any>(
   sql: string,

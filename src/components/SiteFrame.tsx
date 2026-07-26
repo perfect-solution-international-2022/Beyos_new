@@ -1,11 +1,13 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import Header from "./Header";
 import Footer from "./Footer";
-import CartDrawer from "./CartDrawer";
 import MobileBottomNav from "./MobileBottomNav";
 import WhatsAppButton from "./WhatsAppButton";
+
+const CartDrawer = dynamic(() => import("./CartDrawer"), { ssr: false });
 
 // Storefront chrome (header/footer/cart) — hidden inside the /dashboard portal,
 // which supplies its own sidebar + topbar layout.

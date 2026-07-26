@@ -41,8 +41,10 @@ export const metadata: Metadata = {
   },
 };
 
-// Product, category and hero data are database-managed and must be read at request time.
-export const dynamic = "force-dynamic";
+// Cache the storefront HTML for fast repeat requests. Admin catalog, category,
+// hero and promotion writes call revalidatePath("/") so changes still appear
+// immediately; this one-minute window is only a safety net.
+export const revalidate = 60;
 
 const features = [
   {

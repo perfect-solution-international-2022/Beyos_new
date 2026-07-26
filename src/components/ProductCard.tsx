@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Product } from "@/lib/types";
@@ -10,7 +11,8 @@ import { useWishlist } from "@/context/WishlistProvider";
 import { useAuth } from "@/context/AuthProvider";
 import { useToast } from "@/context/ToastProvider";
 import ProductBadges from "./ProductBadges";
-import QuickView from "./QuickView";
+
+const QuickView = dynamic(() => import("./QuickView"), { ssr: false });
 
 export default function ProductCard({ product }: { product: Product }) {
   const router = useRouter();

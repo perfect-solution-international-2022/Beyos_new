@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { query } from "@/lib/db";
 import { requireAdminSection } from "@/lib/admin";
 
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
         b.isActive === false ? 0 : 1,
       ]
     );
+    revalidatePath("/");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin promotions POST error:", err);
@@ -124,6 +126,7 @@ export async function PATCH(request: Request) {
         b.id,
       ]
     );
+    revalidatePath("/");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin promotions PATCH error:", err);
@@ -139,6 +142,7 @@ export async function DELETE(request: Request) {
   if (!b.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   try {
     await query("DELETE FROM promotions WHERE id = ?", [b.id]);
+    revalidatePath("/");
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("admin promotions DELETE error:", err);

@@ -46,6 +46,10 @@ const nextConfig = {
         source: "/:path(login|register|forgot-password|reset-password|checkout|cart)/:slug*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
       },
+      {
+        source: "/images/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
     ];
   },
 };

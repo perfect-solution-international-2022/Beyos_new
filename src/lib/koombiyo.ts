@@ -42,6 +42,12 @@ async function postForm(path: string, fields: Record<string, string | number>) {
 export interface KoombiyoDistrict { id: number; name: string }
 export interface KoombiyoCity { id: number; name: string }
 
+const LOCATION_CACHE_MS = 6 * 60 * 60 * 1000;
+let districtCache: { expiresAt: number; value: KoombiyoDistrict[] } | null = null;
+let districtRequest: Promise<KoombiyoDistrict[]> | null = null;
+const cityCache = new Map<number, { expiresAt: number; value: KoombiyoCity[] }>();
+const cityRequests = new Map<number, Promise<KoombiyoCity[]>>();
+
 function cleanLocationName(value: unknown): string {
   return String(value || "")
     .normalize("NFKC")
@@ -55,31 +61,60 @@ function locationKey(name: string): string {
 }
 
 export async function getDistricts(): Promise<KoombiyoDistrict[]> {
-  const raw = await postForm("Districts/users", {});
-  const list = Array.isArray(raw) ? raw : [];
-  const parsed = list.flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const row = item as JsonObject;
-    const id = Number(row.district_id);
-    const name = cleanLocationName(row.district_name);
-    return id && name ? [{ id, name }] : [];
-  });
-  return [...new Map(parsed.map((item) => [locationKey(item.name), item])).values()]
-    .sort((a, b) => a.name.localeCompare(b.name));
+  if (districtCache && districtCache.expiresAt > Date.now()) return districtCache.value;
+  if (districtRequest) return districtRequest;
+
+  districtRequest = (async () => {
+    const raw = await postForm("Districts/users", {});
+    const list = Array.isArray(raw) ? raw : [];
+    const parsed = list.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as JsonObject;
+      const id = Number(row.district_id);
+      const name = cleanLocationName(row.district_name);
+      return id && name ? [{ id, name }] : [];
+    });
+    const value = [...new Map(parsed.map((item) => [locationKey(item.name), item])).values()]
+      .sort((a, b) => a.name.localeCompare(b.name));
+    districtCache = { value, expiresAt: Date.now() + LOCATION_CACHE_MS };
+    return value;
+  })();
+
+  try {
+    return await districtRequest;
+  } finally {
+    districtRequest = null;
+  }
 }
 
 export async function getCities(districtId: number): Promise<KoombiyoCity[]> {
-  const raw = await postForm("Cities/users", { district_id: districtId });
-  const list = Array.isArray(raw) ? raw : [];
-  const parsed = list.flatMap((item) => {
-    if (!item || typeof item !== "object") return [];
-    const row = item as JsonObject;
-    const id = Number(row.city_id);
-    const name = cleanLocationName(row.city_name);
-    return id && name && name.length <= 100 ? [{ id, name }] : [];
-  });
-  return [...new Map(parsed.map((item) => [locationKey(item.name), item])).values()]
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const cached = cityCache.get(districtId);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = cityRequests.get(districtId);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const raw = await postForm("Cities/users", { district_id: districtId });
+    const list = Array.isArray(raw) ? raw : [];
+    const parsed = list.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as JsonObject;
+      const id = Number(row.city_id);
+      const name = cleanLocationName(row.city_name);
+      return id && name && name.length <= 100 ? [{ id, name }] : [];
+    });
+    const value = [...new Map(parsed.map((item) => [locationKey(item.name), item])).values()]
+      .sort((a, b) => a.name.localeCompare(b.name));
+    cityCache.set(districtId, { value, expiresAt: Date.now() + LOCATION_CACHE_MS });
+    return value;
+  })();
+  cityRequests.set(districtId, request);
+
+  try {
+    return await request;
+  } finally {
+    cityRequests.delete(districtId);
+  }
 }
 
 function findWaybill(value: unknown): string | null {

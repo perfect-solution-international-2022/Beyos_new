@@ -41,7 +41,7 @@ export default function AdminInventoryPage() {
   const [saving, setSaving] = useState<RowKey | "">("");
 
   useEffect(() => {
-    fetch("/api/admin/products", { cache: "no-store" })
+    fetch("/api/admin/products?view=inventory", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setProducts(d.products ?? []))
       .finally(() => setLoading(false));

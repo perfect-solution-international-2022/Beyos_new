@@ -276,6 +276,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <Link
                               key={c.href}
                               href={c.href}
+                              prefetch={false}
+                              onMouseEnter={() => router.prefetch(c.href)}
+                              onFocus={() => router.prefetch(c.href)}
                               className={`block rounded-lg px-3 py-2 text-[13px] transition ${
                                 isActive(c.href)
                                   ? "bg-brand/15 font-semibold text-brand"
@@ -292,6 +295,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <Link
                       key={item.label}
                       href={item.href!}
+                      prefetch={false}
+                      onMouseEnter={() => router.prefetch(item.href!)}
+                      onFocus={() => router.prefetch(item.href!)}
                       className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                         isActive(item.href!)
                           ? "bg-brand text-white shadow-lg shadow-brand/25"
