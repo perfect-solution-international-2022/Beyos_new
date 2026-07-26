@@ -152,7 +152,7 @@ export default async function HomePage() {
       {/* Categories */}
       <section className="container-x mt-20 sm:mt-24">
         <div className="flex items-end justify-between gap-4">
-          <div><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#a94700]">Find your style</p><h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy-800 sm:text-5xl">Shop by collection</h2></div>
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.22em] text-brand-600">Find your style</p><h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-navy-800 sm:text-5xl">Shop by collection</h2></div>
           <Link href="/shop" className="shrink-0 pt-1 text-sm font-semibold text-navy-800 transition hover:text-brand">
             View all <span aria-hidden="true">→</span>
           </Link>
@@ -163,7 +163,7 @@ export default async function HomePage() {
       {activePromotion && <LimitedOffer promotion={activePromotion} />}
 
       {/* Featured products */}
-      <section className="mt-20 bg-[#f5f3ef] py-16 sm:mt-24 sm:py-24">
+      <section className="mt-20 bg-[#f2f5f8] py-16 sm:mt-24 sm:py-24">
         <div className="container-x">
         <SectionHeader
           eyebrow="Explore Beyos"
@@ -188,14 +188,14 @@ export default async function HomePage() {
 
       {/* Custom printing banner */}
       <section className="container-x mt-20 sm:mt-28">
-        <div className="grid overflow-hidden rounded-[28px] bg-[#091b2f] text-white lg:grid-cols-[.9fr_1.1fr]">
+        <div className="premium-dark glass-edge grid overflow-hidden rounded-[28px] bg-navy-900 text-white ring-1 ring-white/10 lg:grid-cols-[.9fr_1.1fr]">
           <div className="relative min-h-[380px] lg:order-1 lg:min-h-[560px]">
             <Image src="/images/about/Woman_about.jpeg" alt="Beyos clothing craftsmanship and style" fill sizes="(max-width: 1023px) 100vw, 55vw" className="object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-navy-900/40 to-transparent" />
           </div>
           <div className="flex flex-col justify-center p-7 sm:p-14 lg:p-16">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand">Made for your story</p>
-            <h2 className="mt-3 font-display text-4xl font-bold leading-tight sm:text-5xl">More than clothing.<br/><span className="italic text-brand">A way to show up.</span></h2>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-brand-400">Made for your story</p>
+            <h2 className="mt-3 font-display text-4xl font-bold leading-tight sm:text-5xl">More than clothing.<br/><span className="italic text-brand-400">A way to show up.</span></h2>
             <p className="mt-5 max-w-lg leading-7 text-white/65">
               From single pieces to team orders, bring your ideas to life with
               custom sizes, styles and prints. No die & plate charges, low
@@ -216,11 +216,11 @@ export default async function HomePage() {
           eyebrow="Why Beyos"
           title="Why Customize With Us"
         />
-        <div className="grid overflow-hidden rounded-3xl border border-navy-800/10 bg-white sm:grid-cols-2 lg:grid-cols-4">
+        <div className="premium-panel glass-edge grid overflow-hidden rounded-3xl bg-white/55 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((f) => (
             <div
               key={f.title}
-              className="border-b border-navy-800/10 p-6 transition hover:bg-brand-50/40 sm:p-8 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0"
+              className="relative border-b border-white/70 bg-gradient-to-br from-white/55 to-navy-50/45 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,.9)] transition hover:bg-white/80 sm:p-8 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand">
                 <FeatureIcon name={f.icon} />
@@ -248,7 +248,7 @@ export default async function HomePage() {
           {testimonials.map((t) => (
             <figure
               key={t.name}
-              className="flex flex-col rounded-2xl border border-navy-800/10 bg-white p-7 shadow-[0_12px_35px_rgba(15,37,64,0.06)] sm:p-8"
+              className="premium-card glass-edge flex flex-col rounded-2xl border border-white/70 bg-white/60 p-7 sm:p-8"
             >
               <div className="flex gap-0.5 text-brand">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -276,9 +276,9 @@ export default async function HomePage() {
       </section>
 
       <section className="container-x mt-20 sm:mt-28">
-        <div className="relative overflow-hidden rounded-[28px] bg-[#a94700] px-6 py-14 text-center text-white sm:px-12 sm:py-20">
+        <div className="premium-dark glass-edge relative overflow-hidden rounded-[28px] bg-brand-600 px-6 py-14 text-center text-white ring-1 ring-white/15 sm:px-12 sm:py-20">
           <div className="absolute -left-16 -top-20 h-64 w-64 rounded-full border-[40px] border-white/5" /><div className="absolute -bottom-28 -right-16 h-72 w-72 rounded-full bg-white/5" />
-          <div className="relative mx-auto max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.22em] text-white/65">Your next favourite is waiting</p><h2 className="mt-3 font-display text-4xl font-bold sm:text-6xl">Find the piece that feels like you.</h2><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/70 sm:text-base">Everyday comfort, expressive details and island-wide delivery—made simple.</p><Link href="/shop" className="mt-7 inline-flex rounded-full bg-white px-7 py-3.5 text-sm font-bold text-[#a94700] shadow-xl transition hover:-translate-y-0.5">Shop all products →</Link></div>
+          <div className="relative mx-auto max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.22em] text-white/65">Your next favourite is waiting</p><h2 className="mt-3 font-display text-4xl font-bold sm:text-6xl">Find the piece that feels like you.</h2><p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-white/70 sm:text-base">Everyday comfort, expressive details and island-wide delivery—made simple.</p><Link href="/shop" className="mt-7 inline-flex rounded-full bg-white px-7 py-3.5 text-sm font-bold text-brand-700 shadow-xl transition hover:-translate-y-0.5">Shop all products →</Link></div>
         </div>
       </section>
 

@@ -11,8 +11,8 @@ export default function AuthShell({
   subtitle: string;
 }) {
   return (
-    <div className="container-x py-12">
-      <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-navy-800/10 shadow-sm lg:grid-cols-2">
+    <div className="glass-shell container-x py-12">
+      <div className="premium-panel glass-edge mx-auto grid max-w-5xl overflow-hidden rounded-3xl bg-white/55 lg:grid-cols-2">
         {/* Visual */}
         <div className="relative hidden min-h-[560px] bg-navy-800 lg:block">
           <Image
@@ -32,7 +32,7 @@ export default function AuthShell({
         </div>
 
         {/* Form */}
-        <div className="flex flex-col justify-center p-8 sm:p-12">
+        <div className="flex flex-col justify-center bg-gradient-to-br from-white/65 to-white/30 p-8 backdrop-blur-xl sm:p-12">
           <Link href="/" className="mb-8 flex items-center gap-2">
             <Image
               src="/images/logo.png"
@@ -42,7 +42,7 @@ export default function AuthShell({
               className="h-12 w-12 object-contain"
             />
             <span className="text-xl font-bold text-navy-800">
-              Beyos<span className="text-brand"> Clothing</span>
+              Beyos<span className="text-brand-500"> Clothing</span>
             </span>
           </Link>
           <h1 className="font-display text-3xl font-bold text-navy-800">

@@ -311,7 +311,7 @@ export default function CheckoutPage() {
         className="grid gap-10 lg:grid-cols-[1fr_380px]"
       >
         {/* Details */}
-        <div>
+        <div className="premium-panel rounded-3xl bg-white/50 p-5 sm:p-7">
           <h2 className="text-lg font-bold text-navy-800">
             Shipping Information
           </h2>
@@ -432,7 +432,7 @@ export default function CheckoutPage() {
         </div>
 
         {/* Summary */}
-        <aside className="h-fit rounded-2xl border border-navy-800/10 bg-white p-4 sm:p-6 lg:sticky lg:top-28">
+        <aside className="premium-panel glass-edge h-fit rounded-2xl bg-white/60 p-4 sm:p-6 lg:sticky lg:top-28">
           <h2 className="text-lg font-bold text-navy-800">Your Order</h2>
           <ul className="mt-4 space-y-4">
             {items.map((item) => (
@@ -566,8 +566,8 @@ function PaymentOption({
   const isOnepay = method === "onepay";
   return (
     <label
-      className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm transition ${
-        selected === method ? "border-brand bg-brand-50" : "border-navy-800/10 hover:border-navy-800/20"
+      className={`glass-edge flex cursor-pointer items-start gap-3 rounded-2xl border p-5 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_10px_25px_rgba(9,23,34,.06)] backdrop-blur-md transition ${
+        selected === method ? "border-brand bg-brand-50/80" : "border-white/70 bg-white/45 hover:border-brand/40"
       }`}
     >
       <input

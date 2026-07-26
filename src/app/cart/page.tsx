@@ -138,7 +138,7 @@ export default function CartPage() {
       <CheckoutProgress current={0} />
 
       {items.length === 0 ? (
-        <div className="mt-12 flex flex-col items-center gap-5 rounded-3xl bg-navy-50 py-20 text-center">
+        <div className="premium-panel glass-edge mt-12 flex flex-col items-center gap-5 rounded-3xl bg-white/55 py-20 text-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white text-navy-800/40">
             <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
@@ -161,8 +161,8 @@ export default function CartPage() {
       ) : (
         <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_360px]">
           {/* Items */}
-          <div>
-            <ul className="divide-y divide-navy-800/10 border-y border-navy-800/10">
+          <div className="premium-panel rounded-3xl bg-white/45 p-4 sm:p-6">
+            <ul className="divide-y divide-navy-800/10">
               {items.map((item) => (
                 <li
                   key={`${item.productId}-${item.size}-${item.color}`}
@@ -269,7 +269,7 @@ export default function CartPage() {
           </div>
 
           {/* Summary */}
-          <aside className="h-fit rounded-2xl border border-navy-800/10 bg-navy-50 p-4 sm:p-6 lg:sticky lg:top-28">
+          <aside className="premium-panel glass-edge h-fit rounded-2xl bg-white/60 p-4 sm:p-6 lg:sticky lg:top-28">
             <h2 className="text-lg font-bold text-navy-800">Order Summary</h2>
 
             {/* Promo code */}

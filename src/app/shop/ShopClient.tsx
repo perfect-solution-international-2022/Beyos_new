@@ -343,7 +343,7 @@ export default function ShopClient({
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)]">
-        <aside className={`${mobileFiltersOpen ? "block" : "hidden"} rounded-2xl border border-navy-800/10 bg-navy-50/40 p-5 lg:block lg:self-start lg:sticky lg:top-28`}>
+        <aside className={`${mobileFiltersOpen ? "block" : "hidden"} premium-panel rounded-2xl bg-white/75 p-5 backdrop-blur-sm lg:block lg:self-start lg:sticky lg:top-28`}>
           <div className="mb-5 flex items-center justify-between lg:hidden">
             <h2 className="font-semibold text-navy-800">Filters</h2>
             <button onClick={() => setMobileFiltersOpen(false)} className="text-sm font-semibold text-navy-800/60">Close</button>
@@ -357,7 +357,7 @@ export default function ShopClient({
               {filtered.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
           ) : (
-            <div className="rounded-2xl bg-navy-50 py-20 text-center">
+            <div className="premium-panel glass-edge rounded-2xl bg-white/50 py-20 text-center">
               <p className="font-semibold text-navy-800">No products match these filters.</p>
               <button onClick={clearFilters} className="mt-3 text-sm font-semibold text-brand">Clear all filters</button>
             </div>

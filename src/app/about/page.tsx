@@ -71,7 +71,7 @@ export default function AboutPage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-navy-900 py-16 text-center text-white sm:py-24">
+      <section className="premium-dark relative overflow-hidden bg-navy-900 py-16 text-center text-white sm:py-24">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(245,133,31,0.18),_transparent_55%)]" />
         <div className="container-x relative">
           <span className="badge bg-white/10 text-white/80">Est. Beyos Clothing</span>
@@ -94,7 +94,7 @@ export default function AboutPage() {
                 priority
               />
             </div>
-            <div className="absolute -bottom-6 -right-4 w-[85%] rounded-2xl border border-navy-800/5 bg-white p-4 shadow-xl shadow-navy-900/10 sm:-right-6 sm:w-auto sm:p-5">
+            <div className="liquid-glass glass-edge absolute -bottom-6 -right-4 w-[85%] rounded-2xl p-4 sm:-right-6 sm:w-auto sm:p-5">
               <div className="flex items-center gap-4 sm:gap-6">
                 {stats.map((s) => (
                   <div key={s.label} className="text-center">
@@ -131,7 +131,7 @@ export default function AboutPage() {
       </section>
 
       {/* Vision & Mission */}
-      <section className="bg-navy-50/60 py-14 sm:py-20">
+      <section className="bg-white/25 py-14 backdrop-blur-sm sm:py-20">
         <div className="container-x">
           <div className="mx-auto max-w-xl text-center">
             <span className="text-xs font-bold uppercase tracking-[0.2em] text-brand">What Drives Us</span>
@@ -141,7 +141,7 @@ export default function AboutPage() {
             {visionMission.map((item) => (
               <article
                 key={item.title}
-                className="rounded-2xl border border-navy-800/5 bg-white p-7 shadow-[0_8px_24px_rgba(0,0,0,0.05)] transition hover:-translate-y-1 hover:shadow-lg sm:p-8"
+                className="premium-card glass-edge rounded-2xl border border-white/70 bg-white/55 p-7 sm:p-8"
               >
                 <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand">
                   <Icon name={item.icon} />
@@ -167,7 +167,7 @@ export default function AboutPage() {
           {reasons.map((item) => (
             <article
               key={item.title}
-              className="group rounded-2xl border border-navy-800/5 bg-white p-7 shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition hover:-translate-y-1 hover:border-brand/30 hover:shadow-lg"
+              className="group premium-card glass-edge rounded-2xl border border-white/70 bg-white/55 p-7 hover:border-brand/30"
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-navy-50 text-navy-800 transition group-hover:bg-brand group-hover:text-white">
                 <Icon name={item.icon} />
@@ -181,7 +181,7 @@ export default function AboutPage() {
 
       {/* CTA banner */}
       <section className="container-x pb-14 sm:pb-20">
-        <div className="relative overflow-hidden rounded-3xl bg-navy-900 px-8 py-12 text-center sm:px-14 sm:py-16">
+        <div className="premium-dark glass-edge relative overflow-hidden rounded-3xl bg-navy-900 px-8 py-12 text-center sm:px-14 sm:py-16">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,_rgba(245,133,31,0.22),_transparent_55%)]" />
           <div className="relative">
             <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">Ready to wear your story?</h2>

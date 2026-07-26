@@ -46,7 +46,7 @@ export default function PromotionsPage() {
   };
 
   return (
-    <div className="bg-navy-50/40">
+    <div className="bg-transparent">
       <div className="container-x py-14 sm:py-20">
         <div className="text-center">
           <span className="badge bg-brand-50 text-brand-700">Limited Time</span>
@@ -82,7 +82,7 @@ export default function PromotionsPage() {
 
 function EmptyState() {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center rounded-3xl border border-dashed border-navy-800/15 bg-white px-8 py-16 text-center">
+    <div className="premium-panel glass-edge mx-auto flex max-w-lg flex-col items-center rounded-3xl border border-dashed border-white/70 bg-white/50 px-8 py-16 text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-navy-50 text-navy-800/30">
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.5 3H4a1 1 0 0 0-1 1v5.5a2 2 0 0 0 .83 1.5l9.58 9.59a2 2 0 0 0 2.83 0l4.34-4.34a2 2 0 0 0 .01-2.84Z" />
@@ -99,7 +99,7 @@ function EmptyState() {
 
 function PromoCard({ promo, copied, onCopy }: { promo: Promotion; copied: boolean; onCopy: () => void }) {
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-3xl border border-navy-800/10 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+    <div className="group premium-card glass-edge relative flex flex-col overflow-hidden rounded-3xl border border-white/70 bg-white/60">
       <div className="relative h-56 w-full shrink-0 overflow-hidden bg-gradient-to-br from-navy-800 to-navy-900">
         {promo.imageUrl && (
           <Image src={promo.imageUrl} alt={promo.code} fill className="object-cover" />

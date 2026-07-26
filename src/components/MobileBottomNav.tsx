@@ -19,11 +19,11 @@ export default function MobileBottomNav() {
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-navy-800/10 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-white/70 bg-white/65 pb-[env(safe-area-inset-bottom)] shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_-12px_32px_rgba(9,23,34,.12)] backdrop-blur-2xl lg:hidden">
       <Link
         href="/"
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
-          isActive("/") ? "text-[#a94700]" : "text-navy-800/75"
+          isActive("/") ? "text-brand-600" : "text-navy-800/75"
         }`}
       >
         <HomeIcon />
@@ -33,7 +33,7 @@ export default function MobileBottomNav() {
       <Link
         href="/shop"
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
-          isActive("/shop") ? "text-[#a94700]" : "text-navy-800/75"
+          isActive("/shop") ? "text-brand-600" : "text-navy-800/75"
         }`}
       >
         <ShopIcon />
@@ -59,7 +59,7 @@ export default function MobileBottomNav() {
         href={user ? "/dashboard" : "/login"}
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
           isActive("/dashboard") || isActive("/login")
-            ? "text-[#a94700]"
+            ? "text-brand-600"
             : "text-navy-800/75"
         }`}
       >

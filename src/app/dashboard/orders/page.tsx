@@ -136,7 +136,7 @@ export default function OrdersPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-4 rounded-lg border border-navy-800/5 bg-white px-5 py-16 text-center shadow-sm">
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-[#a94700]" aria-hidden="true">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-brand-600" aria-hidden="true">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M9 11h6"/></svg>
             </span>
             <div><p className="font-semibold text-navy-800">{orders.length ? "No orders match these filters" : "No orders yet"}</p><p className="mt-1 text-sm text-navy-800/55">{orders.length ? "Try changing or clearing your filters." : "Your orders will appear here after checkout."}</p></div>

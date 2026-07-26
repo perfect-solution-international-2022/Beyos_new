@@ -29,11 +29,11 @@ export default function CookieConsent() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-navy-900/20 p-3 backdrop-blur-[2px] sm:p-6">
-      <aside aria-label="Cookie consent" className="w-full max-w-2xl overflow-hidden rounded-[24px] border border-white/60 bg-white shadow-[0_24px_80px_rgba(15,37,64,0.28)]">
-        <div className="h-1.5 bg-gradient-to-r from-[#a94700] via-brand to-amber-300" />
+      <aside aria-label="Cookie consent" className="liquid-glass glass-edge w-full max-w-2xl overflow-hidden rounded-[24px] shadow-[0_30px_100px_rgba(9,23,34,0.32)]">
+        <div className="h-1.5 bg-gradient-to-r from-brand-700 via-brand to-brand-100" />
         <div className="p-5 sm:p-7">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-[#a94700] ring-1 ring-brand/15"><CookieIcon /></div>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 ring-1 ring-brand/15"><CookieIcon /></div>
             <div>
               <p className="font-display text-xl font-bold text-navy-800 sm:text-2xl">Your privacy, your choice</p>
               <p className="mt-1.5 text-sm leading-6 text-navy-800/65">Cookies keep your cart and sign-in secure. Optional cookies help us understand useful pages and improve your shopping experience.</p>
@@ -54,7 +54,7 @@ export default function CookieConsent() {
           )}
 
           <div className="mt-5 flex flex-col-reverse gap-2 border-t border-navy-800/10 pt-5 sm:flex-row sm:items-center">
-            <Link href="/privacy#cookies" className="px-2 py-2 text-center text-xs font-semibold text-navy-800/55 underline-offset-4 hover:text-[#a94700] hover:underline">Privacy & Cookie Policy</Link>
+            <Link href="/privacy#cookies" className="px-2 py-2 text-center text-xs font-semibold text-navy-800/55 underline-offset-4 hover:text-brand-600 hover:underline">Privacy & Cookie Policy</Link>
             <div className="flex flex-1 flex-wrap justify-end gap-2">
               {customizing ? (
                 <>
@@ -86,7 +86,7 @@ function CookieChoice({ icon, title, description, enabled, locked = false, onCha
         <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold text-navy-800">{title}</p>{locked && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700">Always on</span>}</div>
         <p className="mt-0.5 text-xs leading-5 text-navy-800/55">{description}</p>
       </div>
-      {!locked && <button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${title}`} onClick={() => onChange?.(!enabled)} className={`relative h-7 w-12 shrink-0 rounded-full transition ${enabled ? "bg-[#a94700]" : "bg-navy-800/20"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${enabled ? "left-6" : "left-1"}`} /></button>}
+      {!locked && <button type="button" role="switch" aria-checked={enabled} aria-label={`Enable ${title}`} onClick={() => onChange?.(!enabled)} className={`relative h-7 w-12 shrink-0 rounded-full transition ${enabled ? "bg-brand-600" : "bg-navy-800/20"}`}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${enabled ? "left-6" : "left-1"}`} /></button>}
     </div>
   );
 }

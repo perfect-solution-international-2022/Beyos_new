@@ -92,8 +92,8 @@ export default function Header() {
     <header
       className={`sticky top-0 z-40 w-full border-b transition-all ${
         scrolled
-          ? "border-navy-800/10 bg-white/90 backdrop-blur-md"
-          : "border-transparent bg-white"
+          ? "border-white/60 bg-white/65 shadow-[0_12px_40px_rgba(9,23,34,.10)] backdrop-blur-2xl"
+          : "border-white/40 bg-[#f7f9fb]/80 backdrop-blur-xl"
       }`}
     >
       <div className="container-x relative flex h-20 items-center justify-between gap-4">
@@ -119,13 +119,13 @@ export default function Header() {
             priority
           />
           <span className="hidden text-xl font-bold tracking-tight text-navy-800 lg:block">
-            Beyos<span className="text-brand"> Clothing</span>
+            Beyos<span className="text-brand-500"> Clothing</span>
           </span>
         </Link>
 
         {/* Desktop search */}
         <div className="relative mx-auto hidden max-w-xl flex-1 lg:block">
-          <form onSubmit={handleSearch} className="flex items-center overflow-hidden rounded-lg border-2 border-navy-800/10 bg-white">
+          <form onSubmit={handleSearch} className="liquid-glass flex items-center overflow-hidden rounded-xl">
             <SearchIcon />
             <input
               value={search}
@@ -171,7 +171,7 @@ export default function Header() {
                   </span>
                 </button>
                 {accountOpen && (
-                  <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-navy-800/10 bg-white py-1 shadow-lg">
+                  <div className="liquid-glass absolute right-0 top-12 w-48 overflow-hidden rounded-xl py-1">
                     <div className="border-b border-navy-800/10 px-4 py-2">
                       <p className="truncate text-sm font-semibold text-navy-800">
                         {user.name}
@@ -260,7 +260,7 @@ export default function Header() {
 
       {/* Mobile search */}
       <div className="container-x relative mb-3 lg:hidden">
-        <form onSubmit={handleSearch} className="flex items-center overflow-hidden rounded-lg border-2 border-navy-800/10 bg-white">
+        <form onSubmit={handleSearch} className="liquid-glass flex items-center overflow-hidden rounded-xl">
           <SearchIcon />
           <input
             value={search}
@@ -296,7 +296,7 @@ export default function Header() {
       {menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="Close menu" className="absolute inset-0 bg-navy-900/45 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
-          <nav className="absolute inset-y-0 left-0 flex h-[100dvh] w-[86%] max-w-sm flex-col overflow-hidden bg-white shadow-2xl" aria-label="Mobile navigation">
+          <nav className="absolute inset-y-0 left-0 flex h-[100dvh] w-[86%] max-w-sm flex-col overflow-hidden border-r border-white/60 bg-white/75 shadow-[20px_0_70px_rgba(9,23,34,.28)] backdrop-blur-2xl" aria-label="Mobile navigation">
             <div className="flex h-20 shrink-0 items-center justify-between border-b border-navy-800/10 px-5">
               <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
                 <Image src="/images/logo.png" alt="Beyos Clothing" width={48} height={48} sizes="48px" quality={60} className="h-12 w-12 object-contain" />
@@ -403,7 +403,7 @@ function BagIcon() {
 function SearchSuggestions({ query, open, loading, products, onSelect }: { query: string; open: boolean; loading: boolean; products: ProductSearchSuggestion[]; onSelect: () => void }) {
   if (!open) return null;
   return (
-    <div className="absolute inset-x-0 top-[calc(100%+0.4rem)] z-50 overflow-hidden rounded-lg border border-navy-800/10 bg-white shadow-2xl">
+    <div className="liquid-glass absolute inset-x-0 top-[calc(100%+0.4rem)] z-50 overflow-hidden rounded-xl">
       {loading ? (
         <p className="px-4 py-5 text-center text-sm text-navy-800/50">Searching...</p>
       ) : products.length ? (
@@ -413,7 +413,7 @@ function SearchSuggestions({ query, open, loading, products, onSelect }: { query
               <Image src={product.image} alt="" width={48} height={48} sizes="48px" className="h-12 w-12 shrink-0 rounded-md object-cover" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-navy-800">{product.name}</span>
-                <span className="mt-0.5 block text-xs font-bold text-[#a94700]">{formatPrice(product.price)}</span>
+                <span className="mt-0.5 block text-xs font-bold text-brand-600">{formatPrice(product.price)}</span>
               </span>
               <span aria-hidden="true" className="text-navy-800/30">→</span>
             </Link>

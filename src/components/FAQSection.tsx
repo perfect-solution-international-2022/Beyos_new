@@ -12,7 +12,7 @@ export default function FAQSection() {
   return (
     <section className="container-x mt-20" aria-labelledby="faq-heading">
       <SectionHeader eyebrow="Need to know" title="Frequently Asked Questions" />
-      <div className="mx-auto max-w-4xl divide-y divide-navy-800/10 border-y border-navy-800/10">
+      <div className="premium-panel glass-edge mx-auto max-w-4xl divide-y divide-navy-800/10 rounded-3xl bg-white/50 px-5 sm:px-7">
         {homepageFaqs.map((faq) => (
           <details key={faq.question} name="homepage-faq" className="group py-1">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-5 text-left text-sm font-bold text-navy-800 marker:content-none sm:text-base">

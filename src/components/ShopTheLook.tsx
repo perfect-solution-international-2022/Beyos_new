@@ -12,7 +12,7 @@ export default function ShopTheLook({ products }: { products: Product[] }) {
     <section className="container-x mt-20">
       <SectionHeader eyebrow="Styled by Beyos" title="Shop The Look" action={{ href: "/shop", label: "Shop all" }} />
       <div className="grid items-stretch gap-6 lg:grid-cols-[minmax(0,1.45fr)_minmax(280px,.55fr)]">
-        <div className="relative min-h-[460px] overflow-hidden rounded-2xl bg-navy-50 sm:min-h-[580px]">
+        <div className="premium-panel glass-edge relative min-h-[460px] overflow-hidden rounded-2xl bg-navy-50 sm:min-h-[580px]">
           <Image src="/images/hero-images/hero1.webp" alt="Beyos menswear styling inspiration" fill sizes="(max-width: 1023px) 100vw, 70vw" className="object-cover" />
           {picks.map((product, index) => (
             <Link key={product.id} href={`/product/${product.slug}`} aria-label={`View ${product.name}`} className={`group absolute flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-brand text-lg font-bold text-white shadow-lg transition hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white ${index === 0 ? "left-[46%] top-[48%]" : "left-[58%] top-[64%]"}`}>

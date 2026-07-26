@@ -38,7 +38,7 @@ export default function ContactPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fafafa] py-12 sm:py-16">
+    <main className="min-h-screen bg-transparent py-12 sm:py-16">
       <div className="container-x">
         <header className="text-center">
           <h1 className="font-display text-3xl font-bold text-navy-800 sm:text-4xl">Get In Touch With Us</h1>
@@ -48,7 +48,7 @@ export default function ContactPage() {
         </header>
 
         <div className="mt-12 grid gap-7 lg:grid-cols-2">
-          <section className="rounded-xl bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.1)] sm:p-8">
+          <section className="premium-panel glass-edge rounded-2xl bg-white/55 p-6 sm:p-8">
             <h2 className="text-2xl font-semibold text-navy-800">Send us a Message</h2>
             <form onSubmit={submit} className="mt-7 space-y-4">
               <input name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
@@ -71,7 +71,7 @@ export default function ContactPage() {
 
           <aside className="space-y-5">
             {contactDetails.map((item) => (
-              <article key={item.title} className="flex items-start gap-4 rounded-xl bg-white p-6 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+              <article key={item.title} className="premium-card glass-edge flex items-start gap-4 rounded-2xl border border-white/70 bg-white/55 p-6">
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-[#FFE0CC] text-2xl text-brand" aria-hidden="true">{item.icon}</span>
                 <div>
                   <h2 className="text-lg font-semibold text-navy-800">{item.title}</h2>
@@ -84,7 +84,7 @@ export default function ContactPage() {
               </article>
             ))}
 
-            <div className="overflow-hidden rounded-xl bg-white shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
+            <div className="premium-panel glass-edge overflow-hidden rounded-2xl bg-white/55">
               <iframe
                 title="Beyos Clothing location"
                 src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d74285.82508060843!2d80.13999031862414!3d6.278309038350375!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ae17f43041be07b%3A0x81a76bcb2ff474c5!2sBeyos%20Clothing!5e0!3m2!1sen!2str!4v1784612089527!5m2!1sen!2str"

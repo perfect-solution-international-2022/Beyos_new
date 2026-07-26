@@ -8,7 +8,7 @@ export default function Newsletter() {
 
   return (
     <section className="container-x my-20">
-      <div className="relative overflow-hidden rounded-3xl bg-navy-800 px-6 py-14 text-center sm:px-16">
+      <div className="premium-dark glass-edge relative overflow-hidden rounded-3xl bg-navy-800 px-6 py-14 text-center ring-1 ring-white/10 sm:px-16">
         <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-brand/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-16 h-64 w-64 rounded-full bg-brand/10 blur-3xl" />
         <div className="relative mx-auto max-w-xl">

@@ -39,8 +39,8 @@ export default function ProductCard({ product }: { product: Product }) {
   };
 
   return (
-    <div className="group flex flex-col">
-      <div className="relative overflow-hidden rounded-2xl bg-navy-50">
+    <div className="group glass-edge flex flex-col rounded-[24px] border border-white/85 bg-gradient-to-br from-white/95 via-white/70 to-navy-50/70 p-2.5 pb-3 shadow-[inset_0_1px_0_white,inset_0_-1px_0_rgba(16,38,61,.08),0_5px_12px_rgba(8,24,39,.08),0_22px_48px_rgba(8,24,39,.14)] backdrop-blur-xl transition-shadow duration-300 hover:shadow-[inset_0_1px_0_white,0_10px_20px_rgba(8,24,39,.10),0_34px_68px_rgba(8,24,39,.20)]">
+      <div className="relative z-20 overflow-hidden rounded-[18px] bg-navy-50 shadow-[inset_0_1px_0_rgba(255,255,255,.8),0_12px_28px_rgba(9,23,34,.16)] transition duration-500 group-hover:-translate-y-1 group-hover:scale-[1.01]">
         <Link href={`/product/${product.slug}`} className="block">
           <div className="aspect-square w-full">
             <Image
@@ -76,8 +76,8 @@ export default function ProductCard({ product }: { product: Product }) {
             width="16"
             height="16"
             viewBox="0 0 24 24"
-            fill={wished ? "#f5851f" : "none"}
-            stroke={wished ? "#f5851f" : "#0f2540"}
+            fill={wished ? "#ff8426" : "none"}
+            stroke={wished ? "#ff8426" : "#10263d"}
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -105,7 +105,7 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-col gap-1">
+      <div className="relative z-20 mt-2 flex flex-1 flex-col gap-1 rounded-2xl border border-white/70 bg-white/45 px-3 pb-2 pt-3 shadow-[inset_0_1px_0_rgba(255,255,255,.95)] backdrop-blur-md">
         <Link
           href={`/product/${product.slug}`}
           className="text-sm font-semibold text-navy-800 transition hover:text-brand"
@@ -136,7 +136,7 @@ export default function ProductCard({ product }: { product: Product }) {
 
 function StarIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="#f5851f">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="#ff8426">
       <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01Z" />
     </svg>
   );

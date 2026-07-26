@@ -148,7 +148,7 @@ export default function ProductDetail({ product }: { product: Product }) {
             ))}
           </div>
         )}
-        <div className="relative flex-1 overflow-hidden rounded-3xl bg-navy-50">
+        <div className="premium-panel relative flex-1 overflow-hidden rounded-3xl bg-navy-50">
           <div className="aspect-square w-full">
             <button
               type="button"
@@ -171,7 +171,7 @@ export default function ProductDetail({ product }: { product: Product }) {
       </div>
 
       {/* Info */}
-      <div>
+      <div className="premium-panel glass-edge rounded-3xl bg-white/50 p-5 sm:p-7 lg:p-8">
         <p className="text-sm font-semibold uppercase tracking-wider text-brand">
           {product.category}
         </p>
@@ -335,7 +335,7 @@ export default function ProductDetail({ product }: { product: Product }) {
         </ul>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t border-navy-800/10 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_rgba(15,37,64,0.12)] backdrop-blur lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t border-white/70 bg-white/65 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_-14px_35px_rgba(9,23,34,.13)] backdrop-blur-2xl lg:hidden">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-navy-800/55">{selectedVariant?.attributeSummary || product.name}</p>

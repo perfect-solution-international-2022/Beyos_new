@@ -6,14 +6,14 @@ export function productBadges(product: Product): { label: string; className: str
     ? Math.round((1 - product.price / product.compareAtPrice) * 100)
     : 0;
 
-  if (discount > 0) badges.push({ label: `-${discount}%`, className: "bg-[#a94700] text-white" });
+  if (discount > 0) badges.push({ label: `-${discount}%`, className: "bg-brand-600 text-white" });
   if (product.stock > 0 && product.stock <= 5) badges.push({ label: "Low Stock", className: "bg-red-600 text-white" });
   if (product.badge === "New") badges.push({ label: "New", className: "bg-navy-800 text-white" });
   if (product.badge === "Bestseller" || (product.rating >= 4.7 && product.reviews >= 10)) {
     badges.push({ label: "Best Seller", className: "bg-brand-100 text-brand-700" });
   }
   if (!badges.length && product.badge === "Sale") {
-    badges.push({ label: "Sale", className: "bg-[#a94700] text-white" });
+    badges.push({ label: "Sale", className: "bg-brand-600 text-white" });
   }
   return badges.slice(0, 2);
 }

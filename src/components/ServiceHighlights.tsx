@@ -1,3 +1,5 @@
+"use client";
+
 const highlights = [
   { title: "Island-wide delivery", description: "Fast, tracked delivery across Sri Lanka", icon: "truck" },
   { title: "Cash on delivery", description: "Pay safely when your order arrives", icon: "cash" },
@@ -8,15 +10,31 @@ const highlights = [
 export default function ServiceHighlights() {
   return (
     <section className="container-x relative z-10 -mt-5" aria-label="Why shop with Beyos">
-      <div className="grid overflow-hidden rounded-2xl border border-navy-800/10 bg-white shadow-[0_18px_50px_rgba(15,37,64,0.10)] sm:grid-cols-2 lg:grid-cols-4">
-        {highlights.map((item) => (
-          <div key={item.title} className="group flex items-center gap-3 border-b border-navy-800/10 p-4 last:border-0 sm:p-5 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-[#a94700] transition group-hover:bg-[#a94700] group-hover:text-white"><Icon name={item.icon} /></span>
-            <span><strong className="block text-sm text-navy-800">{item.title}</strong><small className="mt-0.5 block text-xs leading-4 text-navy-800/50">{item.description}</small></span>
-          </div>
-        ))}
+      <div className="premium-panel glass-edge overflow-hidden rounded-2xl bg-white/55">
+        <div className="service-highlight-track flex w-max">
+          <HighlightGroup />
+          <HighlightGroup duplicate />
+        </div>
       </div>
+      <style jsx>{`
+        .service-highlight-track { animation: serviceHighlightScroll 12s linear infinite; }
+        @keyframes serviceHighlightScroll { to { transform: translateX(-50%); } }
+        @media (prefers-reduced-motion: reduce) { .service-highlight-track { animation: none; } }
+      `}</style>
     </section>
+  );
+}
+
+function HighlightGroup({ duplicate = false }: { duplicate?: boolean }) {
+  return (
+    <div className="flex" aria-hidden={duplicate || undefined}>
+      {highlights.map((item) => (
+        <div key={item.title} className="group relative flex w-[85vw] max-w-[430px] shrink-0 items-center gap-3 border-r border-white/75 bg-gradient-to-br from-white/70 to-navy-50/55 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.95)] sm:w-[360px] sm:p-5 lg:w-[430px]">
+          <span className="relative z-20 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/80 bg-brand-50/80 text-brand-600 shadow-[inset_0_1px_0_white,0_8px_18px_rgba(140,66,24,.12)] transition group-hover:-translate-y-0.5 group-hover:bg-brand-600 group-hover:text-white"><Icon name={item.icon} /></span>
+          <span className="relative z-20"><strong className="block text-sm text-navy-800">{item.title}</strong><small className="mt-0.5 block text-xs leading-4 text-navy-800/50">{item.description}</small></span>
+        </div>
+      ))}
+    </div>
   );
 }
 

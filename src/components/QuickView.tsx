@@ -59,8 +59,8 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
 
   return (
     <div className="fixed inset-0 z-[105] flex items-end justify-center bg-navy-900/55 p-0 backdrop-blur-sm sm:items-center sm:p-5" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={`Quick view ${product.name}`} className="max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-navy-800/10 bg-white px-5 py-4">
+      <div role="dialog" aria-modal="true" aria-label={`Quick view ${product.name}`} className="glass-shell max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-white/60 bg-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,.95),0_35px_100px_rgba(9,23,34,.35)] backdrop-blur-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/60 bg-white/65 px-5 py-4 backdrop-blur-2xl">
           <p className="font-semibold text-navy-800">Quick View</p>
           <button type="button" onClick={onClose} aria-label="Close quick view" className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-50 text-2xl text-navy-800">×</button>
         </div>
@@ -70,7 +70,7 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
             <ProductBadges product={product} />
           </div>
           <div className="p-5 sm:p-8">
-            <p className="text-xs font-semibold uppercase text-[#a94700]">{product.category}</p>
+            <p className="text-xs font-semibold uppercase text-brand-600">{product.category}</p>
             <h2 className="mt-2 font-display text-2xl font-bold text-navy-800 sm:text-3xl">{product.name}</h2>
             <p className="mt-3 text-2xl font-bold text-navy-800">{formatPrice(price)}</p>
             {wholesaleActive && <p className="mt-1 text-xs font-semibold text-emerald-600">Cart-wide bulk price applied</p>}

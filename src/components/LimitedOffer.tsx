@@ -38,9 +38,9 @@ export default function LimitedOffer({ promotion }: { promotion: HomepagePromoti
 
   return (
     <section className="container-x mt-20" aria-labelledby="limited-offer-title">
-      <div className="relative grid min-h-[300px] overflow-hidden rounded-2xl bg-navy-900 text-white md:grid-cols-[1fr_40%]">
+      <div className="premium-dark glass-edge relative grid min-h-[300px] overflow-hidden rounded-2xl bg-navy-900 text-white ring-1 ring-white/10 md:grid-cols-[1fr_40%]">
         <div className="flex flex-col justify-center p-7 sm:p-10 lg:p-14">
-          <p className="text-xs font-bold uppercase text-brand sm:text-sm">Limited-time offer</p>
+          <p className="text-xs font-bold uppercase text-brand-400 sm:text-sm">Limited-time offer</p>
           <h2 id="limited-offer-title" className="mt-2 font-display text-3xl font-bold sm:text-4xl">{offerLabel(promotion)}</h2>
           <p className="mt-3 max-w-xl text-sm leading-6 text-white/75 sm:text-base">{promotion.description || "Save on your next Beyos order while this offer is active."}</p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -54,7 +54,7 @@ export default function LimitedOffer({ promotion }: { promotion: HomepagePromoti
               <TimePart value={time.minutes} label="Mins" />
               <TimePart value={time.seconds} label="Secs" />
             </div>
-          ) : <p className="mt-6 text-sm font-semibold text-brand">Available while the promotion is active</p>}
+          ) : <p className="mt-6 text-sm font-semibold text-brand-400">Available while the promotion is active</p>}
           <Link href="/shop" className="btn-primary mt-7 w-fit">Shop the offer</Link>
         </div>
         <div className="relative min-h-[220px] bg-[#f1efec] md:min-h-full">

@@ -29,10 +29,10 @@ export default function ProductRail({
       <div className="flex items-end justify-between gap-4">
         <SectionHeader eyebrow={eyebrow} title={title} action={{ href: "/shop", label: "View all" }} />
         <div className="mb-8 hidden shrink-0 items-center gap-2 sm:flex">
-          <button type="button" onClick={() => scroll(-1)} aria-label={`Previous ${title}`} title="Previous" className="flex h-10 w-10 items-center justify-center rounded-full border border-navy-800/15 bg-white text-navy-800 transition hover:border-brand hover:text-brand">
+          <button type="button" onClick={() => scroll(-1)} aria-label={`Previous ${title}`} title="Previous" className="liquid-glass flex h-10 w-10 items-center justify-center rounded-full text-navy-800 transition hover:border-brand hover:text-brand">
             <ArrowIcon direction="left" />
           </button>
-          <button type="button" onClick={() => scroll(1)} aria-label={`Next ${title}`} title="Next" className="flex h-10 w-10 items-center justify-center rounded-full border border-navy-800/15 bg-white text-navy-800 transition hover:border-brand hover:text-brand">
+          <button type="button" onClick={() => scroll(1)} aria-label={`Next ${title}`} title="Next" className="liquid-glass flex h-10 w-10 items-center justify-center rounded-full text-navy-800 transition hover:border-brand hover:text-brand">
             <ArrowIcon direction="right" />
           </button>
         </div>

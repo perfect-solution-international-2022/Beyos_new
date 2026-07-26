@@ -33,18 +33,18 @@ const columns = [
 
 export default function Footer() {
   return (
-    <footer className="relative mt-24 overflow-hidden bg-[#091b2f] text-white">
+    <footer className="relative mt-24 overflow-hidden bg-navy-900 text-white">
       <div className="pointer-events-none absolute -left-32 -top-40 h-96 w-96 rounded-full bg-brand/10 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-[#a94700]/15 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 bottom-0 h-80 w-80 rounded-full bg-brand-600/15 blur-3xl" />
 
       <div className="container-x relative pt-14 sm:pt-16">
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.06] p-6 backdrop-blur-sm sm:p-8 lg:flex lg:items-center lg:justify-between lg:gap-10">
+        <div className="glass-edge overflow-hidden rounded-3xl border border-white/15 bg-white/[0.08] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,.12),0_20px_55px_rgba(0,0,0,.18)] backdrop-blur-xl sm:p-8 lg:flex lg:items-center lg:justify-between lg:gap-10">
           <div className="max-w-2xl">
             <span className="inline-flex rounded-full border border-brand/25 bg-brand/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-brand-100">Style is forever</span>
             <h2 className="mt-4 font-display text-2xl font-bold sm:text-3xl">Wear confidence. Make every day yours.</h2>
             <p className="mt-2 max-w-xl text-sm leading-6 text-white/60">Explore premium clothing made for comfort, character and everyday Sri Lankan life.</p>
           </div>
-          <Link href="/shop" className="mt-6 inline-flex shrink-0 items-center justify-center gap-3 rounded-full bg-[#a94700] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-[#c25300] lg:mt-0">
+          <Link href="/shop" className="mt-6 inline-flex shrink-0 items-center justify-center gap-3 rounded-full bg-brand-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-brand-700 lg:mt-0">
             Shop the collection <span aria-hidden="true">→</span>
           </Link>
         </div>
@@ -56,7 +56,7 @@ export default function Footer() {
                 <Image src="/images/logo.png" alt="" width={72} height={72} className="h-full w-full object-contain p-1" />
               </span>
               <span>
-                <span className="block text-xl font-bold tracking-tight">Beyos <span className="text-brand">Clothing</span></span>
+                <span className="block text-xl font-bold tracking-tight">Beyos <span className="text-brand-400">Clothing</span></span>
                 <span className="mt-0.5 block text-[10px] font-semibold uppercase tracking-[0.24em] text-white/40">Style is forever</span>
               </span>
             </Link>
@@ -116,5 +116,5 @@ function ContactIcon({ name }: { name: "phone" | "mail" | "truck" }) {
     mail: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" /></>,
     truck: <><path d="M10 17h4V5H2v12h3" /><path d="M14 9h4l4 4v4h-3" /><circle cx="7.5" cy="17.5" r="2.5" /><circle cx="16.5" cy="17.5" r="2.5" /></>,
   };
-  return <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.07] text-brand"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg></span>;
+  return <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.07] text-brand-400"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg></span>;
 }
