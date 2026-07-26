@@ -22,6 +22,7 @@ export default function ProductCard({ product }: { product: Product }) {
   const [quickViewOpen, setQuickViewOpen] = useState(false);
   const [heartBurst, setHeartBurst] = useState(false);
   const wished = has(product.slug);
+  const displayedPrice = user?.isWholesaleCustomer && product.wholesalePrice != null && product.wholesalePrice > 0 && product.wholesalePrice < product.price ? product.wholesalePrice : product.price;
   const hoverImage = product.images.find((image) => image !== product.image);
 
   const onWishlist = async () => {
@@ -118,8 +119,9 @@ export default function ProductCard({ product }: { product: Product }) {
         </div>
         <div className="mt-1 flex items-center gap-2">
           <span className="text-sm font-bold text-navy-800">
-            {formatPrice(product.price)}
+            {formatPrice(displayedPrice)}
           </span>
+          {user?.isWholesaleCustomer && displayedPrice !== product.price && <span className="badge bg-emerald-50 text-emerald-700">Wholesale</span>}
           {product.compareAtPrice && (
             <span className="text-xs text-navy-800/70 line-through">
               {formatPrice(product.compareAtPrice)}

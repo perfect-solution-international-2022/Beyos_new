@@ -9,10 +9,10 @@ const SLIDE_MS = 6000;
 
 // Fixed hero content — stays in place while only the background images rotate.
 const content = {
-  eyebrow: "New Season Collection",
+  eyebrow: "The new Beyos edit",
   subtitle:
     "Timeless pieces, crafted to last. Discover the new Beyos collection for men and women.",
-  cta: "Shop the Collection",
+  cta: "Explore collection",
   href: "/shop",
 };
 
@@ -32,7 +32,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
   return (
     <section
-      className={`relative mx-3 mt-3 h-[56vh] min-h-[420px] overflow-hidden rounded-2xl bg-navy-900 sm:mx-4 sm:h-[70vh] sm:min-h-[520px] lg:mx-6 ${paused ? "hero-paused" : ""}`}
+      className={`relative mx-2 mt-2 h-[72svh] min-h-[520px] max-h-[820px] overflow-hidden rounded-[24px] bg-navy-900 sm:mx-4 sm:mt-3 lg:mx-6 ${paused ? "hero-paused" : ""}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -60,27 +60,28 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       ))}
 
       {/* Fixed left-side overlay + a soft bottom vignette for the controls */}
-      <div className="absolute inset-0 bg-gradient-to-r from-navy-900/90 via-navy-900/50 to-navy-900/10" />
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-navy-900/60 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#07192d]/95 via-[#07192d]/55 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#07192d]/65 via-transparent to-[#07192d]/10" />
 
       <div className="container-x relative flex h-full items-center">
-        <div className="max-w-xl">
-          <span className="badge bg-[#a94700] text-white">
+        <div className="max-w-2xl pb-8 sm:pb-0">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-white backdrop-blur-md">
+            <span className="h-1.5 w-1.5 rounded-full bg-brand" />
             {content.eyebrow}
           </span>
-          <h1 className="mt-4 font-display text-5xl font-bold leading-tight text-white sm:text-6xl md:text-7xl">
-            Style Is <span className="italic text-brand">Forever</span>
+          <h1 className="mt-5 max-w-xl font-display text-[44px] font-bold leading-[0.98] tracking-[-0.035em] text-white min-[390px]:text-5xl sm:text-7xl lg:text-[82px]">
+            Style that feels <span className="italic text-brand">like you.</span>
           </h1>
-          <p className="mt-4 text-base text-white/80 sm:text-lg">
+          <p className="mt-5 max-w-lg text-sm leading-6 text-white/70 sm:text-lg sm:leading-8">
             {content.subtitle}
           </p>
-          <div className="mt-8 flex gap-4">
-            <Link href={content.href} className="btn-primary">
+          <div className="mt-8 flex flex-col gap-3 min-[360px]:flex-row">
+            <Link href={content.href} className="btn-primary px-7 py-3.5">
               {content.cta}
             </Link>
             <Link
               href="/about"
-              className="btn border border-white/40 bg-white/5 text-white backdrop-blur-sm hover:bg-white/15"
+              className="btn border border-white/25 bg-white/5 px-7 py-3.5 text-white backdrop-blur-sm hover:border-white/50 hover:bg-white/10"
             >
               About Beyos Clothing
             </Link>
@@ -89,14 +90,14 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       </div>
 
       {/* Slide indicators — the active one fills up over the slide's duration */}
-      <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+      <div className="absolute bottom-7 right-7 z-10 flex gap-2 sm:right-10">
         {slides.map((slide, i) => (
           <button
             key={slide.id}
             onClick={() => setCurrent(i)}
             aria-label={`Show image ${i + 1}`}
-            className={`h-1.5 overflow-hidden rounded-full transition-all duration-300 ${
-              i === current ? "w-10 bg-white/30" : "w-5 bg-white/30 hover:bg-white/60"
+            className={`h-1 overflow-hidden rounded-full transition-all duration-300 ${
+              i === current ? "w-12 bg-white/25" : "w-5 bg-white/25 hover:bg-white/50"
             }`}
           >
             {i === current && <span className="hero-progress block h-full rounded-full bg-brand" />}

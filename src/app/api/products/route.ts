@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 
   const user = await getCurrentUser();
   if (search) {
-    const products = await getProductSearchSuggestions(search, user?.role === "reseller", 5);
+    const products = await getProductSearchSuggestions(search, user?.role === "reseller", 5, !!user?.isWholesaleCustomer);
     return NextResponse.json({ count: products.length, products });
   }
 

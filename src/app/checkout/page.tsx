@@ -17,6 +17,7 @@ export default function CheckoutPage() {
   const [mounted, setMounted] = useState(false);
   const { items, promoCode, setPromoCode } = useCart();
   const subtotal = useCart((s) => s.subtotal());
+  const isWholesaleCustomer = useCart((state) => state.isWholesaleCustomer);
   const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -460,7 +461,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <span className="text-sm font-semibold text-navy-800">
-                  {formatPrice(effectiveUnitPrice(item, cartQuantity) * item.quantity)}
+                  {formatPrice(effectiveUnitPrice(item, cartQuantity, isWholesaleCustomer) * item.quantity)}
                 </span>
               </li>
             ))}

@@ -12,6 +12,7 @@ export default function CartDrawer() {
   const [mounted, setMounted] = useState(false);
   const { items, isOpen, closeCart, removeItem, updateQuantity } = useCart();
   const subtotal = useCart((s) => s.subtotal());
+  const isWholesaleCustomer = useCart((state) => state.isWholesaleCustomer);
   const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
   useEffect(() => setMounted(true), []);
@@ -154,12 +155,12 @@ export default function CartDrawer() {
                           </button>
                         </div>
                         <span className="text-sm font-bold text-navy-800">
-                          {formatPrice(effectiveUnitPrice(item, cartQuantity) * item.quantity)}
+                          {formatPrice(effectiveUnitPrice(item, cartQuantity, isWholesaleCustomer) * item.quantity)}
                         </span>
                       </div>
-                      {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && cartQuantity >= WHOLESALE_MIN_QTY && (
+                      {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && (isWholesaleCustomer || cartQuantity >= WHOLESALE_MIN_QTY) && (
                         <p className="mt-1 text-right text-[11px] font-semibold text-emerald-600">
-                          Cart-wide bulk price of {formatPrice(item.wholesalePrice)}/unit applied
+                          {isWholesaleCustomer ? "Wholesale customer" : "Cart-wide bulk"} price of {formatPrice(item.wholesalePrice)}/unit applied
                         </p>
                       )}
                     </div>

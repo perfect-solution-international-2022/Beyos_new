@@ -59,6 +59,7 @@ const sections: Section[] = [
       { label: "User Management", icon: "users", children: [
         { label: "All Users", href: "/admin/users" },
         { label: "Customers", href: "/admin/customers" },
+        { label: "Wholesale Customers", href: "/admin/customers/wholesale" },
         { label: "Resellers", href: "/admin/resellers" },
       ] },
     ],

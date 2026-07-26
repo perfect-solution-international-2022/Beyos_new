@@ -8,6 +8,7 @@ import { useCart } from "@/store/cart";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 import { trackRecentlyViewed } from "@/lib/recentlyViewed";
 import ProductBadges from "@/components/ProductBadges";
+import { useAuth } from "@/context/AuthProvider";
 
 // Matches the admin's attribute order (Size, then Color) — see
 // src/app/admin/products/page.tsx's generateVariations().
@@ -30,6 +31,8 @@ function variantOptionGroups(variants: NonNullable<Product["variants"]>): string
 }
 
 export default function ProductDetail({ product }: { product: Product }) {
+  const { user } = useAuth();
+  const isWholesaleCustomer = !!user?.isWholesaleCustomer;
   const variants = product.variants ?? [];
   const defaultVariant = variants.find((variant) => variant.isDefault) || variants[0];
   const optionGroups = variantOptionGroups(variants);
@@ -96,7 +99,7 @@ export default function ProductDetail({ product }: { product: Product }) {
 
   const wholesalePrice = selectedVariant?.wholesalePrice ?? product.wholesalePrice;
   const projectedCartQuantity = existingCartQuantity + quantity;
-  const wholesaleActive = projectedCartQuantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
+  const wholesaleActive = (isWholesaleCustomer || projectedCartQuantity >= WHOLESALE_MIN_QTY) && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
   const currentPrice = wholesaleActive ? wholesalePrice : salePrice;
   const discount = comparePrice
     ? Math.round((1 - currentPrice / comparePrice) * 100)
@@ -219,7 +222,7 @@ export default function ProductDetail({ product }: { product: Product }) {
         {wholesalePrice != null && wholesalePrice > 0 && (
           <p className="mt-2 text-sm text-navy-800/60">
             {wholesaleActive
-              ? `Cart-wide bulk price of ${formatPrice(wholesalePrice)}/unit applied.`
+              ? `${isWholesaleCustomer ? "Wholesale customer" : "Cart-wide bulk"} price of ${formatPrice(wholesalePrice)}/unit applied.`
               : `Add ${WHOLESALE_MIN_QTY - projectedCartQuantity} more item${WHOLESALE_MIN_QTY - projectedCartQuantity === 1 ? "" : "s"} across your cart and pay ${formatPrice(wholesalePrice)} per unit.`}
           </p>
         )}

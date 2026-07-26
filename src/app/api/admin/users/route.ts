@@ -9,6 +9,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const role = searchParams.get("role");
+  const wholesale = searchParams.get("wholesale");
 
   try {
     const conditions: string[] = ["deleted_at IS NULL"];
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
       conditions.push("role = ?");
       params.push(role);
     }
+    if (wholesale === "true") conditions.push("role = 'buyer' AND is_wholesale_customer = 1");
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const rows = await query<{
       id: number;
@@ -28,6 +30,13 @@ export async function GET(request: Request) {
       admin_role: string | null;
       phone: string;
       city: string | null;
+      address_line1: string | null;
+      address_line2: string | null;
+      district: string | null;
+      province: string | null;
+      postal_code: string | null;
+      is_wholesale_customer: number;
+      wholesale_since: string | null;
       reseller_status: string;
       account_status: string;
       last_login_at: string | null;
@@ -37,7 +46,8 @@ export async function GET(request: Request) {
       credit_limit: string;
       created_at: string;
     }>(
-      `SELECT id, name, first_name, last_name, email, role, admin_role, phone, city, reseller_status,
+      `SELECT id, name, first_name, last_name, email, role, admin_role, phone, city, address_line1, address_line2,
+              district, province, postal_code, is_wholesale_customer, wholesale_since, reseller_status,
               account_status, last_login_at, allow_price_override, min_markup_pct, max_markup_pct, credit_limit, created_at
        FROM users ${where} ORDER BY created_at DESC`,
       params
@@ -53,6 +63,13 @@ export async function GET(request: Request) {
         adminRole: u.admin_role,
         phone: u.phone,
         city: u.city,
+        addressLine1: u.address_line1,
+        addressLine2: u.address_line2,
+        district: u.district,
+        province: u.province,
+        postalCode: u.postal_code,
+        isWholesaleCustomer: !!u.is_wholesale_customer,
+        wholesaleSince: u.wholesale_since,
         resellerStatus: u.reseller_status,
         accountStatus: u.account_status,
         lastLoginAt: u.last_login_at,
@@ -138,21 +155,30 @@ export async function PATCH(request: Request) {
     accountStatus?: string;
     profile?: { firstName?: string; lastName?: string; email?: string; phone?: string; city?: string };
     pricingRules?: { allowPriceOverride?: boolean; minMarkupPct?: number; maxMarkupPct?: number | null; creditLimit?: number };
+    wholesaleCustomer?: boolean;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { id, role, adminRole, resellerStatus, accountStatus, profile, pricingRules } = body;
-  if (!id || (!role && !adminRole && !resellerStatus && !accountStatus && !profile && !pricingRules)) {
+  const { id, role, adminRole, resellerStatus, accountStatus, profile, pricingRules, wholesaleCustomer } = body;
+  if (!id || (!role && !adminRole && !resellerStatus && !accountStatus && !profile && !pricingRules && wholesaleCustomer === undefined)) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   if (id === admin.id && (role || adminRole || accountStatus)) {
     return NextResponse.json({ error: "You cannot change your own role" }, { status: 400 });
   }
   try {
-    if (role) {
+    if (wholesaleCustomer !== undefined) {
+      const result = await query(
+        `UPDATE users SET is_wholesale_customer = ?,
+                wholesale_since = IF(? = 1, COALESCE(wholesale_since, NOW()), NULL)
+         WHERE id = ? AND role = 'buyer' AND deleted_at IS NULL`,
+        [wholesaleCustomer ? 1 : 0, wholesaleCustomer ? 1 : 0, id]
+      ) as unknown as { affectedRows: number };
+      if (!result.affectedRows) return NextResponse.json({ error: "Only registered customer accounts can be marked as wholesale" }, { status: 400 });
+    } else if (role) {
       if (!["buyer", "reseller", "admin"].includes(role)) {
         return NextResponse.json({ error: "Invalid role" }, { status: 400 });
       }
@@ -160,8 +186,8 @@ export async function PATCH(request: Request) {
         ? (["super", "manager", "cashier"].includes(adminRole || "") ? adminRole : "super")
         : null;
       await query(
-        "UPDATE users SET role = ?, admin_role = ?, reseller_status = ?, session_version = session_version + 1 WHERE id = ?",
-        [role, nextAdminRole, "approved", id]
+        "UPDATE users SET role = ?, admin_role = ?, reseller_status = ?, is_wholesale_customer = IF(? = 'buyer', is_wholesale_customer, 0), wholesale_since = IF(? = 'buyer', wholesale_since, NULL), session_version = session_version + 1 WHERE id = ?",
+        [role, nextAdminRole, "approved", role, role, id]
       );
     } else if (adminRole) {
       if (!["super", "manager", "cashier"].includes(adminRole)) {

@@ -9,6 +9,7 @@ import {
   useRef,
   ReactNode,
 } from "react";
+import { useCart } from "@/store/cart";
 
 export interface AuthUser {
   id: number;
@@ -16,6 +17,7 @@ export interface AuthUser {
   email: string;
   role: "buyer" | "reseller" | "admin";
   adminRole?: "super" | "manager" | "cashier" | null;
+  isWholesaleCustomer: boolean;
 }
 
 export interface RegisterPayload {
@@ -47,6 +49,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const setWholesaleCustomer = useCart((state) => state.setWholesaleCustomer);
   const midnightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
@@ -54,12 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
       const data = await res.json();
       setUser(data.user ?? null);
+      setWholesaleCustomer(!!data.user?.isWholesaleCustomer);
       if (midnightTimer.current) clearTimeout(midnightTimer.current);
       if (data.user && Number(data.serverNow) && Number(data.sessionExpiresAt)) {
         // Use the server-provided clock delta, not the visitor's device clock.
         const delay = Math.max(0, (Number(data.sessionExpiresAt) - Number(data.serverNow)) * 1000);
         midnightTimer.current = setTimeout(() => {
           setUser(null);
+          setWholesaleCustomer(false);
           const path = window.location.pathname;
           if (["/admin", "/reseller", "/dashboard"].some((prefix) => path.startsWith(prefix))) {
             window.location.assign(`/login?redirect=${encodeURIComponent(`${path}${window.location.search}`)}`);
@@ -71,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setWholesaleCustomer]);
 
   useEffect(() => {
     refresh();
@@ -89,8 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Login failed");
     setUser(data.user);
+    setWholesaleCustomer(!!data.user?.isWholesaleCustomer);
     return data.user as AuthUser;
-  }, []);
+  }, [setWholesaleCustomer]);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const res = await fetch("/api/auth/register", {
@@ -101,13 +107,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Registration failed");
     setUser(data.user);
+    setWholesaleCustomer(!!data.user?.isWholesaleCustomer);
     return data.user as AuthUser;
-  }, []);
+  }, [setWholesaleCustomer]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
-  }, []);
+    setWholesaleCustomer(false);
+  }, [setWholesaleCustomer]);
 
   return (
     <AuthContext.Provider

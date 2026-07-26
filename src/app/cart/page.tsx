@@ -13,6 +13,7 @@ import { PageLoadingSkeleton } from "@/components/LoadingSkeleton";
 export default function CartPage() {
   const [mounted, setMounted] = useState(false);
   const { items, removeItem, updateQuantity, promoCode, setPromoCode } = useCart();
+  const isWholesaleCustomer = useCart((state) => state.isWholesaleCustomer);
   const subtotal = useCart((s) => s.subtotal());
   const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
 
@@ -194,16 +195,16 @@ export default function CartPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold text-navy-800 min-[380px]:text-base">
-                          {formatPrice(effectiveUnitPrice(item, cartQuantity) * item.quantity)}
+                          {formatPrice(effectiveUnitPrice(item, cartQuantity, isWholesaleCustomer) * item.quantity)}
                         </p>
-                        {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && cartQuantity >= WHOLESALE_MIN_QTY && (
-                          <span className="badge mt-1 bg-emerald-50 text-emerald-700">Bulk price applied</span>
+                        {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && (isWholesaleCustomer || cartQuantity >= WHOLESALE_MIN_QTY) && (
+                          <span className="badge mt-1 bg-emerald-50 text-emerald-700">{isWholesaleCustomer ? "Wholesale" : "Bulk price applied"}</span>
                         )}
                       </div>
                     </div>
                     {item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && (
                       <p className="mt-1.5 text-xs text-navy-800/50">
-                        {cartQuantity >= WHOLESALE_MIN_QTY
+                        {isWholesaleCustomer || cartQuantity >= WHOLESALE_MIN_QTY
                           ? `Cart-wide bulk price: ${formatPrice(item.wholesalePrice)}/unit (regular ${formatPrice(item.price)}/unit).`
                           : `Add ${WHOLESALE_MIN_QTY - cartQuantity} more item${WHOLESALE_MIN_QTY - cartQuantity === 1 ? "" : "s"} across your cart for the bulk price of ${formatPrice(item.wholesalePrice)}/unit.`}
                       </p>

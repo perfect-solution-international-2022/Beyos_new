@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
   admin_role    ENUM('super','manager','cashier') NULL DEFAULT NULL,
   reseller_status ENUM('pending','approved','suspended','rejected') NOT NULL DEFAULT 'approved',
   account_status ENUM('active','suspended','disabled') NOT NULL DEFAULT 'active',
+  is_wholesale_customer TINYINT(1) NOT NULL DEFAULT 0,
+  wholesale_since TIMESTAMP NULL,
   allow_price_override TINYINT(1) NOT NULL DEFAULT 1,
   min_markup_pct DECIMAL(6,2) NOT NULL DEFAULT 0,
   max_markup_pct DECIMAL(6,2) NULL,

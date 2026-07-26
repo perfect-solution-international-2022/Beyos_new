@@ -9,8 +9,10 @@ import { useCart } from "@/store/cart";
 import { useToast } from "@/context/ToastProvider";
 import ProductBadges from "./ProductBadges";
 import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
+import { useAuth } from "@/context/AuthProvider";
 
 export default function QuickView({ product, onClose }: { product: Product; onClose: () => void }) {
+  const { user } = useAuth();
   const variants = product.variants ?? [];
   const [variantId, setVariantId] = useState(variants.find((item) => item.isDefault)?.id ?? variants[0]?.id);
   const [size, setSize] = useState(product.sizes[0] || "One Size");
@@ -22,7 +24,7 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
   const variant = variants.find((item) => item.id === variantId);
   const salePrice = variant?.salePrice && variant.salePrice < variant.price ? variant.salePrice : variant?.price ?? product.price;
   const wholesalePrice = variant?.wholesalePrice ?? product.wholesalePrice;
-  const wholesaleActive = existingCartQuantity + quantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
+  const wholesaleActive = (!!user?.isWholesaleCustomer || existingCartQuantity + quantity >= WHOLESALE_MIN_QTY) && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice;
   const price = wholesaleActive ? wholesalePrice : salePrice;
   const stock = variant?.stock ?? product.stock;
   const image = variant?.image || product.image;

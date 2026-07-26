@@ -8,9 +8,10 @@ import { WHOLESALE_MIN_QTY } from "@/lib/pricing";
 /** The unit price charged for a line, based on the combined cart quantity. */
 export function effectiveUnitPrice(
   item: Pick<CartItem, "price" | "wholesalePrice" | "quantity">,
-  cartQuantity = item.quantity
+  cartQuantity = item.quantity,
+  isWholesaleCustomer = false
 ): number {
-  return item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && cartQuantity >= WHOLESALE_MIN_QTY
+  return item.wholesalePrice != null && item.wholesalePrice > 0 && item.wholesalePrice < item.price && (isWholesaleCustomer || cartQuantity >= WHOLESALE_MIN_QTY)
     ? item.wholesalePrice
     : item.price;
 }
@@ -19,6 +20,8 @@ interface CartState {
   items: CartItem[];
   isOpen: boolean;
   promoCode: string | null;
+  isWholesaleCustomer: boolean;
+  setWholesaleCustomer: (enabled: boolean) => void;
   addItem: (item: CartItem) => void;
   removeItem: (productId: string, size: string, color: string) => void;
   updateQuantity: (
@@ -44,6 +47,8 @@ export const useCart = create<CartState>()(
       items: [],
       isOpen: false,
       promoCode: null,
+      isWholesaleCustomer: false,
+      setWholesaleCustomer: (enabled) => set({ isWholesaleCustomer: enabled }),
       addItem: (item) =>
         set((state) => {
           const existing = state.items.find((i) =>
@@ -83,7 +88,7 @@ export const useCart = create<CartState>()(
       subtotal: () => {
         const items = get().items;
         const cartQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-        return items.reduce((sum, item) => sum + effectiveUnitPrice(item, cartQuantity) * item.quantity, 0);
+        return items.reduce((sum, item) => sum + effectiveUnitPrice(item, cartQuantity, get().isWholesaleCustomer) * item.quantity, 0);
       },
     }),
     { name: "beyos-cart" }

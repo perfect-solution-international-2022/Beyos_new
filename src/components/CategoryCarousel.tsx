@@ -1,75 +1,22 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
-import { useRef } from "react";
 
-interface Category {
-  id: number;
-  name: string;
-  href: string;
-  image: string;
-}
+interface Category { id: number; name: string; href: string; image: string; }
 
 export default function CategoryCarousel({ categories }: { categories: Category[] }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  const scroll = (direction: -1 | 1) => {
-    const track = trackRef.current;
-    if (!track) return;
-    track.scrollBy({ left: direction * Math.max(track.clientWidth * 0.75, 240), behavior: "smooth" });
-  };
-
+  if (!categories.length) return null;
   return (
-    <div className="relative mt-8">
-      <div
-        ref={trackRef}
-        className="-mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-3 no-scrollbar sm:mx-0 sm:gap-8 sm:px-0 lg:gap-10"
-      >
-        {categories.map((category) => (
-          <Link
-            key={category.id}
-            href={category.href}
-            className="group flex w-[calc((100%-1.25rem)/2)] shrink-0 snap-start flex-col items-center text-center sm:w-[calc((100%-4rem)/3)] lg:w-[calc((100%-9rem)/4)] xl:w-[calc((100%-12rem)/5)]"
-          >
-            <div className="relative h-24 w-24 overflow-hidden rounded-full bg-navy-50 ring-1 ring-navy-800/5 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-lg min-[360px]:h-28 min-[360px]:w-28 sm:h-32 sm:w-32 lg:h-36 lg:w-36">
-              <Image
-                src={category.image}
-                alt=""
-                fill
-                sizes="(min-width: 1024px) 144px, (min-width: 640px) 128px, (min-width: 360px) 112px, 96px"
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
-              />
-            </div>
-            <h3 className="mt-4 text-base font-semibold text-navy-800 transition group-hover:text-brand">
-              {category.name}
-            </h3>
-          </Link>
-        ))}
-      </div>
-
-      {categories.length > 4 && (
-        <>
-          <button
-            type="button"
-            aria-label="Previous categories"
-            title="Previous categories"
-            onClick={() => scroll(-1)}
-            className="absolute left-0 top-16 hidden h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border border-navy-800/10 bg-white text-2xl text-navy-800 shadow-md transition hover:border-brand hover:text-brand lg:flex"
-          >
-            <span aria-hidden="true">‹</span>
-          </button>
-          <button
-            type="button"
-            aria-label="Next categories"
-            title="Next categories"
-            onClick={() => scroll(1)}
-            className="absolute right-0 top-16 hidden h-10 w-10 translate-x-1/2 items-center justify-center rounded-full border border-navy-800/10 bg-white text-2xl text-navy-800 shadow-md transition hover:border-brand hover:text-brand lg:flex"
-          >
-            <span aria-hidden="true">›</span>
-          </button>
-        </>
-      )}
+    <div className="mt-8 grid auto-rows-[220px] gap-3 sm:auto-rows-[280px] sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+      {categories.slice(0, 5).map((category, index) => (
+        <Link key={category.id} href={category.href} className={`group relative overflow-hidden rounded-2xl bg-navy-100 ${index === 0 ? "sm:row-span-2 lg:col-span-2" : ""} ${index === 1 ? "lg:col-span-2" : ""}`}>
+          <Image src={category.image} alt={`${category.name} collection`} fill sizes={index === 0 ? "(max-width: 639px) 100vw, 50vw" : "(max-width: 639px) 100vw, 25vw"} className="object-cover transition duration-700 ease-out group-hover:scale-105" />
+          <div className="absolute inset-0 bg-gradient-to-t from-navy-900/80 via-navy-900/10 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-5 sm:p-6">
+            <div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">Explore collection</p><h3 className="mt-1 font-display text-2xl font-bold text-white sm:text-3xl">{category.name}</h3></div>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/30 bg-white/10 text-xl text-white backdrop-blur transition group-hover:border-white group-hover:bg-white group-hover:text-navy-800">→</span>
+          </div>
+        </Link>
+      ))}
     </div>
   );
 }

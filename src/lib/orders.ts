@@ -51,6 +51,14 @@ export async function computeOrderTotals(
   userId?: number,
   paymentMethod?: ProductPaymentMethod
 ) {
+  let isWholesaleCustomer = false;
+  if (userId) {
+    const [rows] = await pool.query(
+      "SELECT is_wholesale_customer FROM users WHERE id = ? AND role = 'buyer' AND deleted_at IS NULL LIMIT 1",
+      [userId]
+    );
+    isWholesaleCustomer = !!(rows as { is_wholesale_customer: number }[])[0]?.is_wholesale_customer;
+  }
   let subtotal = 0;
   let totalWeightKg = 0;
   const lineItems: OrderLineItem[] = [];
@@ -73,7 +81,7 @@ export async function computeOrderTotals(
     const salePrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
     const wholesalePrice = variant?.wholesalePrice ?? product.wholesalePrice;
     // Mixed products and variations share one cart-wide wholesale threshold.
-    const unitPrice = cartQuantity >= WHOLESALE_MIN_QTY && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice
+    const unitPrice = (isWholesaleCustomer || cartQuantity >= WHOLESALE_MIN_QTY) && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < salePrice
       ? wholesalePrice
       : salePrice;
     const lineTotal = unitPrice * qty;

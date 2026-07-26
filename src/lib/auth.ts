@@ -22,6 +22,7 @@ export interface DbUser {
   reseller_status: "pending" | "approved" | "suspended" | "rejected";
   account_status: "active" | "suspended" | "disabled";
   session_version: number;
+  is_wholesale_customer: number;
   created_at: string;
 }
 
@@ -31,6 +32,7 @@ export interface PublicUser {
   email: string;
   role: UserRole;
   adminRole: AdminRole | null;
+  isWholesaleCustomer: boolean;
 }
 
 export function hashPassword(password: string): Promise<string> {
@@ -92,7 +94,7 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   const uid = await getSessionUserId();
   if (!uid) return null;
   const rows = await query<DbUser>(
-    "SELECT id, name, email, role, admin_role, reseller_status, account_status, session_version FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
+    "SELECT id, name, email, role, admin_role, reseller_status, account_status, session_version, is_wholesale_customer FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1",
     [uid]
   );
   if (rows.length === 0) return null;
@@ -109,6 +111,7 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
     email: u.email,
     role: effectiveRole,
     adminRole: effectiveRole === "admin" ? u.admin_role : null,
+    isWholesaleCustomer: effectiveRole === "buyer" && !!u.is_wholesale_customer,
   };
 }
 

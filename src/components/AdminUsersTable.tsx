@@ -18,6 +18,13 @@ interface AdminUser {
   accountStatus: "active" | "suspended" | "disabled";
   lastLoginAt: string | null;
   createdAt: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  district?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  isWholesaleCustomer: boolean;
+  wholesaleSince?: string | null;
 }
 
 const roleBadge: Record<string, string> = {
@@ -38,10 +45,12 @@ export default function AdminUsersTable({
   title,
   role,
   manage = false,
+  wholesaleOnly = false,
 }: {
   title: string;
   role?: string;
   manage?: boolean;
+  wholesaleOnly?: boolean;
 }) {
   const { toast, confirm } = useToast();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -54,13 +63,16 @@ export default function AdminUsersTable({
   const [viewing, setViewing] = useState<AdminUser | null>(null);
 
   const load = () => {
-    const qs = role ? `?role=${role}` : "";
+    const params = new URLSearchParams();
+    if (role) params.set("role", role);
+    if (wholesaleOnly) params.set("wholesale", "true");
+    const qs = params.size ? `?${params}` : "";
     fetch(`/api/admin/users${qs}`, { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => setUsers(d.users ?? []))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [role]);
+  useEffect(load, [role, wholesaleOnly]);
   useEffect(() => { if (manage && new URLSearchParams(window.location.search).get("new")) setCreating(true); }, [manage]);
 
   const filtered = useMemo(
@@ -119,6 +131,33 @@ export default function AdminUsersTable({
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : "Could not update account status", "error");
     } finally { setSaving(0); }
+  };
+
+  const changeWholesale = async (id: number, isWholesaleCustomer: boolean) => {
+    setSaving(id);
+    try {
+      const response = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, wholesaleCustomer: isWholesaleCustomer }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not update wholesale access");
+      if (wholesaleOnly && !isWholesaleCustomer) setUsers((current) => current.filter((user) => user.id !== id));
+      else setUsers((current) => current.map((user) => user.id === id ? { ...user, isWholesaleCustomer } : user));
+      setViewing((current) => current?.id === id ? { ...current, isWholesaleCustomer } : current);
+      toast(isWholesaleCustomer ? "Wholesale pricing enabled" : "Wholesale pricing removed");
+    } catch (cause) { toast(cause instanceof Error ? cause.message : "Could not update wholesale access", "error"); }
+    finally { setSaving(0); }
+  };
+
+  const exportCsv = () => {
+    const escape = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const headers = ["Customer ID", "Name", "First Name", "Last Name", "Email", "Phone", "Address Line 1", "Address Line 2", "City", "District", "Province", "Postal Code", "Account Status", "Wholesale Since", "Last Login", "Registered At"];
+    const rows = filtered.map((user) => [user.id, user.name, user.firstName, user.lastName, user.email, user.phone, user.addressLine1, user.addressLine2, user.city, user.district, user.province, user.postalCode, user.accountStatus, user.wholesaleSince, user.lastLoginAt, user.createdAt]);
+    const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `wholesale-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   const updateProfile = async (id: number, profile: { firstName: string; lastName: string; email: string; phone: string; city: string }) => {
@@ -199,6 +238,7 @@ export default function AdminUsersTable({
           </p>
         </div>
         {manage && <button onClick={() => setCreating(true)} className="btn-primary">+ Add User</button>}
+        {wholesaleOnly && <button type="button" onClick={exportCsv} disabled={!filtered.length} className="btn-primary disabled:opacity-50">Export CSV</button>}
       </div>
 
       {manage && (
@@ -257,7 +297,7 @@ export default function AdminUsersTable({
               <th className="px-6 py-4">Last active</th>
               <th className="px-6 py-4">Joined</th>
               {role === "reseller" && <th className="px-6 py-4"></th>}
-              {manage && <th className="px-6 py-4 text-right">Actions</th>}
+              {(manage || wholesaleOnly || role === "buyer") && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -283,11 +323,13 @@ export default function AdminUsersTable({
                     {manage ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {u.isWholesaleCustomer && <span className="badge bg-emerald-100 text-emerald-700">Wholesale</span>}
                         {u.adminRole && <span className="text-xs text-navy-800/45">{adminRoleLabel[u.adminRole]}</span>}
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {u.isWholesaleCustomer && <span className="badge bg-emerald-100 text-emerald-700">Wholesale</span>}
                         {u.role === "admin" && u.adminRole && (
                           <span className="badge bg-navy-50 text-navy-800">{adminRoleLabel[u.adminRole]}</span>
                         )}
@@ -330,7 +372,7 @@ export default function AdminUsersTable({
                       </div>
                     </td>
                   )}
-                  {manage && (
+                  {(manage || wholesaleOnly || role === "buyer") && (
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
                         <button onClick={() => setViewing(u)} className="rounded-lg bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand">Manage</button>
@@ -356,6 +398,7 @@ export default function AdminUsersTable({
           onChangeRole={(nextRole) => changeRole(viewing.id, nextRole)}
           onChangeAdminRole={(nextRole) => changeAdminRole(viewing.id, nextRole)}
           onChangeAccountStatus={(status) => changeAccountStatus(viewing.id, status)}
+          onChangeWholesale={(enabled) => changeWholesale(viewing.id, enabled)}
           onSaveProfile={(profile) => updateProfile(viewing.id, profile)}
           onDelete={async () => { await del(viewing); setViewing(null); }}
         />
@@ -367,6 +410,7 @@ export default function AdminUsersTable({
 function UserDetailModal({
   user, saving, onClose, onApprove, onSuspend, onReject, onChangeRole, onChangeAdminRole,
   onChangeAccountStatus, onSaveProfile, onDelete,
+  onChangeWholesale,
 }: {
   user: AdminUser;
   saving: boolean;
@@ -377,6 +421,7 @@ function UserDetailModal({
   onChangeRole: (role: string) => void;
   onChangeAdminRole: (role: string) => void;
   onChangeAccountStatus: (status: AdminUser["accountStatus"]) => void;
+  onChangeWholesale: (enabled: boolean) => void;
   onSaveProfile: (profile: { firstName: string; lastName: string; email: string; phone: string; city: string }) => Promise<boolean>;
   onDelete: () => void;
 }) {
@@ -407,6 +452,7 @@ function UserDetailModal({
           <Detail label="Email"><a href={`mailto:${user.email}`} className="break-all font-medium text-brand hover:underline">{user.email}</a></Detail>
           <Detail label="Phone">{user.phone ? <a href={`tel:${user.phone}`} className="font-medium text-brand hover:underline">{user.phone}</a> : <span>Not provided</span>}</Detail>
           <Detail label="Location" value={user.city || "Not provided"} />
+          <Detail label="Address" value={[user.addressLine1, user.addressLine2, user.city, user.district, user.province, user.postalCode].filter(Boolean).join(", ") || "Not provided"} />
           <Detail label="Account role">
             <div className="flex flex-wrap gap-2">
               <span className={`badge capitalize ${roleBadge[user.role] ?? "bg-navy-50 text-navy-800"}`}>{user.role}</span>
@@ -436,6 +482,17 @@ function UserDetailModal({
           </div>
           {user.role === "admin" && <div><label className="mb-1.5 block text-sm font-medium text-navy-800">Access level</label><select value={user.adminRole ?? "super"} disabled={saving} onChange={(event) => onChangeAdminRole(event.target.value)} className="input"><option value="super">Super Admin</option><option value="manager">Manager</option><option value="cashier">Cashier</option></select></div>}
         </div>
+
+        {user.role === "buyer" && (
+          <div className="flex flex-col gap-4 border-t border-emerald-100 bg-emerald-50/60 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+            <div>
+              <p className="text-sm font-bold text-navy-800">Wholesale customer</p>
+              <p className="mt-1 text-xs leading-5 text-navy-800/55">Wholesale-priced products apply from one item. Products without a wholesale price keep their normal sale or regular price.</p>
+              {user.wholesaleSince && <p className="mt-1 text-xs text-emerald-700">Enabled {new Date(user.wholesaleSince).toLocaleDateString("en-GB")}</p>}
+            </div>
+            <button type="button" disabled={saving} onClick={() => onChangeWholesale(!user.isWholesaleCustomer)} className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${user.isWholesaleCustomer ? "bg-red-100 text-red-700" : "bg-emerald-600 text-white"}`}>{user.isWholesaleCustomer ? "Remove wholesale" : "Make wholesale"}</button>
+          </div>
+        )}
 
         {user.role === "reseller" && (
           <div className="border-t border-navy-800/10 bg-navy-50/60 px-5 py-5 sm:px-7">

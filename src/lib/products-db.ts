@@ -156,12 +156,13 @@ export interface ProductSearchSuggestion {
 export async function getProductSearchSuggestions(
   search: string,
   resellerOnly = false,
-  limit = 5
+  limit = 5,
+  wholesaleCustomer = false
 ): Promise<ProductSearchSuggestion[]> {
   const where = resellerOnly ? `${STOREFRONT_WHERE} AND is_reseller_product = 1` : STOREFRONT_WHERE;
   const term = `%${search.trim().slice(0, 100)}%`;
-  const rows = await query<{ id: number; slug: string; name: string; price: string; image: string }>(
-    `SELECT id, slug, name, price, image FROM products
+  const rows = await query<{ id: number; slug: string; name: string; price: string; wholesale_price: string | null; image: string }>(
+    `SELECT id, slug, name, price, wholesale_price, image FROM products
      WHERE ${where} AND (name LIKE ? OR sku LIKE ? OR category LIKE ?)
      ORDER BY featured DESC, created_at DESC, id DESC LIMIT ?`,
     [term, term, term, Math.max(1, Math.min(10, limit))]
@@ -170,7 +171,9 @@ export async function getProductSearchSuggestions(
     id: String(row.id),
     slug: row.slug,
     name: row.name,
-    price: Number(row.price),
+    price: wholesaleCustomer && row.wholesale_price != null && Number(row.wholesale_price) > 0 && Number(row.wholesale_price) < Number(row.price)
+      ? Number(row.wholesale_price)
+      : Number(row.price),
     image: row.image,
   }));
 }
