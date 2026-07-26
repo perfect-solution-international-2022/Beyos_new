@@ -17,6 +17,7 @@ import ProductRail from "@/components/ProductRail";
 import LimitedOffer from "@/components/LimitedOffer";
 import ShopTheLook from "@/components/ShopTheLook";
 import FAQSection, { homepageFaqs } from "@/components/FAQSection";
+import { unstable_cache } from "next/cache";
 
 export const metadata: Metadata = {
   title: "Online Clothing Store Sri Lanka",
@@ -45,6 +46,10 @@ export const metadata: Metadata = {
 // hero and promotion writes call revalidatePath("/") so changes still appear
 // immediately; this one-minute window is only a safety net.
 export const revalidate = 60;
+// The homepage is backed by live catalog/category/promotion queries. Rendering
+// it on request prevents production builds from failing when build-time DB
+// state differs from the running application.
+export const dynamic = "force-dynamic";
 
 const features = [
   {
@@ -90,15 +95,24 @@ const testimonials = [
   },
 ];
 
-export default async function HomePage() {
-  const [featured, newArrivals, bestSellers, homeCategories, heroSlides, activePromotion] = await Promise.all([
+// Avoid repeating six catalog queries (including the best-seller aggregation)
+// for every homepage request. The short TTL matches the storefront freshness
+// window while keeping the first byte fast during normal traffic.
+const getHomePageData = unstable_cache(
+  async () => Promise.all([
     getFeaturedProducts(),
     getNewArrivalProducts(8),
     getBestSellingProducts(8),
     getHomeCategories(),
     getHeroSlides(),
     getActiveHomepagePromotion(),
-  ]);
+  ]),
+  ["homepage-data-v1"],
+  { revalidate: 60 }
+);
+
+export default async function HomePage() {
+  const [featured, newArrivals, bestSellers, homeCategories, heroSlides, activePromotion] = await getHomePageData();
 
   return (
     <>

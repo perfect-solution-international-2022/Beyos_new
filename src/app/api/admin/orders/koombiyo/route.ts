@@ -120,20 +120,22 @@ export async function POST(request: Request) {
         [order.reseller_id, Number(order.profit || 0), order.order_ref]
       );
     }
-    if (isReseller && status === "cancelled" && !order.inventory_reverted_at) {
+    if (["cancelled", "returned"].includes(status) && !order.inventory_reverted_at) {
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
-        const [locked] = await conn.execute("SELECT id, inventory_reverted_at FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL FOR UPDATE", [order.order_ref]);
+        const orderTable = isReseller ? "reseller_orders" : "orders";
+        const itemTable = isReseller ? "reseller_order_items" : "order_items";
+        const [locked] = await conn.execute(`SELECT id, inventory_reverted_at FROM ${orderTable} WHERE order_ref = ? AND deleted_at IS NULL FOR UPDATE`, [order.order_ref]);
         const current = (locked as { id: number; inventory_reverted_at: string | null }[])[0];
         if (current && !current.inventory_reverted_at) {
-          const [items] = await conn.execute("SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?", [current.id]);
+          const [items] = await conn.execute(`SELECT product_id, product_slug, variant_id, quantity FROM ${itemTable} WHERE order_id = ?`, [current.id]);
           for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
             if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
-            else if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+            if (item.product_id && (!isReseller || !item.variant_id)) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
             else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
           }
-          await conn.execute("UPDATE reseller_orders SET inventory_reverted_at = NOW() WHERE id = ?", [current.id]);
+          await conn.execute(`UPDATE ${orderTable} SET inventory_reverted_at = NOW() WHERE id = ?`, [current.id]);
         }
         await conn.commit();
       } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }

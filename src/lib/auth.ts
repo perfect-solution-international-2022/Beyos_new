@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { query } from "./db";
 import {
   SESSION_COOKIE_NAME,
-  SESSION_MAX_AGE,
+  nextSriLankaMidnight,
   sessionSecretKey,
   verifySessionToken,
 } from "./session";
@@ -63,15 +63,17 @@ export async function createSession(userId: number): Promise<void> {
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE}s`)
+    .setExpirationTime(nextSriLankaMidnight())
     .sign(sessionSecretKey());
+
+  const maxAge = Math.max(1, nextSriLankaMidnight() - Math.floor(Date.now() / 1000));
 
   (await cookies()).set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: SESSION_MAX_AGE,
+    maxAge,
   });
 }
 

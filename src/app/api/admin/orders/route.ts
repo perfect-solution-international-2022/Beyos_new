@@ -4,8 +4,8 @@ import { requireAdminSection } from "@/lib/admin";
 import { sendOrderStatusSms } from "@/lib/sms";
 import { sendOrderEmail } from "@/lib/mail";
 
-const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
-const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled", "rejected"];
+const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "returned", "cancelled"];
+const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "returned", "cancelled", "rejected"];
 const PAYMENT_STATUSES = ["unpaid", "paid", "refunded"];
 
 export async function GET(request: Request) {
@@ -212,12 +212,12 @@ export async function PATCH(request: Request) {
         );
         const order = (rows as { id: number; reseller_id: number; profit: string; status: string; inventory_reverted_at: string | null }[])[0];
         if (!order) { await conn.rollback(); return NextResponse.json({ error: "Order not found" }, { status: 404 }); }
-        const terminal = ["cancelled", "rejected", "delivered", "completed"];
+        const terminal = ["cancelled", "rejected", "returned", "delivered", "completed"];
         if (terminal.includes(order.status) && order.status !== status) {
           await conn.rollback();
           return NextResponse.json({ error: "A completed or cancelled reseller order cannot be reopened" }, { status: 400 });
         }
-        if (["cancelled", "rejected"].includes(status) && !order.inventory_reverted_at) {
+        if (["cancelled", "rejected", "returned"].includes(status) && !order.inventory_reverted_at) {
           const [items] = await conn.execute(
             "SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?", [order.id]
           );
@@ -249,6 +249,28 @@ export async function PATCH(request: Request) {
         sendOrderStatusSms(recipient[0]?.phone, orderRef, status),
         recipient[0]?.email ? sendOrderEmail(recipient[0].email, { orderRef, total: Number(recipient[0].amount), status }) : Promise.resolve(),
       ]);
+      return NextResponse.json({ ok: true });
+    }
+    if (type !== "reseller" && status && ["cancelled", "returned"].includes(status)) {
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        const [rows] = await conn.execute(
+          "SELECT id, status, inventory_reverted_at FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE", [orderRef]
+        );
+        const order = (rows as { id: number; status: string; inventory_reverted_at: string | null }[])[0];
+        if (!order) { await conn.rollback(); return NextResponse.json({ error: "Order not found" }, { status: 404 }); }
+        if (!order.inventory_reverted_at) {
+          const [items] = await conn.execute("SELECT product_id, product_slug, variant_id, quantity FROM order_items WHERE order_id = ?", [order.id]);
+          for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
+            if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+            if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+            else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+          }
+        }
+        await conn.execute("UPDATE orders SET status = ?, inventory_reverted_at = COALESCE(inventory_reverted_at, NOW()) WHERE id = ?", [status, order.id]);
+        await conn.commit();
+      } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
       return NextResponse.json({ ok: true });
     }
     const recipient = type === "reseller"

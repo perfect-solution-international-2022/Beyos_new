@@ -25,8 +25,8 @@ interface Order {
   createdAt: string;
 }
 
-const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
-const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled", "rejected"];
+const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "returned", "cancelled"];
+const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "returned", "cancelled", "rejected"];
 
 const paymentBadge: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",

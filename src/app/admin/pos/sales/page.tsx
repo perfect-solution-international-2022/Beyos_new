@@ -16,6 +16,7 @@ const DELIVERY_STATUS_LABELS: Record<string, string> = {
   accepted: "Accepted",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
+  returned: "Returned",
   cancelled: "Cancelled",
 };
 const DELIVERY_STATUS_STYLES: Record<string, string> = {
@@ -23,6 +24,7 @@ const DELIVERY_STATUS_STYLES: Record<string, string> = {
   accepted: "bg-blue-100 text-blue-700",
   out_for_delivery: "bg-blue-100 text-blue-700",
   delivered: "bg-emerald-100 text-emerald-700",
+  returned: "bg-orange-100 text-orange-700",
   cancelled: "bg-red-100 text-red-700",
 };
 

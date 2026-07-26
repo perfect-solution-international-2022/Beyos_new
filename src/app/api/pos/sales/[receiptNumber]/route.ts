@@ -60,7 +60,7 @@ export async function GET(
   }
 }
 
-const DELIVERY_STATUSES = ["pending", "accepted", "out_for_delivery", "delivered", "cancelled"];
+const DELIVERY_STATUSES = ["pending", "accepted", "out_for_delivery", "delivered", "returned", "cancelled"];
 
 export async function PATCH(
   request: Request,
@@ -86,11 +86,11 @@ export async function PATCH(
     if (sale.fulfillment_type !== "delivery") {
       return NextResponse.json({ error: "This sale is not a delivery order" }, { status: 400 });
     }
-    if (sale.delivery_status === "cancelled" && sale.delivery_status !== b.deliveryStatus) {
-      return NextResponse.json({ error: "A cancelled delivery order cannot be reopened" }, { status: 400 });
+    if (["cancelled", "returned"].includes(sale.delivery_status || "") && sale.delivery_status !== b.deliveryStatus) {
+      return NextResponse.json({ error: "A cancelled or returned delivery order cannot be reopened" }, { status: 400 });
     }
 
-    if (b.deliveryStatus === "cancelled" && !sale.inventory_reverted_at) {
+    if (["cancelled", "returned"].includes(b.deliveryStatus) && !sale.inventory_reverted_at) {
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();

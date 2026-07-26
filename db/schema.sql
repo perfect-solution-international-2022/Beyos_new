@@ -112,6 +112,7 @@ CREATE TABLE IF NOT EXISTS orders (
   koombiyo_status     VARCHAR(100) NULL,
   koombiyo_response   JSON NULL,
   koombiyo_updated_at TIMESTAMP NULL,
+  inventory_reverted_at TIMESTAMP NULL,
   deleted_at         TIMESTAMP NULL,
   created_at         TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_order_user FOREIGN KEY (user_id)
@@ -409,6 +410,8 @@ CREATE TABLE IF NOT EXISTS order_items (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   order_id    INT NOT NULL,
   product_slug VARCHAR(160) NOT NULL,
+  product_id  INT NULL,
+  variant_id  INT NULL,
   name        VARCHAR(200) NOT NULL,
   size        VARCHAR(40) NOT NULL,
   color       VARCHAR(60) NOT NULL,
@@ -417,5 +420,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   line_total  DECIMAL(10,2) NOT NULL,
   CONSTRAINT fk_item_order FOREIGN KEY (order_id)
     REFERENCES orders(id) ON DELETE CASCADE,
-  INDEX idx_order (order_id)
+  INDEX idx_order (order_id),
+  INDEX idx_order_item_product (product_id),
+  INDEX idx_order_item_variant (variant_id)
 ) ENGINE=InnoDB;

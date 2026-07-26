@@ -20,7 +20,14 @@ export const pool =
     keepAliveInitialDelay: 0,
     namedPlaceholders: true,
     dateStrings: true,
+    // Keep timestamp conversion aligned with the business timezone even when
+    // this application is moved to a host configured in another timezone.
+    timezone: "+05:30",
   });
+
+pool.on("connection", (connection) => {
+  connection.query("SET time_zone = '+05:30'");
+});
 
 // Next.js route bundles can evaluate this module independently. Keep one pool
 // per Node process in production too, avoiding needless connections and TLS/

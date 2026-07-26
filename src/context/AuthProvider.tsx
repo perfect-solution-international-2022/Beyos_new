@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from "react";
 
@@ -46,12 +47,25 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const midnightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       const res = await fetch("/api/auth/me", { cache: "no-store" });
       const data = await res.json();
       setUser(data.user ?? null);
+      if (midnightTimer.current) clearTimeout(midnightTimer.current);
+      if (data.user && Number(data.serverNow) && Number(data.sessionExpiresAt)) {
+        // Use the server-provided clock delta, not the visitor's device clock.
+        const delay = Math.max(0, (Number(data.sessionExpiresAt) - Number(data.serverNow)) * 1000);
+        midnightTimer.current = setTimeout(() => {
+          setUser(null);
+          const path = window.location.pathname;
+          if (["/admin", "/reseller", "/dashboard"].some((prefix) => path.startsWith(prefix))) {
+            window.location.assign(`/login?redirect=${encodeURIComponent(`${path}${window.location.search}`)}`);
+          }
+        }, delay + 250);
+      }
     } catch {
       setUser(null);
     } finally {
@@ -61,6 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     refresh();
+    return () => {
+      if (midnightTimer.current) clearTimeout(midnightTimer.current);
+    };
   }, [refresh]);
 
   const login = useCallback(async (email: string, password: string) => {

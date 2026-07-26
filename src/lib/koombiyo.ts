@@ -191,6 +191,7 @@ export async function trackOrder(waybillId: string): Promise<KoombiyoTracking> {
 export function mapKoombiyoStatus(status: string): string {
   const normalized = status.trim().toUpperCase().replace(/[\s-]+/g, "_");
   if (["DELIVERED", "CLIENT_RECEIVED"].includes(normalized)) return "delivered";
+  if (["RETURNED", "RETURN_TO_CLIENT", "RETURNED_TO_CLIENT", "RETURN_COMPLETED"].includes(normalized)) return "returned";
   if (["FAILED", "FAILED_TO_DELIVER", "CANCELLED"].includes(normalized)) return "cancelled";
   if (
     [

@@ -27,6 +27,8 @@ export interface CustomerInfo {
 }
 
 export interface OrderLineItem {
+  productId: number;
+  variantId: number | null;
   slug: string;
   name: string;
   size: string;
@@ -78,6 +80,8 @@ export async function computeOrderTotals(
     subtotal += lineTotal;
     totalWeightKg += (variant?.weightKg ?? product.weightKg ?? 0) * qty;
     lineItems.push({
+      productId: Number(product.id),
+      variantId: variant?.id ?? null,
       slug: product.slug,
       name: product.name,
       size: variant?.attributeSummary || line.size,
@@ -135,6 +139,10 @@ export async function createPendingOrder(opts: {
   try {
     conn = await pool.getConnection();
     await conn.beginTransaction();
+    await conn.query(
+      "SET @stock_movement_type = 'customer_order_hold', @stock_reference_type = 'customer_order', @stock_reference_id = ?",
+      [orderRef]
+    );
 
     const [orderResult] = await conn.execute(
       `INSERT INTO orders
@@ -165,11 +173,28 @@ export async function createPendingOrder(opts: {
     const orderId = (orderResult as { insertId: number }).insertId;
 
     for (const li of opts.lineItems) {
+      const [productRows] = await conn.execute(
+        "SELECT stock FROM products WHERE id = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
+        [li.productId]
+      );
+      if (!(productRows as { stock: number }[])[0]) throw new Error(`Product is no longer available: ${li.name}`);
+      if (li.variantId) {
+        const [variantRows] = await conn.execute(
+          "SELECT stock FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          [li.variantId, li.productId]
+        );
+        const variant = (variantRows as { stock: number }[])[0];
+        if (!variant || Number(variant.stock) < li.quantity) throw new Error(`Not enough stock for ${li.name}`);
+        await conn.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [li.quantity, li.variantId]);
+      } else if (Number((productRows as { stock: number }[])[0].stock) < li.quantity) {
+        throw new Error(`Not enough stock for ${li.name}`);
+      }
+      await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [li.quantity, li.productId]);
       await conn.execute(
         `INSERT INTO order_items
-          (order_id, product_slug, name, size, color, quantity, unit_price, line_total)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [orderId, li.slug, li.name, li.size, li.color, li.quantity, li.unitPrice, li.lineTotal]
+          (order_id, product_slug, product_id, variant_id, name, size, color, quantity, unit_price, line_total)
+         VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [orderId, li.slug, li.productId, li.variantId, li.name, li.size, li.color, li.quantity, li.unitPrice, li.lineTotal]
       );
     }
 
@@ -189,11 +214,35 @@ export async function createPendingOrder(opts: {
     if (conn) await conn.rollback().catch(() => {});
     throw err;
   } finally {
-    if (conn) conn.release();
+    if (conn) {
+      await conn.query("SET @stock_movement_type = NULL, @stock_reference_type = NULL, @stock_reference_id = NULL").catch(() => {});
+      conn.release();
+    }
   }
 }
 
 /** Cancels an order that failed to reach a payment gateway (e.g. OnePay request failed). */
 export async function cancelOrder(orderId: number): Promise<void> {
-  await pool.execute("UPDATE orders SET status = 'cancelled' WHERE id = ?", [orderId]);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.execute(
+      "SELECT id, status, inventory_reverted_at FROM orders WHERE id = ? LIMIT 1 FOR UPDATE", [orderId]
+    );
+    const order = (rows as { id: number; status: string; inventory_reverted_at: string | null }[])[0];
+    if (!order) throw new Error("Order not found");
+    if (!order.inventory_reverted_at) {
+      const [items] = await conn.execute("SELECT product_id, product_slug, variant_id, quantity FROM order_items WHERE order_id = ?", [orderId]);
+      for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
+        if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+        if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+        else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+      }
+    }
+    await conn.execute("UPDATE orders SET status = 'cancelled', inventory_reverted_at = COALESCE(inventory_reverted_at, NOW()) WHERE id = ?", [orderId]);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback().catch(() => {});
+    throw error;
+  } finally { conn.release(); }
 }

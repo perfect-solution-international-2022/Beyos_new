@@ -6,6 +6,7 @@ import Header from "./Header";
 import Footer from "./Footer";
 import MobileBottomNav from "./MobileBottomNav";
 import WhatsAppButton from "./WhatsAppButton";
+import CookieConsent from "./CookieConsent";
 
 const CartDrawer = dynamic(() => import("./CartDrawer"), { ssr: false });
 
@@ -28,6 +29,7 @@ export default function SiteFrame({ children }: { children: React.ReactNode }) {
       <CartDrawer />
       <MobileBottomNav />
       <WhatsAppButton />
+      <CookieConsent />
     </>
   );
 }

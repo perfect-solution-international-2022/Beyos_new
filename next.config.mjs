@@ -29,6 +29,11 @@ const securityHeaders = [
 const nextConfig = {
   compress: true,
   poweredByHeader: false,
+  // Keep static generation within the server's memory limit. Next otherwise
+  // starts several page workers and can be killed without a useful error.
+  experimental: {
+    cpus: 1,
+  },
   images: {
     remotePatterns: [],
     formats: ["image/avif", "image/webp"],
