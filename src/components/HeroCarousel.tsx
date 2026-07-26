@@ -5,17 +5,16 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { HeroSlide } from "@/lib/hero-slides";
 
-const SLIDE_MS = 6500;
+const SLIDE_MS = 3000;
 
 export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0);
-  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused || slides.length < 2) return;
+    if (slides.length < 2) return;
     const timer = window.setTimeout(() => setCurrent((value) => (value + 1) % slides.length), SLIDE_MS);
     return () => window.clearTimeout(timer);
-  }, [current, paused, slides.length]);
+  }, [current, slides.length]);
 
   if (!slides.length) return null;
   const move = (direction: number) => setCurrent((value) => (value + direction + slides.length) % slides.length);
@@ -24,9 +23,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     <section
       aria-roledescription="carousel"
       aria-label="Beyos featured collection"
-      className={`hero-shell relative mx-2 mt-2 h-[74svh] min-h-[540px] max-h-[860px] overflow-hidden rounded-[26px] bg-[#07192d] sm:mx-4 sm:mt-3 sm:rounded-[32px] lg:mx-6 ${paused ? "is-paused" : ""}`}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      className="hero-shell relative mx-2 mt-2 h-[74svh] min-h-[540px] max-h-[860px] overflow-hidden rounded-[26px] bg-[#07192d] sm:mx-4 sm:mt-3 sm:rounded-[32px] lg:mx-6"
     >
       {slides.map((slide, index) => (
         <div key={slide.id} aria-hidden={index !== current} className={`absolute inset-0 transition-opacity duration-[1400ms] ease-out ${index === current ? "z-0 opacity-100" : "pointer-events-none opacity-0"}`}>
@@ -39,21 +36,21 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             fetchPriority={index === 0 ? "high" : "low"}
             quality={75}
             sizes="100vw"
-            className={`object-cover transition-transform duration-[8000ms] ease-out ${index === current && !paused ? "scale-[1.045]" : "scale-100"}`}
+            className={`object-cover transition-transform duration-[8000ms] ease-out ${index === current ? "scale-[1.045]" : "scale-100"}`}
           />
         </div>
       ))}
 
-      <div className="absolute inset-0 bg-gradient-to-r from-[#061629]/95 via-[#061629]/60 to-[#061629]/5" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#061629]/80 via-transparent to-[#061629]/15" />
-      <div className="absolute inset-y-0 left-[54%] hidden w-px bg-gradient-to-b from-transparent via-white/15 to-transparent lg:block" />
+      <div className="absolute inset-0 z-[1] bg-gradient-to-r from-[#03101f]/100 via-[#061629]/78 to-[#061629]/15" />
+      <div className="absolute inset-0 z-[1] bg-gradient-to-t from-[#061629]/85 via-transparent to-[#061629]/20" />
+      <div className="absolute inset-y-0 left-[54%] z-[2] hidden w-px bg-gradient-to-b from-transparent via-white/15 to-transparent lg:block" />
 
-      <div className="container-x relative flex h-full items-center pb-16 pt-8 sm:pb-20">
+      <div className="container-x relative z-10 flex h-full items-center pb-16 pt-8 sm:pb-20">
         <div className="max-w-2xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.24em] text-white/85 backdrop-blur-md">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand" /> New season · Sri Lanka
           </span>
-          <h1 className="mt-6 max-w-2xl font-display text-[46px] font-bold leading-[0.96] tracking-[-0.04em] text-white min-[390px]:text-[54px] sm:text-7xl lg:text-[88px]">
+          <h1 className="mt-6 max-w-2xl font-display text-[46px] font-bold leading-[0.96] tracking-[-0.04em] text-white [text-shadow:0_3px_28px_rgba(0,0,0,.55)] min-[390px]:text-[54px] sm:text-7xl lg:text-[88px]">
             Made to move.<br/><span className="font-normal italic text-brand">Designed to stay.</span>
           </h1>
           <p className="mt-6 max-w-lg text-sm leading-6 text-white/68 sm:text-lg sm:leading-8">Contemporary essentials, effortless fits and premium comfort—made for every version of your day.</p>
@@ -89,7 +86,6 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 
       <style jsx>{`
         .hero-progress { width: 100%; transform-origin: left; animation: heroFill ${SLIDE_MS}ms linear forwards; }
-        .is-paused .hero-progress { animation-play-state: paused; }
         @keyframes heroFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
         @media (prefers-reduced-motion: reduce) { .hero-progress { animation: none; } }
       `}</style>
