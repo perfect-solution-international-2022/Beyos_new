@@ -46,7 +46,7 @@ export async function GET(request: Request) {
               DATE(o.created_at) AS d, TIME(o.created_at) AS t
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
-       WHERE o.created_at BETWEEN ? AND ?`,
+       WHERE o.deleted_at IS NULL AND o.created_at BETWEEN ? AND ?`,
       [start, end]
     );
 
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
               DATE(ro.created_at) AS d, TIME(ro.created_at) AS t
        FROM reseller_order_items roi
        JOIN reseller_orders ro ON ro.id = roi.order_id
-       WHERE ro.created_at BETWEEN ? AND ? AND ro.status <> 'rejected'`,
+       WHERE ro.deleted_at IS NULL AND ro.created_at BETWEEN ? AND ? AND ro.status <> 'rejected'`,
       [start, end]
     );
 
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
               DATE(s.created_at) AS d, TIME(s.created_at) AS t
        FROM pos_sale_items psi
        JOIN pos_sales s ON s.id = psi.sale_id
-       WHERE s.created_at BETWEEN ? AND ? AND s.status = 'completed'`,
+       WHERE s.deleted_at IS NULL AND s.created_at BETWEEN ? AND ? AND s.status = 'completed'`,
       [start, end]
     );
 
@@ -95,15 +95,15 @@ export async function GET(request: Request) {
 
     // ---- Order/receipt counts + revenue totals (order-level, incl. shipping/discount/tax) ----
     const buyerOrders = await query<{ id: number; total: string }>(
-      `SELECT id, total FROM orders WHERE created_at BETWEEN ? AND ?`,
+      `SELECT id, total FROM orders WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ?`,
       [start, end]
     );
     const resellerOrders = await query<{ id: number; amount: string }>(
-      `SELECT id, amount FROM reseller_orders WHERE created_at BETWEEN ? AND ? AND status <> 'rejected'`,
+      `SELECT id, amount FROM reseller_orders WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND status <> 'rejected'`,
       [start, end]
     );
     const posSales = await query<{ id: number; total: string }>(
-      `SELECT id, total FROM pos_sales WHERE created_at BETWEEN ? AND ? AND status = 'completed'`,
+      `SELECT id, total FROM pos_sales WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND status = 'completed'`,
       [start, end]
     );
 

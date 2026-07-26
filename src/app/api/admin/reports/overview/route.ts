@@ -29,7 +29,7 @@ export async function GET(request: Request) {
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.slug = oi.product_slug
-       WHERE DATE(o.created_at) BETWEEN ? AND ?`,
+       WHERE o.deleted_at IS NULL AND DATE(o.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
@@ -44,17 +44,17 @@ export async function GET(request: Request) {
        FROM reseller_order_items roi
        JOIN reseller_orders ro ON ro.id = roi.order_id
        LEFT JOIN products p ON p.slug = roi.product_slug
-       WHERE DATE(ro.created_at) BETWEEN ? AND ? AND ro.status <> 'rejected'`,
+       WHERE ro.deleted_at IS NULL AND DATE(ro.created_at) BETWEEN ? AND ? AND ro.status <> 'rejected'`,
       [start, end]
     );
 
     // ---- Order counts + status breakdown in range ----
     const buyerOrders = await query<{ id: number; total: string; status: string; created_at: string }>(
-      `SELECT id, total, status, DATE(created_at) AS created_at FROM orders WHERE DATE(created_at) BETWEEN ? AND ?`,
+      `SELECT id, total, status, DATE(created_at) AS created_at FROM orders WHERE deleted_at IS NULL AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const resellerOrders = await query<{ id: number; amount: string; status: string; created_at: string }>(
-      `SELECT id, amount, status, DATE(created_at) AS created_at FROM reseller_orders WHERE DATE(created_at) BETWEEN ? AND ? AND status <> 'rejected'`,
+      `SELECT id, amount, status, DATE(created_at) AS created_at FROM reseller_orders WHERE deleted_at IS NULL AND DATE(created_at) BETWEEN ? AND ? AND status <> 'rejected'`,
       [start, end]
     );
 
