@@ -208,7 +208,7 @@ export async function PATCH(request: Request) {
         await conn.beginTransaction();
         const [rows] = await conn.execute(
           `SELECT id, reseller_id, profit, status, inventory_reverted_at
-           FROM reseller_orders WHERE order_ref = ? LIMIT 1 FOR UPDATE`, [orderRef]
+           FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE`, [orderRef]
         );
         const order = (rows as { id: number; reseller_id: number; profit: string; status: string; inventory_reverted_at: string | null }[])[0];
         if (!order) { await conn.rollback(); return NextResponse.json({ error: "Order not found" }, { status: 404 }); }
@@ -243,7 +243,7 @@ export async function PATCH(request: Request) {
         await conn.commit();
       } catch (error) { await conn.rollback(); throw error; } finally { conn.release(); }
       const recipient = await query<{ phone: string; email: string; amount: string }>(
-        `SELECT u.phone, u.email, ro.amount FROM reseller_orders ro JOIN users u ON u.id = ro.reseller_id WHERE ro.order_ref = ? LIMIT 1`, [orderRef]
+        `SELECT u.phone, u.email, ro.amount FROM reseller_orders ro JOIN users u ON u.id = ro.reseller_id WHERE ro.order_ref = ? AND ro.deleted_at IS NULL LIMIT 1`, [orderRef]
       );
       await Promise.allSettled([
         sendOrderStatusSms(recipient[0]?.phone, orderRef, status),
@@ -254,15 +254,16 @@ export async function PATCH(request: Request) {
     const recipient = type === "reseller"
       ? await query<{ phone: string; status: string }>(
           `SELECT u.phone, ro.status FROM reseller_orders ro
-           JOIN users u ON u.id = ro.reseller_id WHERE ro.order_ref = ? LIMIT 1`,
+           JOIN users u ON u.id = ro.reseller_id WHERE ro.order_ref = ? AND ro.deleted_at IS NULL LIMIT 1`,
           [orderRef]
         )
       : await query<{ phone: string; status: string }>(
-          "SELECT customer_phone AS phone, status FROM orders WHERE order_ref = ? LIMIT 1",
+          "SELECT customer_phone AS phone, status FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1",
           [orderRef]
         );
     params.push(orderRef);
-    await query(`UPDATE ${table} SET ${sets.join(", ")} WHERE order_ref = ?`, params);
+    const result = await query(`UPDATE ${table} SET ${sets.join(", ")} WHERE order_ref = ? AND deleted_at IS NULL`, params) as unknown as { affectedRows: number };
+    if (!result.affectedRows) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     if (status && recipient[0] && recipient[0].status !== status) {
       await sendOrderStatusSms(recipient[0].phone, orderRef, status);
     }
@@ -293,7 +294,7 @@ export async function DELETE(request: Request) {
 
     if (body.type === "customer") {
       const [rows] = await conn.execute(
-        "SELECT id, status, koombiyo_status FROM orders WHERE order_ref = ? LIMIT 1 FOR UPDATE",
+        "SELECT id, status, koombiyo_status FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [body.orderRef]
       );
       const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
@@ -303,7 +304,7 @@ export async function DELETE(request: Request) {
       await conn.execute("UPDATE orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
     } else if (body.type === "reseller") {
       const [rows] = await conn.execute(
-        "SELECT id, status, koombiyo_status FROM reseller_orders WHERE order_ref = ? LIMIT 1 FOR UPDATE",
+        "SELECT id, status, koombiyo_status FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [body.orderRef]
       );
       const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
@@ -324,7 +325,7 @@ export async function DELETE(request: Request) {
     } else {
       const [rows] = await conn.execute(
         `SELECT id, fulfillment_type, delivery_status, koombiyo_status
-         FROM pos_sales WHERE receipt_number = ? LIMIT 1 FOR UPDATE`,
+         FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE`,
         [body.orderRef]
       );
       const order = (rows as { id: number; fulfillment_type: string; delivery_status: string | null; koombiyo_status: string | null }[])[0];

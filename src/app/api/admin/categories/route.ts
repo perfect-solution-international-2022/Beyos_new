@@ -24,7 +24,7 @@ export async function GET() {
               CASE WHEN c.image_data IS NULL THEN 0 ELSE 1 END AS has_uploaded_image,
               UNIX_TIMESTAMP(c.updated_at) AS image_version,
               p.name AS parent_name,
-              (SELECT COUNT(*) FROM products pr WHERE pr.category = c.slug) AS product_count
+              (SELECT COUNT(*) FROM products pr WHERE pr.category = c.slug AND pr.deleted_at IS NULL) AS product_count
        FROM categories c LEFT JOIN categories p ON p.id = c.parent_id
        ORDER BY c.name ASC`
     );

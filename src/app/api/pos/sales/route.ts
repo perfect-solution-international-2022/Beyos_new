@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const search = searchParams.get("search")?.trim();
 
   try {
-    const conditions: string[] = [];
+    const conditions: string[] = ["s.deleted_at IS NULL"];
     const params: unknown[] = [];
     if (search) {
       conditions.push("(s.receipt_number LIKE ? OR s.customer_name LIKE ?)");

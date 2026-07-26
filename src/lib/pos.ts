@@ -12,7 +12,7 @@ export function makeReceiptNumber(): string {
 /** Sum of cash-paid sales within a shift — used to compute the expected drawer amount at close-out. */
 export async function cashSalesTotal(shiftId: number): Promise<number> {
   const rows = await query<{ total: string | null }>(
-    "SELECT COALESCE(SUM(total),0) AS total FROM pos_sales WHERE shift_id = ? AND payment_method = 'cash' AND status = 'completed'",
+    "SELECT COALESCE(SUM(total),0) AS total FROM pos_sales WHERE shift_id = ? AND deleted_at IS NULL AND payment_method = 'cash' AND status = 'completed' AND COALESCE(delivery_status, '') <> 'cancelled'",
     [shiftId]
   );
   return Number(rows[0]?.total ?? 0);

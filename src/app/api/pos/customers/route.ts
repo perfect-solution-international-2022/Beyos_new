@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     const rows = await query<CustomerRow>(
       `SELECT * FROM (
          SELECT CONCAT('user-', id) id, name, email, phone, address_line1, address_line2, city, district, province, postal_code
-         FROM users WHERE role = 'buyer' AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
+         FROM users WHERE role = 'buyer' AND deleted_at IS NULL AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
          UNION ALL
          SELECT CONCAT('pos-', id) id, name, '' email, phone, address address_line1, NULL address_line2, city, district, province, postal_code
          FROM pos_customers WHERE name LIKE ? OR phone LIKE ?

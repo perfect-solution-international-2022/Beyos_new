@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "You already have a pending withdrawal request" }, { status: 400 });
     }
     const [earnedRows] = await conn.execute(
-      "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND status IN ('completed','delivered')", [reseller.id]
+      "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL AND status IN ('completed','delivered')", [reseller.id]
     );
     const [withdrawnRows] = await conn.execute(
       "SELECT COALESCE(SUM(amount),0) AS total FROM withdrawals WHERE reseller_id = ? AND status <> 'rejected'", [reseller.id]

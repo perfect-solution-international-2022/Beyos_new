@@ -35,7 +35,7 @@ export async function GET(
     `SELECT id, name, email, phone, city, reseller_status, allow_price_override,
             min_markup_pct, max_markup_pct, credit_limit,
             bank_name, account_name, account_number, bank_branch, created_at
-     FROM users WHERE id = ? AND role = 'reseller' LIMIT 1`,
+     FROM users WHERE id = ? AND role = 'reseller' AND deleted_at IS NULL LIMIT 1`,
     [id]
   );
   const reseller = rows[0];
@@ -44,7 +44,7 @@ export async function GET(
   const [orderAgg] = await query<{ total: number; pending: number; sales: string | null }>(
     `SELECT COUNT(*) AS total, SUM(status = 'pending') AS pending,
             COALESCE(SUM(CASE WHEN status IN ('completed','delivered') THEN amount ELSE 0 END),0) AS sales
-     FROM reseller_orders WHERE reseller_id = ?`,
+     FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL`,
     [id]
   );
 
@@ -58,7 +58,7 @@ export async function GET(
     created_at: string;
   }>(
     `SELECT order_ref, customer_name, amount, profit, status, payment_status, created_at
-     FROM reseller_orders WHERE reseller_id = ? ORDER BY created_at DESC LIMIT 20`,
+     FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 20`,
     [id]
   );
 

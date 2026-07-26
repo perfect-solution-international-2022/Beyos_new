@@ -12,12 +12,12 @@ export async function GET() {
     const [[revenue], [counts], weeklyRows] = await Promise.all([
       query<{ count: number; daily: string | null; monthly: string | null }>(
         `SELECT COUNT(*) AS count,
-                COALESCE(SUM(CASE WHEN DATE(created_at) = CURDATE() THEN amount ELSE 0 END), 0) AS daily,
-                COALESCE(SUM(CASE WHEN YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END), 0) AS monthly
+                COALESCE(SUM(CASE WHEN status IN ('completed','delivered') AND DATE(created_at) = CURDATE() THEN amount ELSE 0 END), 0) AS daily,
+                COALESCE(SUM(CASE WHEN status IN ('completed','delivered') AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END), 0) AS monthly
          FROM (
-           SELECT created_at, total AS amount FROM orders WHERE deleted_at IS NULL
+           SELECT created_at, status, total AS amount FROM orders WHERE deleted_at IS NULL
            UNION ALL
-           SELECT created_at, amount FROM reseller_orders WHERE deleted_at IS NULL
+           SELECT created_at, status, amount FROM reseller_orders WHERE deleted_at IS NULL
          ) combined_orders`
       ),
       query<{
@@ -27,12 +27,13 @@ export async function GET() {
         low_stock: number;
       }>(
         `SELECT
-           (SELECT COUNT(*) FROM users WHERE role = 'buyer') AS customers,
+           (SELECT COUNT(*) FROM users WHERE role = 'buyer' AND deleted_at IS NULL) AS customers,
            (SELECT COUNT(*) FROM orders WHERE status = 'pending' AND deleted_at IS NULL) +
              (SELECT COUNT(*) FROM reseller_orders WHERE status = 'pending' AND deleted_at IS NULL) AS pending_orders,
-           (SELECT COUNT(*) FROM users WHERE role = 'reseller' AND reseller_status = 'pending') AS pending_resellers,
-           (SELECT COUNT(*) FROM products WHERE product_type <> 'variable' AND stock <= low_stock_threshold AND is_publish = 1) +
-             (SELECT COUNT(*) FROM product_variants WHERE stock <= low_stock_threshold) AS low_stock`
+           (SELECT COUNT(*) FROM users WHERE role = 'reseller' AND reseller_status = 'pending' AND deleted_at IS NULL) AS pending_resellers,
+           (SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND product_type <> 'variable' AND stock <= low_stock_threshold AND is_publish = 1) +
+             (SELECT COUNT(*) FROM product_variants pv JOIN products p ON p.id = pv.product_id
+               WHERE pv.stock <= pv.low_stock_threshold AND p.deleted_at IS NULL AND p.is_publish = 1) AS low_stock`
       ),
       query<{ dow: number; c: number }>(
         `SELECT dow, SUM(c) AS c FROM (

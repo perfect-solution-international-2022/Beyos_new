@@ -91,7 +91,7 @@ export async function GET(
 
   const posRows = await query<any>(
     `SELECT s.*, c.name AS cashier_name FROM pos_sales s
-     JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.receipt_number = ? LIMIT 1`,
+     JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.receipt_number = ? AND s.deleted_at IS NULL LIMIT 1`,
     [ref]
   );
   if (posRows[0]) {

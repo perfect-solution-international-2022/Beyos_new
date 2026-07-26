@@ -29,7 +29,7 @@ export async function GET(request: Request) {
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.slug = oi.product_slug
-       WHERE o.deleted_at IS NULL AND DATE(o.created_at) BETWEEN ? AND ?`,
+       WHERE o.deleted_at IS NULL AND o.status IN ('completed','delivered') AND DATE(o.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
@@ -44,17 +44,39 @@ export async function GET(request: Request) {
        FROM reseller_order_items roi
        JOIN reseller_orders ro ON ro.id = roi.order_id
        LEFT JOIN products p ON p.slug = roi.product_slug
-       WHERE ro.deleted_at IS NULL AND DATE(ro.created_at) BETWEEN ? AND ? AND ro.status <> 'rejected'`,
+       WHERE ro.deleted_at IS NULL AND ro.status IN ('completed','delivered') AND DATE(ro.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
     // ---- Order counts + status breakdown in range ----
     const buyerOrders = await query<{ id: number; total: string; status: string; created_at: string }>(
-      `SELECT id, total, status, DATE(created_at) AS created_at FROM orders WHERE deleted_at IS NULL AND DATE(created_at) BETWEEN ? AND ?`,
+      `SELECT id, total, status, DATE(created_at) AS created_at FROM orders WHERE deleted_at IS NULL AND status IN ('completed','delivered') AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const resellerOrders = await query<{ id: number; amount: string; status: string; created_at: string }>(
-      `SELECT id, amount, status, DATE(created_at) AS created_at FROM reseller_orders WHERE deleted_at IS NULL AND DATE(created_at) BETWEEN ? AND ? AND status <> 'rejected'`,
+      `SELECT id, amount, status, DATE(created_at) AS created_at FROM reseller_orders WHERE deleted_at IS NULL AND status IN ('completed','delivered') AND DATE(created_at) BETWEEN ? AND ?`,
+      [start, end]
+    );
+
+    // ---- Completed POS sales in range ----
+    const posLines = await query<{
+      product_slug: string; name: string; category: string | null;
+      quantity: number; unit_price: string; line_total: string;
+      production_cost: string | null; order_date: string;
+    }>(
+      `SELECT psi.product_slug, psi.name, p.category, psi.quantity, psi.unit_price, psi.line_total,
+              p.production_cost, DATE(s.created_at) AS order_date
+       FROM pos_sale_items psi
+       JOIN pos_sales s ON s.id = psi.sale_id
+       LEFT JOIN products p ON p.slug = psi.product_slug
+       WHERE s.deleted_at IS NULL AND s.status = 'completed'
+         AND COALESCE(s.delivery_status, '') <> 'cancelled' AND DATE(s.created_at) BETWEEN ? AND ?`,
+      [start, end]
+    );
+    const posSales = await query<{ id: number; total: string; status: string; created_at: string }>(
+      `SELECT id, total, status, DATE(created_at) AS created_at FROM pos_sales
+       WHERE deleted_at IS NULL AND status = 'completed' AND COALESCE(delivery_status, '') <> 'cancelled'
+         AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
@@ -62,7 +84,7 @@ export async function GET(request: Request) {
       prodCost !== null ? Number(prodCost) : unitPrice * 0.55; // fallback estimate when no cost is recorded
 
     // ---- Summary ----
-    let revenue = 0, profit = 0, unitsSold = 0, customerRevenue = 0, resellerRevenue = 0;
+    let revenue = 0, profit = 0, unitsSold = 0, customerRevenue = 0, resellerRevenue = 0, posRevenue = 0;
     for (const l of buyerLines) {
       const lt = Number(l.line_total);
       revenue += lt; customerRevenue += lt; unitsSold += l.quantity;
@@ -73,13 +95,19 @@ export async function GET(request: Request) {
       revenue += lt; resellerRevenue += lt; unitsSold += l.quantity;
       profit += lt - Number(l.reseller_price) * l.quantity;
     }
-    const totalOrders = buyerOrders.length + resellerOrders.length;
+    for (const l of posLines) {
+      const lt = Number(l.line_total);
+      revenue += lt; posRevenue += lt; unitsSold += l.quantity;
+      profit += lt - estimateCost(Number(l.unit_price), l.production_cost) * l.quantity;
+    }
+    const totalOrders = buyerOrders.length + resellerOrders.length + posSales.length;
     const avgOrderValue = totalOrders > 0 ? revenue / totalOrders : 0;
 
     // ---- Daily trend ----
     const trendMap = new Map<string, number>();
     for (const l of buyerLines) trendMap.set(l.order_date, (trendMap.get(l.order_date) ?? 0) + Number(l.line_total));
     for (const l of resellerLines) trendMap.set(l.order_date, (trendMap.get(l.order_date) ?? 0) + Number(l.line_total));
+    for (const l of posLines) trendMap.set(l.order_date, (trendMap.get(l.order_date) ?? 0) + Number(l.line_total));
     const trend = Array.from(trendMap.entries())
       .map(([date, value]) => ({ date, revenue: value }))
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -90,7 +118,7 @@ export async function GET(request: Request) {
 
     // ---- Top products by revenue ----
     const productMap = new Map<string, { name: string; revenue: number; units: number }>();
-    for (const l of [...buyerLines, ...resellerLines]) {
+    for (const l of [...buyerLines, ...resellerLines, ...posLines]) {
       const cur = productMap.get(l.product_slug) ?? { name: l.name, revenue: 0, units: 0 };
       cur.revenue += Number(l.line_total);
       cur.units += l.quantity;
@@ -100,7 +128,7 @@ export async function GET(request: Request) {
 
     // ---- Category breakdown ----
     const catMap = new Map<string, number>();
-    for (const l of [...buyerLines, ...resellerLines]) {
+    for (const l of [...buyerLines, ...resellerLines, ...posLines]) {
       const cat = l.category ?? "uncategorized";
       catMap.set(cat, (catMap.get(cat) ?? 0) + Number(l.line_total));
     }
@@ -112,6 +140,7 @@ export async function GET(request: Request) {
     const statusMap = new Map<string, number>();
     for (const o of buyerOrders) statusMap.set(o.status, (statusMap.get(o.status) ?? 0) + 1);
     for (const o of resellerOrders) statusMap.set(o.status, (statusMap.get(o.status) ?? 0) + 1);
+    for (const o of posSales) statusMap.set("pos_completed", (statusMap.get("pos_completed") ?? 0) + 1);
     const statusBreakdown = Array.from(statusMap.entries()).map(([status, count]) => ({ status, count }));
 
     // ---- Full product table for the range ----
@@ -129,6 +158,7 @@ export async function GET(request: Request) {
         unitsSold,
         customerRevenue,
         resellerRevenue,
+        posRevenue,
         topSalesDay: topSalesDay ? { date: topSalesDay.date, revenue: topSalesDay.revenue } : null,
       },
       trend,

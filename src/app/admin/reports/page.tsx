@@ -11,6 +11,7 @@ interface Summary {
   unitsSold: number;
   customerRevenue: number;
   resellerRevenue: number;
+  posRevenue: number;
   topSalesDay: { date: string; revenue: number } | null;
 }
 interface TrendPoint { date: string; revenue: number; }
@@ -168,6 +169,9 @@ export default function SalesReportPage() {
           </span>
           <span className="rounded-full bg-navy-50 px-3 py-1.5">
             Reseller revenue: <b className="text-navy-800">{formatPrice(data.summary.resellerRevenue)}</b>
+          </span>
+          <span className="rounded-full bg-navy-50 px-3 py-1.5">
+            POS revenue: <b className="text-navy-800">{formatPrice(data.summary.posRevenue)}</b>
           </span>
         </div>
       )}

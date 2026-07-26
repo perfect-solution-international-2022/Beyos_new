@@ -16,7 +16,7 @@ export async function GET(
   try {
     const rows = await query<any>(
       `SELECT s.*, c.name AS cashier_name FROM pos_sales s
-       JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.receipt_number = ? LIMIT 1`,
+       JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.receipt_number = ? AND s.deleted_at IS NULL LIMIT 1`,
       [receiptNumber]
     );
     const sale = rows[0];
@@ -78,7 +78,7 @@ export async function PATCH(
 
   try {
     const rows = await query<{ id: number; fulfillment_type: string; customer_phone: string | null; delivery_status: string | null; inventory_reverted_at: string | null }>(
-      "SELECT id, fulfillment_type, customer_phone, delivery_status, inventory_reverted_at FROM pos_sales WHERE receipt_number = ? LIMIT 1",
+      "SELECT id, fulfillment_type, customer_phone, delivery_status, inventory_reverted_at FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1",
       [receiptNumber]
     );
     const sale = rows[0];
@@ -188,7 +188,7 @@ export async function PUT(
 
     const [saleRows] = await conn.execute(
       `SELECT id, shift_id, cashier_id, fulfillment_type, delivery_status, koombiyo_waybill_id
-       FROM pos_sales WHERE receipt_number = ? LIMIT 1 FOR UPDATE`,
+       FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE`,
       [receiptNumber]
     );
     const sale = (saleRows as any[])[0];

@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const rows = await query<PosSaleRow>(
       `SELECT receipt_number, customer_name, customer_phone, total, fulfillment_type,
               delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id
-       FROM pos_sales WHERE receipt_number = ? LIMIT 1`,
+       FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1`,
       [body.receiptNumber]
     );
     if (!rows.length) return NextResponse.json({ error: "Sale not found" }, { status: 404 });
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     if (body.action === "request-waybill") {
       const waybillId = sale.koombiyo_waybill_id || (await requestWaybill());
       if (!sale.koombiyo_waybill_id) {
-        await query(`UPDATE pos_sales SET koombiyo_waybill_id = ? WHERE receipt_number = ?`, [waybillId, sale.receipt_number]);
+        await query(`UPDATE pos_sales SET koombiyo_waybill_id = ? WHERE receipt_number = ? AND deleted_at IS NULL`, [waybillId, sale.receipt_number]);
       }
       return NextResponse.json({ ok: true, waybillId });
     }
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     });
     await query(
       `UPDATE pos_sales SET koombiyo_status = 'Booked', koombiyo_response = ?, koombiyo_updated_at = NOW(),
-       delivery_status = 'out_for_delivery' WHERE receipt_number = ?`,
+       delivery_status = 'out_for_delivery' WHERE receipt_number = ? AND deleted_at IS NULL`,
       [JSON.stringify(response), sale.receipt_number]
     );
     return NextResponse.json({ ok: true, waybillId: sale.koombiyo_waybill_id, courierStatus: "Booked", deliveryStatus: "out_for_delivery" });

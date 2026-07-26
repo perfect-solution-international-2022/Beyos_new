@@ -21,7 +21,7 @@ export async function GET(
     if (!shift) return NextResponse.json({ error: "Shift not found" }, { status: 404 });
 
     const sales = await query<any>(
-      "SELECT * FROM pos_sales WHERE shift_id = ? ORDER BY created_at DESC",
+      "SELECT * FROM pos_sales WHERE shift_id = ? AND deleted_at IS NULL ORDER BY created_at DESC",
       [id]
     );
 

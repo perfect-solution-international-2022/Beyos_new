@@ -9,8 +9,8 @@ export async function GET() {
   try {
     const rows = await query<any>(
       `SELECT s.*, c.name AS cashier_name,
-              (SELECT COUNT(*) FROM pos_sales p WHERE p.shift_id = s.id AND p.status='completed') AS sale_count,
-              (SELECT COALESCE(SUM(total),0) FROM pos_sales p WHERE p.shift_id = s.id AND p.status='completed') AS sales_total
+              (SELECT COUNT(*) FROM pos_sales p WHERE p.shift_id = s.id AND p.deleted_at IS NULL AND p.status='completed' AND COALESCE(p.delivery_status, '') <> 'cancelled') AS sale_count,
+              (SELECT COALESCE(SUM(total),0) FROM pos_sales p WHERE p.shift_id = s.id AND p.deleted_at IS NULL AND p.status='completed' AND COALESCE(p.delivery_status, '') <> 'cancelled') AS sales_total
        FROM pos_shifts s JOIN pos_cashiers c ON c.id = s.cashier_id
        ORDER BY s.opened_at DESC`
     );

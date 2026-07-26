@@ -44,11 +44,11 @@ export async function POST(request: Request) {
           `SELECT order_ref, customer_name, customer_phone, customer_email, customer_address AS address, city,
                   amount AS total, payment_status, koombiyo_waybill_id, status, district_id, city_id,
                   reseller_id, profit, inventory_reverted_at
-           FROM reseller_orders WHERE order_ref = ? LIMIT 1`, [body.orderRef])
+           FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [body.orderRef])
       : await query<OrderRow>(
           `SELECT order_ref, customer_name, customer_phone, customer_email, address, city, total,
                   payment_status, koombiyo_waybill_id, status
-           FROM orders WHERE order_ref = ? LIMIT 1`, [body.orderRef]);
+           FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [body.orderRef]);
     if (!rows.length) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const order = rows[0];
     const notify = async (nextStatus: string) => {
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
-        const [locked] = await conn.execute("SELECT id, inventory_reverted_at FROM reseller_orders WHERE order_ref = ? FOR UPDATE", [order.order_ref]);
+        const [locked] = await conn.execute("SELECT id, inventory_reverted_at FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL FOR UPDATE", [order.order_ref]);
         const current = (locked as { id: number; inventory_reverted_at: string | null }[])[0];
         if (current && !current.inventory_reverted_at) {
           const [items] = await conn.execute("SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?", [current.id]);

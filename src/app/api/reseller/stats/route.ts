@@ -16,7 +16,7 @@ export async function GET() {
          COUNT(*) AS total,
          SUM(status = 'pending') AS pending,
          COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END),0) AS sales
-       FROM reseller_orders WHERE reseller_id = ?`,
+       FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL`,
       [reseller.id]
     );
 
@@ -27,7 +27,7 @@ export async function GET() {
       created_at: string;
     }>(
       `SELECT ro.order_ref, ro.amount, ro.status, ro.created_at
-       FROM reseller_orders ro WHERE ro.reseller_id = ?
+       FROM reseller_orders ro WHERE ro.reseller_id = ? AND ro.deleted_at IS NULL
        ORDER BY ro.created_at DESC LIMIT 5`,
       [reseller.id]
     );
@@ -41,7 +41,7 @@ export async function GET() {
         `SELECT ro.order_ref, COALESCE(SUM(i.quantity),0) AS qty
          FROM reseller_orders ro
          JOIN reseller_order_items i ON i.order_id = ro.id
-         WHERE ro.order_ref IN (${ph}) GROUP BY ro.order_ref`,
+         WHERE ro.deleted_at IS NULL AND ro.order_ref IN (${ph}) GROUP BY ro.order_ref`,
         refs
       );
       qtyByRef = new Map(rows.map((r) => [r.order_ref, Number(r.qty)]));
