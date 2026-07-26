@@ -297,7 +297,7 @@ export default function AdminUsersTable({
               <th className="px-6 py-4">Last active</th>
               <th className="px-6 py-4">Joined</th>
               {role === "reseller" && <th className="px-6 py-4"></th>}
-              {(manage || wholesaleOnly || role === "buyer") && <th className="px-6 py-4 text-right">Actions</th>}
+              {(manage || wholesaleOnly || role === "buyer" || role === "admin") && <th className="px-6 py-4 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -372,7 +372,7 @@ export default function AdminUsersTable({
                       </div>
                     </td>
                   )}
-                  {(manage || wholesaleOnly || role === "buyer") && (
+                  {(manage || wholesaleOnly || role === "buyer" || role === "admin") && (
                     <td className="px-6 py-4">
                       <div className="flex justify-end gap-2">
                         <button onClick={() => setViewing(u)} className="rounded-lg bg-navy-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand">Manage</button>
