@@ -23,7 +23,6 @@ interface CartLine {
   sellingPrice: number; quantity: number; stock: number; weightKg: number;
 }
 interface CourierOption { id: number; name: string }
-type LocationMap = Record<string, Record<string, string[]>>;
 
 const VARIANT_GROUP_LABELS = ["Size", "Color"];
 
@@ -207,15 +206,13 @@ function ProductModal({ product, rules, currentCartQuantity, onClose, onAdd }: {
 }
 
 function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { cart: CartLine[]; merchandiseTotal: number; onClose: () => void; onUpdate: (cart: CartLine[]) => void; onCreated: () => void }) {
-  const [customer, setCustomer] = useState({ name: "", email: "", phone: "", addressLine1: "", addressLine2: "", province: "", district: "", districtId: null as number | null, city: "", cityId: null as number | null, postalCode: "", notes: "" });
-  const [locations, setLocations] = useState<LocationMap>({});
+  const [customer, setCustomer] = useState({ name: "", email: "", phone: "", addressLine1: "", addressLine2: "", district: "", districtId: null as number | null, city: "", cityId: null as number | null, postalCode: "", notes: "" });
   const [courierDistricts, setCourierDistricts] = useState<CourierOption[]>([]);
   const [courierCities, setCourierCities] = useState<CourierOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [deliveryFee, setDeliveryFee] = useState(0);
   useEffect(() => {
-    fetch("/api/reseller/locations").then((r) => r.json()).then((data) => setLocations(data.provinces ?? {}));
     fetch("/api/locations", { cache: "no-store" }).then((r) => r.json()).then((data) => setCourierDistricts(data.districts ?? []));
   }, []);
   useEffect(() => {
@@ -245,7 +242,7 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
   };
   const submit = async () => {
     setError("");
-    if (!customer.name.trim() || !customer.phone.trim() || !customer.addressLine1.trim() || !customer.province || !customer.district || !customer.city) { setError("Customer name, phone and complete delivery address are required."); return; }
+    if (!customer.name.trim() || !customer.phone.trim() || !customer.addressLine1.trim() || !customer.districtId || !customer.cityId) { setError("Customer name, phone, district, city and address are required."); return; }
     if (!/^(?:\+94|94|0)?7\d{8}$/.test(customer.phone.replace(/[\s()-]/g, ""))) { setError("Enter a valid Sri Lankan mobile number."); return; }
     setSubmitting(true);
     try {
@@ -264,7 +261,6 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
       <input aria-label="Customer name" value={customer.name} onChange={(e) => update("name", e.target.value)} className="input" placeholder="Customer name *" />
       <input aria-label="Customer phone" value={customer.phone} onChange={(e) => update("phone", e.target.value)} className="input" placeholder="Mobile number *" />
       <input aria-label="Customer email" type="email" value={customer.email} onChange={(e) => update("email", e.target.value)} className="input sm:col-span-2" placeholder="Email (optional)" />
-      <select aria-label="Province" className="input" value={customer.province} onChange={(e) => setCustomer((current) => ({ ...current, province: e.target.value, district: "", districtId: null, city: "", cityId: null }))}><option value="">Select province *</option>{Object.keys(locations).map((name) => <option key={name}>{name}</option>)}</select>
       <select aria-label="District" className="input" value={customer.district} onChange={(e) => selectDistrict(e.target.value)}><option value="">Select district *</option>{courierDistricts.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}</select>
       <select aria-label="City" className="input" disabled={!customer.districtId} value={customer.city} onChange={(e) => { const name = e.target.value; const match = courierCities.find((item) => item.name === name); setCustomer((current) => ({ ...current, city: name, cityId: match?.id ?? null })); }}><option value="">Select city *</option>{courierCities.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}</select>
       <input aria-label="Postal code" value={customer.postalCode} onChange={(e) => update("postalCode", e.target.value)} className="input" placeholder="Postal code" />

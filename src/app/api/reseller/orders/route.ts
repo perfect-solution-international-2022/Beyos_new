@@ -69,8 +69,8 @@ export async function POST(request: Request) {
   if (!customer.name?.trim()) return NextResponse.json({ error: "Customer name is required" }, { status: 400 });
   const phone = customer.phone?.replace(/[\s()-]/g, "") || "";
   if (!/^(?:\+94|94|0)?7\d{8}$/.test(phone)) return NextResponse.json({ error: "Enter a valid Sri Lankan mobile number" }, { status: 400 });
-  if (!customer.addressLine1?.trim() || !customer.province?.trim() || !customer.district?.trim() || !customer.city?.trim()) {
-    return NextResponse.json({ error: "Address, province, district and city are required" }, { status: 400 });
+  if (!customer.addressLine1?.trim() || !customer.district?.trim() || !customer.city?.trim() || !customer.districtId || !customer.cityId) {
+    return NextResponse.json({ error: "Address, district and city are required" }, { status: 400 });
   }
   if (customer.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())) {
     return NextResponse.json({ error: "Enter a valid customer email" }, { status: 400 });
@@ -175,7 +175,7 @@ export async function POST(request: Request) {
     const amount = subtotal + deliveryFee;
     const cost = merchandiseCost + deliveryFee;
     const profit = subtotal - merchandiseCost;
-    const fullAddress = [customer.addressLine1, customer.addressLine2, customer.city, customer.district, customer.province, customer.postalCode].filter(Boolean).join(", ");
+    const fullAddress = [customer.addressLine1, customer.addressLine2, customer.district, customer.city, customer.postalCode].filter(Boolean).join(", ");
     const [result] = await conn.execute(
       `INSERT INTO reseller_orders
        (order_ref, reseller_id, customer_name, customer_phone, customer_address, customer_email,
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
         subtotal, delivery_fee, amount, cost, profit, status, payment_status, koombiyo_status)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','unpaid','Awaiting dispatch')`,
       [orderRef, reseller.id, customer.name.trim(), phone, fullAddress, customer.email?.trim() || null,
-       customer.addressLine1.trim(), customer.addressLine2?.trim() || null, customer.province.trim(), customer.district.trim(),
+       customer.addressLine1.trim(), customer.addressLine2?.trim() || null, customer.province?.trim() || "", customer.district.trim(),
        Number(customer.districtId) || null, customer.city.trim(), Number(customer.cityId) || null,
        customer.postalCode?.trim() || null, customer.notes?.trim() || null, subtotal, deliveryFee, amount, cost, profit]
     );

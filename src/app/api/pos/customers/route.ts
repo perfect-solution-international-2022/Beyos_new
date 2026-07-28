@@ -49,12 +49,11 @@ export async function POST(request: Request) {
   const name = body.name?.trim() || "";
   const phone = body.phone?.replace(/[\s()-]/g, "") || "";
   const address = body.address?.trim() || "";
-  const province = body.province?.trim() || "";
   const district = body.district?.trim() || "";
   const city = body.city?.trim() || "";
   const postalCode = body.postalCode?.trim() || "";
-  if (!name || !phone || !address || !province || !district || !city) {
-    return NextResponse.json({ error: "Name, phone, address, province, district and city are required" }, { status: 400 });
+  if (!name || !phone || !address || !district || !city) {
+    return NextResponse.json({ error: "Name, phone, address, district and city are required" }, { status: 400 });
   }
   if (!/^(?:\+94|94|0)?7\d{8}$/.test(phone)) {
     return NextResponse.json({ error: "Enter a valid Sri Lankan mobile number" }, { status: 400 });
@@ -63,11 +62,11 @@ export async function POST(request: Request) {
   try {
     const result = await query<any>(
       "INSERT INTO pos_customers (name, phone, address, city, district, province, postal_code) VALUES (?,?,?,?,?,?,?)",
-      [name, phone, address, city, district, province, postalCode || null]
+      [name, phone, address, city, district, null, postalCode || null]
     );
     return NextResponse.json({ customer: {
       id: `pos-${Number((result as any).insertId)}`, name, email: "", phone, addressLine1: address,
-      addressLine2: "", city, district, province, postalCode,
+      addressLine2: "", city, district, province: "", postalCode,
     } }, { status: 201 });
   } catch (error) {
     console.error("POS customer creation failed:", error);

@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
 import { useAuth } from "@/context/AuthProvider";
-import { SRI_LANKA_LOCATIONS } from "@/lib/sri-lanka-locations";
 import POSReceiptBill from "@/components/POSReceiptBill";
 
 interface ProductVariant {
@@ -109,11 +108,10 @@ function AdminPosRegister() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", province: "", district: "", city: "", postalCode: "" });
+  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">("pickup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
-  const [deliveryProvince, setDeliveryProvince] = useState("");
   const [deliveryDistrict, setDeliveryDistrict] = useState("");
   const [deliveryDistrictId, setDeliveryDistrictId] = useState(0);
   const [deliveryCityId, setDeliveryCityId] = useState(0);
@@ -224,7 +222,6 @@ function AdminPosRegister() {
     setDeliveryAddress([customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "));
     setDeliveryCity(customer.city);
     setDeliveryDistrict(customer.district);
-    setDeliveryProvince(customer.province);
     setDeliveryPostalCode(customer.postalCode);
     setCustomerResults([]);
     setCustomerMenuOpen(false);
@@ -248,7 +245,9 @@ function AdminPosRegister() {
       const data = await response.json();
       if (!response.ok) { toast(data.error || "Could not add customer"); return; }
       await selectCustomer(data.customer);
-      setNewCustomer({ name: "", phone: "", address: "", province: "", district: "", city: "", postalCode: "" });
+      setNewCustomer({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
+      setNewCustomerDistrictId(0);
+      setNewCustomerCities([]);
       setAddCustomerOpen(false);
       toast("Customer added");
     } finally { setAddingCustomer(false); }
@@ -285,9 +284,9 @@ function AdminPosRegister() {
     return () => { cancelled = true; };
   }, [cart, fulfillmentType]);
   const deliveryDetailsComplete = Boolean(
-    customerName.trim() && customerPhone.trim() && deliveryProvince && deliveryDistrict && deliveryCity && deliveryAddress.trim()
+    customerName.trim() && customerPhone.trim() && deliveryDistrictId && deliveryCityId && deliveryAddress.trim()
   );
-  const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryProvince, deliveryPostalCode.trim()].filter(Boolean).join(", ");
+  const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryCity, deliveryPostalCode.trim()].filter(Boolean).join(", ");
   const paymentDisabled = completing || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
 
   const toggleFullscreen = async () => {
@@ -312,7 +311,7 @@ function AdminPosRegister() {
 
   const saveDeliveryDetails = () => {
     if (!deliveryDetailsComplete) {
-      toast("Enter the customer, phone, province, district, city and address");
+      toast("Enter the customer, phone, district, city and address");
       return;
     }
     setFulfillmentType("delivery");
@@ -400,7 +399,6 @@ function AdminPosRegister() {
     setFulfillmentType("pickup");
     setDeliveryAddress("");
     setDeliveryCity("");
-    setDeliveryProvince("");
     setDeliveryDistrict("");
     setDeliveryDistrictId(0);
     setDeliveryCityId(0);
@@ -720,22 +718,16 @@ function AdminPosRegister() {
                 <input value={newCustomer.address} onChange={(event) => setNewCustomer((customer) => ({ ...customer, address: event.target.value }))} className="delivery-input" placeholder="Enter Address" maxLength={255} />
               </DeliveryField>
               <div className="grid gap-4 sm:grid-cols-2">
+                <DeliveryField label="District">
+                  <select value={newCustomerDistrictId} onChange={(event) => { const id = Number(event.target.value); const district = courierDistricts.find((item) => item.id === id); setNewCustomerDistrictId(id); setNewCustomer((customer) => ({ ...customer, district: district?.name ?? "", city: "" })); setNewCustomerCities([]); if (id) loadCourierCities(id, "customer"); }} className="delivery-input">
+                    <option value="">Select District</option>
+                    {courierDistricts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
+                  </select>
+                </DeliveryField>
                 <DeliveryField label="City">
                   <select value={newCustomer.city} disabled={!newCustomerDistrictId} onChange={(event) => setNewCustomer((customer) => ({ ...customer, city: event.target.value }))} className="delivery-input disabled:cursor-not-allowed disabled:bg-[#f9fafb] disabled:text-[#9ca3af]">
                     <option value="">{newCustomer.district ? "Select City" : "Select district first"}</option>
                     {newCustomerCities.map((city) => <option key={city.id} value={city.name}>{city.name}</option>)}
-                  </select>
-                </DeliveryField>
-                <DeliveryField label="Province">
-                  <select value={newCustomer.province} onChange={(event) => setNewCustomer((customer) => ({ ...customer, province: event.target.value, district: "", city: "" }))} className="delivery-input">
-                    <option value="">Select Province</option>
-                    {Object.keys(SRI_LANKA_LOCATIONS).map((province) => <option key={province} value={province}>{province}</option>)}
-                  </select>
-                </DeliveryField>
-                <DeliveryField label="District">
-                  <select value={newCustomerDistrictId} onChange={(event) => { const id = Number(event.target.value); const district = courierDistricts.find((item) => item.id === id); setNewCustomerDistrictId(id); setNewCustomer((customer) => ({ ...customer, district: district?.name ?? "", city: "" })); setNewCustomerCities([]); if (id) loadCourierCities(id, "customer"); }} className="delivery-input">
-                    <option value="">{newCustomer.province ? "Select District" : "Select province first"}</option>
-                    {courierDistricts.map((district) => <option key={district.id} value={district.id}>{district.name}</option>)}
                   </select>
                 </DeliveryField>
                 <DeliveryField label="ZIP Code">
@@ -796,20 +788,6 @@ function AdminPosRegister() {
                 </DeliveryField>
                 <DeliveryField label="Phone Number">
                   <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/[^0-9+]/g, ""))} className="delivery-input" />
-                </DeliveryField>
-                <DeliveryField label="Province">
-                  <select
-                    value={deliveryProvince}
-                    onChange={(e) => {
-                      setDeliveryProvince(e.target.value);
-                      setDeliveryDistrict("");
-                      setDeliveryCity("");
-                    }}
-                    className="delivery-input"
-                  >
-                    <option value="">Select Province</option>
-                    {Object.keys(SRI_LANKA_LOCATIONS).map((province) => <option key={province} value={province}>{province}</option>)}
-                  </select>
                 </DeliveryField>
                 <DeliveryField label="District">
                   <select
