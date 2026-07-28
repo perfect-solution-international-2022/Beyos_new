@@ -137,7 +137,7 @@ export default function Header() {
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-navy-800 outline-none placeholder:text-navy-800/40"
             />
-            <button type="submit" className="m-1 rounded-md bg-navy-900 px-6 py-2 text-sm font-semibold text-white transition hover:bg-brand">Search</button>
+            <button type="submit" className="m-1 rounded-md bg-brand-600 px-6 py-2 text-sm font-semibold text-white transition hover:bg-brand-700">Search</button>
           </form>
           <SearchSuggestions query={search} open={searchFocused && search.trim().length >= 2} loading={suggestionsLoading} products={suggestions} onSelect={() => setSearchFocused(false)} />
         </div>
@@ -272,7 +272,7 @@ export default function Header() {
             autoComplete="off"
             className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-navy-800 outline-none placeholder:text-navy-800/40"
           />
-          <button type="submit" className="m-1 rounded-md bg-navy-900 px-3 py-2 text-sm font-semibold text-white min-[360px]:px-4">Search</button>
+          <button type="submit" className="m-1 rounded-md bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 min-[360px]:px-4">Search</button>
         </form>
         <SearchSuggestions query={search} open={searchFocused && search.trim().length >= 2} loading={suggestionsLoading} products={suggestions} onSelect={() => setSearchFocused(false)} />
       </div>
@@ -329,7 +329,7 @@ export default function Header() {
                   <span aria-hidden="true" className="text-navy-800/25">{String(index + 1).padStart(2, "0")}</span>
                 </Link>
               ))}
-              <Link href="/checkout" onClick={() => setMenuOpen(false)} className="mt-4 flex items-center justify-between bg-navy-900 px-4 py-3.5 text-sm font-semibold text-white">
+              <Link href="/checkout" onClick={() => setMenuOpen(false)} className="mt-4 flex items-center justify-between bg-brand-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-brand-700">
                 <span>Go to Checkout</span><span aria-hidden="true">→</span>
               </Link>
             </div>

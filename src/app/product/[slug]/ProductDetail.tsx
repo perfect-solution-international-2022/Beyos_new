@@ -263,8 +263,8 @@ export default function ProductDetail({ product }: { product: Product }) {
                         }}
                         className={`min-w-[3rem] rounded-lg border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 ${
                           isSelected
-                            ? "border-navy-800 bg-navy-800 text-white"
-                            : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"
+                            ? "border-brand-600 bg-brand-600 text-white"
+                            : "border-navy-800/15 text-navy-800 hover:border-brand-600/50"
                         }`}
                       >
                         {value}
@@ -291,7 +291,7 @@ export default function ProductDetail({ product }: { product: Product }) {
             <div className="mt-6">
               <p className="text-sm font-semibold text-navy-800">Size: <span className="font-normal text-navy-800/60">{size}</span></p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {product.sizes.map((item) => <button key={item} onClick={() => setSize(item)} className={`min-w-[3rem] rounded-lg border px-3 py-2 text-sm font-semibold transition ${size === item ? "border-navy-800 bg-navy-800 text-white" : "border-navy-800/15 text-navy-800 hover:border-navy-800/40"}`}>{item}</button>)}
+                {product.sizes.map((item) => <button key={item} onClick={() => setSize(item)} className={`min-w-[3rem] rounded-lg border px-3 py-2 text-sm font-semibold transition ${size === item ? "border-brand-600 bg-brand-600 text-white" : "border-navy-800/15 text-navy-800 hover:border-brand-600/50"}`}>{item}</button>)}
               </div>
             </div>
           </>

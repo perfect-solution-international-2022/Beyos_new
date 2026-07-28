@@ -92,7 +92,7 @@ export default function ProductCard({ product }: { product: Product }) {
             onClick={() => setQuickViewOpen(true)}
             aria-label="Quick view"
             aria-haspopup="dialog"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-800 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:focus-visible:translate-y-0 lg:focus-visible:opacity-100"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg transition-all duration-300 hover:scale-105 hover:bg-brand-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 lg:translate-y-2 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:focus-visible:translate-y-0 lg:focus-visible:opacity-100"
           >
             <EyeIcon />
           </button>

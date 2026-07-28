@@ -69,7 +69,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
         </div>
       </div>
 
-      <div className="absolute inset-x-4 bottom-3 z-10 flex items-end justify-between gap-3 sm:inset-x-9 sm:bottom-7 sm:gap-5">
+      <div className="absolute inset-x-4 bottom-3 z-10 flex items-end justify-between gap-2 sm:inset-x-9 sm:bottom-7 sm:gap-5">
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:max-w-sm">
           <span className="w-6 text-xs font-bold tabular-nums text-white">{String(current + 1).padStart(2, "0")}</span>
           <div className="flex flex-1 gap-1.5">
@@ -83,7 +83,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           <span className="w-6 text-right text-xs font-bold tabular-nums text-white/45">{String(slides.length).padStart(2, "0")}</span>
         </div>
 
-        {slides.length > 1 && <div className="hidden gap-2 sm:flex"><NavButton label="Previous slide" direction="left" onClick={() => move(-1)} /><NavButton label="Next slide" direction="right" onClick={() => move(1)} /></div>}
+        {slides.length > 1 && <div className="flex shrink-0 gap-1.5 sm:gap-2"><NavButton label="Previous slide" direction="left" onClick={() => move(-1)} /><NavButton label="Next slide" direction="right" onClick={() => move(1)} /></div>}
       </div>
 
       <style jsx>{`
