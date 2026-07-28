@@ -168,8 +168,8 @@ function AdminPosRegister() {
                 name: item.name,
                 price: item.unitPrice,
                 stock: (variant?.stock ?? product?.stock ?? 0) + item.quantity,
-                sizes: variant ? [] : product?.sizes ?? [],
-                colors: variant ? [] : product?.colors ?? [],
+                sizes: [],
+                colors: [],
                 size: item.size || "",
                 color: item.color || "",
                 quantity: item.quantity,
@@ -322,8 +322,8 @@ function AdminPosRegister() {
   const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
 
   const addLineToCart = (p: Product, variant: ProductVariant | null) => {
-    const size = variant?.attributeSummary || p.sizes[0] || "";
-    const color = variant ? "" : p.colors[0] ?? "";
+    const size = variant?.attributeSummary || "";
+    const color = "";
     const stock = variant?.stock ?? p.stock;
     const price = variant?.price ?? p.price;
     const sku = variant?.sku || p.sku;
@@ -338,7 +338,7 @@ function AdminPosRegister() {
       }
       return [...prev, {
         slug: p.slug, variantId: variant?.id ?? null, sku, name: p.name, price, stock,
-        sizes: variant ? [] : p.sizes, colors: variant ? [] : p.colors, size, color, quantity: 1, weightKg: p.weightKg,
+        sizes: [], colors: [], size, color, quantity: 1, weightKg: p.weightKg,
       }];
     });
   };
@@ -367,6 +367,21 @@ function AdminPosRegister() {
       return prev
         .map((item, i) => (i === idx ? { ...item, quantity: Math.min(maxForLine, Math.max(0, item.quantity + delta)) } : item))
         .filter((item) => item.quantity > 0);
+    });
+  };
+
+  const setQty = (idx: number, quantity: number) => {
+    if (!Number.isFinite(quantity)) return;
+    setCart((prev) => {
+      const line = prev[idx];
+      if (!line) return prev;
+      const otherQuantity = prev.reduce(
+        (sum, item, i) => sum + (i !== idx && item.slug === line.slug && item.variantId === line.variantId ? item.quantity : 0),
+        0
+      );
+      const maxForLine = Math.max(1, line.stock - otherQuantity);
+      const nextQuantity = Math.min(maxForLine, Math.max(1, Math.floor(quantity)));
+      return prev.map((item, i) => (i === idx ? { ...item, quantity: nextQuantity } : item));
     });
   };
 
@@ -601,7 +616,16 @@ function AdminPosRegister() {
                   <div className="mt-3 flex items-center justify-between">
                     <div className="flex items-center overflow-hidden rounded-lg border border-[#d1d5db] bg-white">
                       <button onClick={() => updateQty(idx, -1)} className="h-8 w-8 text-[#6b7280] hover:bg-[#f3f4f6]">−</button>
-                      <span className="w-8 text-center font-semibold text-[#374151]">{l.quantity}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={l.stock}
+                        value={l.quantity}
+                        onFocus={(event) => event.currentTarget.select()}
+                        onChange={(event) => setQty(idx, Number(event.target.value))}
+                        aria-label={`Quantity for ${l.name}`}
+                        className="h-8 w-12 border-x border-[#d1d5db] bg-white text-center font-semibold text-[#374151] outline-none [appearance:textfield] focus:ring-1 focus:ring-inset focus:ring-[#f5851f] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                      />
                       <button onClick={() => updateQty(idx, 1)} className="h-8 w-8 text-[#6b7280] hover:bg-[#f3f4f6]">+</button>
                     </div>
                     <p className="font-bold text-[#1f2937]">{formatPrice(l.price * l.quantity)}</p>

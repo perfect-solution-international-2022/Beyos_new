@@ -171,7 +171,7 @@ export default function Header() {
                   </span>
                 </button>
                 {accountOpen && (
-                  <div className="liquid-glass absolute right-0 top-12 w-48 overflow-hidden rounded-xl py-1">
+                  <div className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-xl border border-navy-800/10 bg-white py-1 shadow-[0_16px_40px_rgba(9,23,34,.18)]">
                     <div className="border-b border-navy-800/10 px-4 py-2">
                       <p className="truncate text-sm font-semibold text-navy-800">
                         {user.name}
@@ -296,7 +296,7 @@ export default function Header() {
       {menuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="Close menu" className="absolute inset-0 bg-navy-900/45 backdrop-blur-[2px]" onClick={() => setMenuOpen(false)} />
-          <nav className="absolute inset-y-0 left-0 flex h-[100dvh] w-[86%] max-w-sm flex-col overflow-hidden border-r border-white/60 bg-white/75 shadow-[20px_0_70px_rgba(9,23,34,.28)] backdrop-blur-2xl" aria-label="Mobile navigation">
+          <nav className="absolute inset-y-0 left-0 flex h-[100dvh] w-[86%] max-w-sm flex-col overflow-hidden border-r border-navy-800/10 bg-white shadow-[20px_0_70px_rgba(9,23,34,.28)]" aria-label="Mobile navigation">
             <div className="flex h-20 shrink-0 items-center justify-between border-b border-navy-800/10 px-5">
               <Link href="/" className="flex items-center gap-3" onClick={() => setMenuOpen(false)}>
                 <Image src="/images/logo.png" alt="Beyos Clothing" width={48} height={48} sizes="48px" quality={60} className="h-12 w-12 object-contain" />
