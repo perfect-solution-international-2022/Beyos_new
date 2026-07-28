@@ -20,6 +20,18 @@ body {
   @apply bg-[#f7f9fb] text-navy-800 antialiased;
 }
 
+.home-premium-background {
+  background-color: #fbfcfd;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 .08'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='.5'/%3E%3C/svg%3E"),
+    radial-gradient(circle at 7% 14%, rgb(255 132 38 / 13%), transparent 24rem),
+    radial-gradient(circle at 94% 31%, rgb(172 197 218 / 22%), transparent 30rem),
+    radial-gradient(circle at 12% 64%, rgb(224 233 241 / 24%), transparent 28rem),
+    radial-gradient(circle at 88% 86%, rgb(255 132 38 / 7%), transparent 26rem),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 42%, #ffffff 100%);
+  background-size: 160px 160px, auto, auto, auto, auto, auto;
+}
+
 ::selection {
   background: rgb(255 132 38 / 24%);
   color: var(--color-theme-ink);

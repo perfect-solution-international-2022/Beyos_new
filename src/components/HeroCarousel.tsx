@@ -23,7 +23,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     <section
       aria-roledescription="carousel"
       aria-label="Beyos featured collection"
-      className="hero-shell premium-dark relative mx-2 mt-2 h-[74svh] min-h-[540px] max-h-[860px] overflow-hidden rounded-[26px] bg-navy-900 ring-1 ring-white/10 sm:mx-4 sm:mt-3 sm:rounded-[32px] lg:mx-6"
+      className="hero-shell premium-dark relative mx-2 mt-2 h-[min(68svh,540px)] min-h-[500px] overflow-hidden rounded-[26px] bg-navy-900 ring-1 ring-white/10 sm:mx-4 sm:mt-3 sm:h-[74svh] sm:min-h-[540px] sm:max-h-[860px] sm:rounded-[32px] lg:mx-6"
     >
       {slides.map((slide, index) => (
         <div key={slide.id} aria-hidden={index !== current} className={`absolute inset-0 transition-opacity duration-[1400ms] ease-out ${index === current ? "z-0 opacity-100" : "pointer-events-none opacity-0"}`}>
@@ -47,29 +47,29 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
       <div className="absolute inset-x-12 top-0 z-[3] h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
       <div className="absolute inset-y-0 left-[54%] z-[2] hidden w-px bg-gradient-to-b from-transparent via-white/15 to-transparent lg:block" />
 
-      <div className="container-x relative z-10 flex h-full items-center pb-16 pt-8 sm:pb-20">
-        <div className="glass-edge max-w-3xl rounded-[28px] border border-white/15 bg-navy-900/25 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.12),0_28px_70px_rgba(0,0,0,.18)] backdrop-blur-[3px] sm:p-7 lg:p-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.24em] text-white/85 backdrop-blur-md">
+      <div className="container-x relative z-10 flex h-full items-center pb-14 pt-3 sm:pb-20 sm:pt-8">
+        <div className="glass-edge max-w-3xl rounded-[24px] border border-white/15 bg-navy-900/25 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,.12),0_28px_70px_rgba(0,0,0,.18)] backdrop-blur-[3px] sm:rounded-[28px] sm:p-7 lg:p-8">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-3 py-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-white/85 backdrop-blur-md sm:px-4 sm:py-2 sm:text-[10px] sm:tracking-[0.24em]">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-400" /> New season · Sri Lanka
           </span>
-          <h1 className="mt-6 max-w-2xl font-display text-[46px] font-bold leading-[0.96] tracking-[-0.04em] text-white [text-shadow:0_3px_28px_rgba(0,0,0,.55)] min-[390px]:text-[54px] sm:text-7xl lg:text-[88px]">
+          <h1 className="mt-4 max-w-2xl font-display text-[40px] font-bold leading-[0.94] tracking-[-0.04em] text-white [text-shadow:0_3px_28px_rgba(0,0,0,.55)] min-[390px]:text-[44px] sm:mt-6 sm:text-7xl sm:leading-[0.96] lg:text-[88px]">
             Made to move.<br/><span className="font-normal italic text-brand-400">Designed to stay.</span>
           </h1>
-          <p className="mt-6 max-w-xl text-sm font-medium leading-6 text-white [text-shadow:0_2px_14px_rgba(0,0,0,.8)] sm:text-lg sm:leading-8">Contemporary essentials, effortless fits and premium comfort—made for every version of your day.</p>
+          <p className="mt-4 max-w-xl text-xs font-medium leading-5 text-white [text-shadow:0_2px_14px_rgba(0,0,0,.8)] sm:mt-6 sm:text-lg sm:leading-8">Contemporary essentials, effortless fits and premium comfort—made for every version of your day.</p>
 
-          <div className="mt-8 flex flex-col gap-3 min-[360px]:flex-row">
-            <Link href="/shop" className="group inline-flex items-center justify-center gap-3 rounded-full bg-brand-600 px-7 py-3.5 text-sm font-bold text-white shadow-[0_12px_35px_rgba(116,56,23,.3)] transition hover:-translate-y-0.5 hover:bg-brand-700">Shop collection <span className="transition-transform group-hover:translate-x-1">→</span></Link>
-            <Link href="/about" className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/[0.06] px-7 py-3.5 text-sm font-bold text-white backdrop-blur-md transition hover:border-white/50 hover:bg-white/10">Discover Beyos</Link>
+          <div className="mt-5 flex flex-col gap-2.5 min-[360px]:flex-row sm:mt-8 sm:gap-3">
+            <Link href="/shop" className="group inline-flex items-center justify-center gap-2 rounded-full bg-brand-600 px-4 py-3 text-xs font-bold text-white shadow-[0_12px_35px_rgba(116,56,23,.3)] transition hover:-translate-y-0.5 hover:bg-brand-700 sm:gap-3 sm:px-7 sm:py-3.5 sm:text-sm">Shop collection <span className="transition-transform group-hover:translate-x-1">→</span></Link>
+            <Link href="/about" className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/[0.06] px-4 py-3 text-xs font-bold text-white backdrop-blur-md transition hover:border-white/50 hover:bg-white/10 sm:px-7 sm:py-3.5 sm:text-sm">Discover Beyos</Link>
           </div>
 
-          <div className="mt-9 flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[9px] font-bold uppercase tracking-[0.12em] text-white/45 sm:mt-9 sm:gap-x-6 sm:text-[10px] sm:tracking-[0.16em]">
             <span className="flex items-center gap-2"><CheckIcon /> Premium quality</span>
             <span className="flex items-center gap-2"><CheckIcon /> Island-wide delivery</span>
           </div>
         </div>
       </div>
 
-      <div className="absolute inset-x-5 bottom-5 z-10 flex items-end justify-between gap-5 sm:inset-x-9 sm:bottom-7">
+      <div className="absolute inset-x-4 bottom-3 z-10 flex items-end justify-between gap-3 sm:inset-x-9 sm:bottom-7 sm:gap-5">
         <div className="flex min-w-0 flex-1 items-center gap-3 sm:max-w-sm">
           <span className="w-6 text-xs font-bold tabular-nums text-white">{String(current + 1).padStart(2, "0")}</span>
           <div className="flex flex-1 gap-1.5">
@@ -83,7 +83,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
           <span className="w-6 text-right text-xs font-bold tabular-nums text-white/45">{String(slides.length).padStart(2, "0")}</span>
         </div>
 
-        {slides.length > 1 && <div className="flex gap-2"><NavButton label="Previous slide" direction="left" onClick={() => move(-1)} /><NavButton label="Next slide" direction="right" onClick={() => move(1)} /></div>}
+        {slides.length > 1 && <div className="hidden gap-2 sm:flex"><NavButton label="Previous slide" direction="left" onClick={() => move(-1)} /><NavButton label="Next slide" direction="right" onClick={() => move(1)} /></div>}
       </div>
 
       <style jsx>{`
@@ -96,7 +96,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
 }
 
 function NavButton({ label, direction, onClick }: { label: string; direction: "left" | "right"; onClick: () => void }) {
-  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/[0.08] text-white backdrop-blur-md transition hover:border-white/50 hover:bg-white hover:text-navy-800"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"}/></svg></button>;
+  return <button type="button" aria-label={label} title={label} onClick={onClick} className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/[0.08] text-white backdrop-blur-md transition hover:border-white/50 hover:bg-white hover:text-navy-800 sm:h-11 sm:w-11"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={direction === "left" ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"}/></svg></button>;
 }
 
 function CheckIcon() {

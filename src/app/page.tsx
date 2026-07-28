@@ -115,7 +115,7 @@ export default async function HomePage() {
   const [featured, newArrivals, bestSellers, homeCategories, heroSlides, activePromotion] = await getHomePageData();
 
   return (
-    <>
+    <main className="home-premium-background overflow-hidden">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -163,7 +163,7 @@ export default async function HomePage() {
       {activePromotion && <LimitedOffer promotion={activePromotion} />}
 
       {/* Featured products */}
-      <section className="mt-20 bg-[#f2f5f8] py-16 sm:mt-24 sm:py-24">
+      <section className="mt-20 bg-[#f2f5f8]/80 py-16 sm:mt-24 sm:py-24">
         <div className="container-x">
         <SectionHeader
           eyebrow="Explore Beyos"
@@ -285,7 +285,7 @@ export default async function HomePage() {
       <FAQSection />
 
       <Newsletter />
-    </>
+    </main>
   );
 }
 
