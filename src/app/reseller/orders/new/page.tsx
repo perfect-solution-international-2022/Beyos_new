@@ -206,7 +206,7 @@ function ProductModal({ product, rules, currentCartQuantity, onClose, onAdd }: {
 }
 
 function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { cart: CartLine[]; merchandiseTotal: number; onClose: () => void; onUpdate: (cart: CartLine[]) => void; onCreated: () => void }) {
-  const [customer, setCustomer] = useState({ name: "", email: "", phone: "", addressLine1: "", addressLine2: "", district: "", districtId: null as number | null, city: "", cityId: null as number | null, postalCode: "", notes: "" });
+  const [customer, setCustomer] = useState({ name: "", email: "", phone: "", phone2: "", addressLine1: "", addressLine2: "", district: "", districtId: null as number | null, city: "", cityId: null as number | null, postalCode: "", notes: "" });
   const [courierDistricts, setCourierDistricts] = useState<CourierOption[]>([]);
   const [courierCities, setCourierCities] = useState<CourierOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -244,6 +244,7 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
     setError("");
     if (!customer.name.trim() || !customer.phone.trim() || !customer.addressLine1.trim() || !customer.districtId || !customer.cityId) { setError("Customer name, phone, district, city and address are required."); return; }
     if (!/^(?:\+94|94|0)?7\d{8}$/.test(customer.phone.replace(/[\s()-]/g, ""))) { setError("Enter a valid Sri Lankan mobile number."); return; }
+    if (customer.phone2.trim() && !/^(?:\+94|94|0)?7\d{8}$/.test(customer.phone2.replace(/[\s()-]/g, ""))) { setError("Enter a valid second Sri Lankan mobile number."); return; }
     setSubmitting(true);
     try {
       const response = await fetch("/api/reseller/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ customer, items: cart.map((line) => ({ slug: line.slug, variantId: line.variantId, quantity: line.quantity, sellingPrice: line.sellingPrice })) }) });
@@ -260,6 +261,7 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
     <div className="mt-6 grid gap-3 sm:grid-cols-2">
       <input aria-label="Customer name" value={customer.name} onChange={(e) => update("name", e.target.value)} className="input" placeholder="Customer name *" />
       <input aria-label="Customer phone" value={customer.phone} onChange={(e) => update("phone", e.target.value)} className="input" placeholder="Mobile number *" />
+      <input aria-label="Customer second phone" value={customer.phone2} onChange={(e) => update("phone2", e.target.value)} className="input" placeholder="2nd phone number (optional)" />
       <input aria-label="Customer email" type="email" value={customer.email} onChange={(e) => update("email", e.target.value)} className="input sm:col-span-2" placeholder="Email (optional)" />
       <select aria-label="District" className="input" value={customer.district} onChange={(e) => selectDistrict(e.target.value)}><option value="">Select district *</option>{courierDistricts.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}</select>
       <select aria-label="City" className="input" disabled={!customer.districtId} value={customer.city} onChange={(e) => { const name = e.target.value; const match = courierCities.find((item) => item.name === name); setCustomer((current) => ({ ...current, city: name, cityId: match?.id ?? null })); }}><option value="">Select city *</option>{courierCities.map((item) => <option key={item.id} value={item.name}>{item.name}</option>)}</select>

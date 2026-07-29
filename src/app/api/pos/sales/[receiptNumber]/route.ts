@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { sendOrderStatusSms } from "@/lib/sms";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 import type { PoolConnection } from "mysql2/promise";
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ receiptNumber: string }> }
 ) {
   const { receiptNumber } = await params;
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
@@ -33,6 +33,7 @@ export async function GET(
         cashierName: sale.cashier_name,
         customerName: sale.customer_name || "Walk-in Customer",
         customerPhone: sale.customer_phone || "",
+        customerPhone2: sale.customer_phone_2 || "",
         items: items.map((i: any) => ({
           slug: i.product_slug, variantId: i.variant_id, name: i.name, sku: i.sku, size: i.size, color: i.color,
           quantity: i.quantity, unitPrice: Number(i.unit_price), lineTotal: Number(i.line_total),
@@ -67,7 +68,7 @@ export async function PATCH(
   { params }: { params: Promise<{ receiptNumber: string }> }
 ) {
   const { receiptNumber } = await params;
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: { deliveryStatus?: string };
@@ -147,7 +148,7 @@ export async function PUT(
   { params }: { params: Promise<{ receiptNumber: string }> }
 ) {
   const { receiptNumber } = await params;
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: {

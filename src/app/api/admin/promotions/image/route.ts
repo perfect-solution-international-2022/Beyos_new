@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { requireAdminSection } from "@/lib/admin";
+import { requireAdminSection, requireSuperAdmin } from "@/lib/admin";
 import { query } from "@/lib/db";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdminSection("sales");
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let body: { promotionId?: number };
   try {

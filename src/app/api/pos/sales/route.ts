@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { makeReceiptNumber } from "@/lib/pos";
 import type { PoolConnection } from "mysql2/promise";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 
 export async function GET(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
@@ -62,13 +62,14 @@ interface SaleLine {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: {
     items?: SaleLine[];
     customerName?: string;
     customerPhone?: string;
+    customerPhone2?: string;
     discountAmount?: number;
     taxRate?: number;
     paymentMethod?: "cash" | "card";
@@ -201,13 +202,14 @@ export async function POST(request: Request) {
     const deliveryStatus = fulfillmentType === "delivery" ? "pending" : null;
     const [saleResult] = await conn.execute(
       `INSERT INTO pos_sales
-        (receipt_number, shift_id, cashier_id, customer_name, customer_phone,
+        (receipt_number, shift_id, cashier_id, customer_name, customer_phone, customer_phone_2,
          subtotal, discount_amount, tax_amount, total, payment_method, amount_tendered, change_due, status,
          fulfillment_type, delivery_address, delivery_district, delivery_district_id, delivery_city, delivery_city_id, delivery_status, delivery_fee)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
       [
         receiptNumber, shiftId, cashierId,
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
+        (b.customerPhone2 ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
         fulfillmentType, deliveryAddress || null, deliveryDistrict || null, deliveryDistrictId || null,
         deliveryCity || null, deliveryCityId || null, deliveryStatus, deliveryFee,

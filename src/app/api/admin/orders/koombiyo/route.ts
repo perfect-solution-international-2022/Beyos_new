@@ -9,11 +9,13 @@ interface OrderRow {
   order_ref: string;
   customer_name: string;
   customer_phone: string;
+  customer_phone_2: string | null;
   address: string;
   city: string;
   total: string;
   payment_status: string;
   koombiyo_waybill_id: string | null;
+  koombiyo_status: string | null;
   status: string;
   district_id?: number | null;
   city_id?: number | null;
@@ -41,13 +43,13 @@ export async function POST(request: Request) {
     const isReseller = body.type === "reseller";
     const rows = isReseller
       ? await query<OrderRow>(
-          `SELECT order_ref, customer_name, customer_phone, customer_email, customer_address AS address, city,
-                  amount AS total, payment_status, koombiyo_waybill_id, status, district_id, city_id,
+          `SELECT order_ref, customer_name, customer_phone, customer_phone_2, customer_email, customer_address AS address, city,
+                  amount AS total, payment_status, koombiyo_waybill_id, koombiyo_status, status, district_id, city_id,
                   reseller_id, profit, inventory_reverted_at
            FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [body.orderRef])
       : await query<OrderRow>(
-          `SELECT order_ref, customer_name, customer_phone, customer_email, address, city, total,
-                  payment_status, koombiyo_waybill_id, status
+          `SELECT order_ref, customer_name, customer_phone, customer_phone_2, customer_email, address, city, total,
+                  payment_status, koombiyo_waybill_id, koombiyo_status, status
            FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [body.orderRef]);
     if (!rows.length) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const order = rows[0];
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
     };
 
     if (body.action === "request-waybill") {
+      if (order.status !== "confirmed") {
+        return NextResponse.json({ error: "Accept this order before requesting a waybill" }, { status: 409 });
+      }
       const waybillId = order.koombiyo_waybill_id || (await requestWaybill());
       if (!order.koombiyo_waybill_id) {
         await query(
@@ -74,8 +79,14 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "place-order") {
+      if (order.status !== "confirmed") {
+        return NextResponse.json({ error: "Accept this order before submitting it to the courier" }, { status: 409 });
+      }
       if (!order.koombiyo_waybill_id) {
         return NextResponse.json({ error: "Request a waybill ID before placing the order" }, { status: 400 });
+      }
+      if (order.koombiyo_status) {
+        return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
       }
       const response = await submitOrder({
         waybillId: order.koombiyo_waybill_id,
@@ -84,7 +95,7 @@ export async function POST(request: Request) {
         receiverStreet: `${order.address}${order.city ? `, ${order.city}` : ""}`,
         receiverPhone: order.customer_phone,
         codAmount: order.payment_status === "paid" ? 0 : Number(order.total),
-        specialNote: body.specialNote,
+        specialNote: [order.customer_phone_2 ? `2nd phone: ${order.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
         districtId: order.district_id ?? undefined,
         cityId: order.city_id ?? undefined,
       });

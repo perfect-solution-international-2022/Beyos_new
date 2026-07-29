@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdminSection } from "@/lib/admin";
+import { requireAdminSection, requireSuperAdmin } from "@/lib/admin";
 
 export async function GET(request: Request) {
   const admin = await requireAdminSection("finance");
@@ -100,7 +100,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdminSection("finance");
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }

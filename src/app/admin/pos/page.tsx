@@ -101,6 +101,7 @@ function AdminPosRegister() {
   const [taxRate, setTaxRate] = useState("0");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerPhone2, setCustomerPhone2] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
   const [customerSearching, setCustomerSearching] = useState(false);
@@ -177,6 +178,7 @@ function AdminPosRegister() {
         );
         setCustomerName(r.customerName === "Walk-in Customer" ? "" : r.customerName || "");
         setCustomerPhone(r.customerPhone || "");
+        setCustomerPhone2(r.customerPhone2 || "");
         setDiscountAmount(String(r.discountAmount || 0));
         const rate = r.subtotal - r.discountAmount > 0 ? (r.taxAmount / (r.subtotal - r.discountAmount)) * 100 : 0;
         setTaxRate(rate ? String(Math.round(rate * 100) / 100) : "0");
@@ -219,6 +221,7 @@ function AdminPosRegister() {
     setCustomerSearch(customer.name);
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone);
+    setCustomerPhone2("");
     setDeliveryAddress([customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "));
     setDeliveryCity(customer.city);
     setDeliveryDistrict(customer.district);
@@ -392,6 +395,7 @@ function AdminPosRegister() {
     setTaxRate("0");
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerPhone2("");
     setCustomerSearch("");
     setCustomerResults([]);
     setCustomerMenuOpen(false);
@@ -416,7 +420,7 @@ function AdminPosRegister() {
         method: editReceipt ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart.map((l) => ({ slug: l.slug, variantId: l.variantId, size: l.size, color: l.color, quantity: l.quantity })),
-          customerName, customerPhone, discountAmount: discount, taxRate: rate,
+          customerName, customerPhone, customerPhone2, discountAmount: discount, taxRate: rate,
           fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryDistrict, deliveryDistrictId, deliveryCity, deliveryCityId,
         }),
       });
@@ -788,6 +792,9 @@ function AdminPosRegister() {
                 </DeliveryField>
                 <DeliveryField label="Phone Number">
                   <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/[^0-9+]/g, ""))} className="delivery-input" />
+                </DeliveryField>
+                <DeliveryField label="2nd Phone Number">
+                  <input value={customerPhone2} onChange={(e) => setCustomerPhone2(e.target.value.replace(/[^0-9+]/g, ""))} className="delivery-input" placeholder="Optional" inputMode="tel" />
                 </DeliveryField>
                 <DeliveryField label="District">
                   <select

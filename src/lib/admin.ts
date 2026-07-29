@@ -10,6 +10,12 @@ export async function requireAdmin(): Promise<PublicUser | null> {
   return user;
 }
 
+/** Returns the current user only when they are a Super Admin. */
+export async function requireSuperAdmin(): Promise<PublicUser | null> {
+  const user = await requireAdmin();
+  return user?.adminRole === "super" ? user : null;
+}
+
 /** Returns the current user only if they're an admin allowed into this section. */
 export async function requireAdminSection(section: AdminSection): Promise<PublicUser | null> {
   const user = await requireAdmin();

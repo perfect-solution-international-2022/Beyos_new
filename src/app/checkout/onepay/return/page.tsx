@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useCart } from "@/store/cart";
 import { formatPrice } from "@/lib/utils";
 import CheckoutProgress from "@/components/CheckoutProgress";
+import { useAuth } from "@/context/AuthProvider";
 
 interface OrderStatus {
   orderRef: string;
@@ -19,6 +20,7 @@ function ReturnContent() {
   const searchParams = useSearchParams();
   const ref = searchParams.get("ref");
   const clearCart = useCart((s) => s.clear);
+  const { user } = useAuth();
   const clearedRef = useRef(false);
 
   const [order, setOrder] = useState<OrderStatus | null>(null);
@@ -41,6 +43,12 @@ function ReturnContent() {
 
     const poll = async () => {
       try {
+        // Ask our server to verify directly with OnePay before reading the
+        // local order. This is a fallback for delayed/missed webhooks.
+        await fetch(`/api/orders/${encodeURIComponent(ref)}/payment/verify`, {
+          method: "POST",
+          cache: "no-store",
+        }).catch(() => null);
         const res = await fetch(`/api/orders/${encodeURIComponent(ref)}`, { cache: "no-store" });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Could not load order");
@@ -93,9 +101,14 @@ function ReturnContent() {
   }
 
   const isPaid = order.paymentStatus === "paid";
+  const ordersDestination = user?.role === "admin"
+    ? `/admin/orders/${encodeURIComponent(order.orderRef)}`
+    : user?.role === "reseller"
+      ? "/reseller/orders"
+      : "/dashboard/orders";
 
   return (
-    <><CheckoutProgress current={3} /><div className="mx-auto max-w-lg rounded-3xl border border-navy-800/10 bg-white p-10 text-center shadow-sm">
+    <><CheckoutProgress current={3} /><div className="relative z-[60] mx-auto max-w-lg rounded-3xl border border-navy-800/10 bg-white p-10 text-center shadow-sm pointer-events-auto">
       <div
         className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${
           isPaid ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
@@ -139,13 +152,13 @@ function ReturnContent() {
         </div>
       </div>
 
-      <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-        <Link href="/dashboard/orders" className="btn-outline flex-1">
+      <div className="relative z-10 mt-8 flex flex-col gap-3 pointer-events-auto sm:flex-row">
+        <button type="button" onClick={() => window.location.assign(ordersDestination)} className="btn-outline flex-1 pointer-events-auto">
           View My Orders
-        </Link>
-        <Link href="/shop" className="btn-primary flex-1">
+        </button>
+        <button type="button" onClick={() => window.location.assign("/shop")} className="btn-primary flex-1 pointer-events-auto">
           Continue Shopping
-        </Link>
+        </button>
       </div>
 
       {!isPaid && (

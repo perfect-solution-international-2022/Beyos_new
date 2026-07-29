@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdminSection } from "@/lib/admin";
+import { requireAdminSection, requireSuperAdmin } from "@/lib/admin";
 import { hashPassword, findUserByEmail } from "@/lib/auth";
 
 export async function GET(request: Request) {
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdminSection("people");
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: any;
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const admin = await requireAdminSection("people");
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: any;
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
@@ -144,7 +144,7 @@ export async function DELETE(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdminSection("people");
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let body: {

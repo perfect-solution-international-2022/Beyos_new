@@ -34,6 +34,7 @@ interface OrderDetail {
   customerName: string;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  customerPhone2?: string | null;
   address?: string | null;
   city?: string | null;
   district?: string | null;
@@ -117,7 +118,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
   const status = statusColor(order.status);
 
   const isPendingReseller = order.type === "reseller" && order.status === "pending";
-  const isPendingCustomerCod = order.type === "customer" && order.paymentMethod === "cod" && order.status === "pending";
+  const isPendingCustomer = order.type === "customer" && order.status === "pending";
   const isPendingPosDelivery = order.type === "pos" && order.fulfillmentType === "delivery" && order.deliveryStatus === "pending";
 
   const decideOrder = async (type: "reseller" | "customer", status: "confirmed" | "rejected" | "cancelled") => {
@@ -186,7 +187,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
         </OrderMetric>
       </div>
 
-      {(isPendingReseller || isPendingCustomerCod || isPendingPosDelivery) && (
+      {(isPendingReseller || isPendingCustomer || isPendingPosDelivery) && (
         <div className="mt-4 flex flex-col gap-4 border border-amber-300 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="font-semibold text-amber-900">This order needs your review</p>
@@ -225,6 +226,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <InfoBlock label="Name" value={order.customerName} bg="#eff6ff" color="#1e40af" />
               {order.customerPhone && <InfoBlock label="Phone" value={order.customerPhone} bg="#f0fdf4" color="#15803d" />}
+              {order.customerPhone2 && <InfoBlock label="2nd Phone" value={order.customerPhone2} bg="#f0fdf4" color="#15803d" />}
               {order.customerEmail && <InfoBlock label="Email" value={order.customerEmail} bg="#fef3c7" color="#92400e" />}
               {(order.address || order.deliveryAddress) && (
                 <InfoBlock
@@ -382,7 +384,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
                         : { backgroundColor: "#fef3c7", color: "#92400e" }
                     }
                   >
-                    {order.paymentStatus}
+                    {order.paymentMethod === "onepay" && order.paymentStatus === "paid" ? "Payment successful" : order.paymentStatus}
                   </span>
                 }
               />
@@ -543,9 +545,9 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
     }
   };
 
-  const isPending = isPos
-    ? order.deliveryStatus === "pending" || order.deliveryStatus === "accepted"
-    : order.status === "pending";
+  const isAccepted = !order.koombiyoStatus && (isPos
+    ? order.deliveryStatus === "accepted"
+    : order.status === "confirmed");
 
   return (
     <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">
@@ -554,7 +556,7 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
       {error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</p>}
       {success && <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700">{success}</p>}
 
-      {isPending ? (
+      {isAccepted ? (
         <div className="mt-4 space-y-4">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-navy-800">Waybill ID</label>
@@ -594,10 +596,14 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
             </div>
           )}
         </div>
-      ) : (
+      ) : order.koombiyoWaybillId || order.koombiyoStatus ? (
         <div className="mt-4 rounded-lg bg-navy-50 px-4 py-3 text-sm text-navy-800/70">
           Waybill ID: <span className="font-mono font-semibold text-navy-800">{order.koombiyoWaybillId || "—"}</span>
           {order.koombiyoStatus && <span className="ml-3 text-navy-800/55">Status: {order.koombiyoStatus}</span>}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Accept this order before requesting a waybill and submitting it to Koombiyo.
         </div>
       )}
     </div>

@@ -36,6 +36,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+  if (customer.phone2?.trim() && !/^(?:\+94|94|0)?7\d{8}$/.test(customer.phone2.replace(/[\s()-]/g, ""))) {
+    return NextResponse.json({ error: "Enter a valid second Sri Lankan mobile number" }, { status: 400 });
+  }
   if (!Array.isArray(items) || items.length === 0) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
@@ -87,7 +90,11 @@ export async function POST(request: Request) {
     const nameParts = customer.name.trim().split(/\s+/);
     const firstName = nameParts[0] || customer.name;
     const lastName = nameParts.slice(1).join(" ") || firstName;
-    const origin = new URL(request.url).origin;
+    // Never expose the internal Next.js/PM2 upstream (127.0.0.1:3000) in a
+    // payment return URL. Behind a reverse proxy request.url may contain that
+    // private origin, so production redirects must use the configured public URL.
+    const configuredOrigin = process.env.APP_BASE_URL?.trim().replace(/\/$/, "");
+    const origin = configuredOrigin || new URL(request.url).origin;
 
     const { redirectUrl, transactionId } = await createOnepayCheckout({
       amount: totals.total,

@@ -42,6 +42,7 @@ const sections: Section[] = [
       { label: "Orders", icon: "cart", children: [
         { label: "All Orders", href: "/admin/orders" },
         { label: "Pending Orders", href: "/admin/orders/pending" },
+        { label: "Pending Delivering", href: "/admin/orders/delivering" },
         { label: "Completed Orders", href: "/admin/orders/completed" },
         { label: "Rejected Orders", href: "/admin/orders/rejected" },
       ] },

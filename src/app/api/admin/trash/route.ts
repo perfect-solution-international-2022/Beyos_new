@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireSuperAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const [users, products, orders, resellerOrders, posSales] = await Promise.all([
@@ -29,7 +29,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireSuperAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let body: { type?: string; id?: number };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }

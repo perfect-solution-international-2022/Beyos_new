@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { findOpenShift } from "@/lib/pos";
 
 export async function GET() {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const rows = await query<any>(
@@ -37,7 +37,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   let b: { cashierId?: number; openingFloat?: number };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }

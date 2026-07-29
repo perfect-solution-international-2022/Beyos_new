@@ -4,7 +4,6 @@ import { pool, query } from "@/lib/db";
 import { requireReseller, makeRef, WHOLESALE_MIN_QTY } from "@/lib/reseller";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { sendOrderEmail } from "@/lib/mail";
-import { requestWaybill, submitOrder } from "@/lib/koombiyo";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 
 interface OrderRow {
@@ -52,7 +51,7 @@ export async function GET(request: Request) {
 
 interface NewOrderItem { slug: string; variantId?: number | null; quantity: number; sellingPrice: number }
 interface CustomerInput {
-  name?: string; email?: string; phone?: string; addressLine1?: string; addressLine2?: string;
+  name?: string; email?: string; phone?: string; phone2?: string; addressLine1?: string; addressLine2?: string;
   province?: string; district?: string; districtId?: number | null; city?: string; cityId?: number | null;
   postalCode?: string; notes?: string;
 }
@@ -69,6 +68,8 @@ export async function POST(request: Request) {
   if (!customer.name?.trim()) return NextResponse.json({ error: "Customer name is required" }, { status: 400 });
   const phone = customer.phone?.replace(/[\s()-]/g, "") || "";
   if (!/^(?:\+94|94|0)?7\d{8}$/.test(phone)) return NextResponse.json({ error: "Enter a valid Sri Lankan mobile number" }, { status: 400 });
+  const phone2 = customer.phone2?.replace(/[\s()-]/g, "") || "";
+  if (phone2 && !/^(?:\+94|94|0)?7\d{8}$/.test(phone2)) return NextResponse.json({ error: "Enter a valid second Sri Lankan mobile number" }, { status: 400 });
   if (!customer.addressLine1?.trim() || !customer.district?.trim() || !customer.city?.trim() || !customer.districtId || !customer.cityId) {
     return NextResponse.json({ error: "Address, district and city are required" }, { status: 400 });
   }
@@ -178,11 +179,11 @@ export async function POST(request: Request) {
     const fullAddress = [customer.addressLine1, customer.addressLine2, customer.district, customer.city, customer.postalCode].filter(Boolean).join(", ");
     const [result] = await conn.execute(
       `INSERT INTO reseller_orders
-       (order_ref, reseller_id, customer_name, customer_phone, customer_address, customer_email,
+       (order_ref, reseller_id, customer_name, customer_phone, customer_phone_2, customer_address, customer_email,
         address_line1, address_line2, province, district, district_id, city, city_id, postal_code, notes,
-        subtotal, delivery_fee, amount, cost, profit, status, payment_status, koombiyo_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','unpaid','Awaiting dispatch')`,
-      [orderRef, reseller.id, customer.name.trim(), phone, fullAddress, customer.email?.trim() || null,
+        subtotal, delivery_fee, amount, cost, profit, status, payment_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','unpaid')`,
+      [orderRef, reseller.id, customer.name.trim(), phone, phone2 || null, fullAddress, customer.email?.trim() || null,
        customer.addressLine1.trim(), customer.addressLine2?.trim() || null, customer.province?.trim() || "", customer.district.trim(),
        Number(customer.districtId) || null, customer.city.trim(), Number(customer.cityId) || null,
        customer.postalCode?.trim() || null, customer.notes?.trim() || null, subtotal, deliveryFee, amount, cost, profit]
@@ -199,29 +200,13 @@ export async function POST(request: Request) {
     }
     await conn.commit();
 
-    let courierWarning: string | null = null;
-    try {
-      if (!customer.districtId || !customer.cityId) throw new Error("Courier location IDs were not available");
-      const waybillId = await requestWaybill();
-      const courierResponse = await submitOrder({ waybillId, orderRef, receiverName: customer.name.trim(),
-        receiverStreet: fullAddress, receiverPhone: phone, codAmount: amount,
-        description: lineItems.map((line) => `${line.name} x${line.quantity}`).join(", ").slice(0, 250),
-        specialNote: customer.notes, districtId: Number(customer.districtId), cityId: Number(customer.cityId) });
-      await query(`UPDATE reseller_orders SET koombiyo_waybill_id = ?, koombiyo_status = 'Booked',
-                   koombiyo_response = ?, koombiyo_updated_at = NOW(), status = 'confirmed' WHERE id = ?`,
-        [waybillId, JSON.stringify(courierResponse), orderId]);
-    } catch (error) {
-      courierWarning = error instanceof Error ? error.message : "Courier booking is pending";
-      await query("UPDATE reseller_orders SET koombiyo_status = ?, koombiyo_updated_at = NOW() WHERE id = ?", [`Pending: ${courierWarning}`.slice(0, 100), orderId]);
-    }
-
     await Promise.allSettled([
-      sendOrderConfirmationSms({ phone, orderRef, total: amount, status: courierWarning ? "pending" : "confirmed" }),
-      sendOrderConfirmationSms({ phone: settings.phone, orderRef, total: amount, status: courierWarning ? "pending" : "confirmed" }),
+      sendOrderConfirmationSms({ phone, orderRef, total: amount, status: "pending" }),
+      sendOrderConfirmationSms({ phone: settings.phone, orderRef, total: amount, status: "pending" }),
       customer.email ? sendOrderEmail(customer.email, { orderRef, total: amount, status: "received" }) : Promise.resolve(),
       sendOrderEmail(settings.email, { orderRef, total: amount, status: "received" }),
     ]);
-    return NextResponse.json({ success: true, order: { orderRef, subtotal, deliveryFee, amount, profit, status: courierWarning ? "pending" : "confirmed" }, courierWarning });
+    return NextResponse.json({ success: true, order: { orderRef, subtotal, deliveryFee, amount, profit, status: "pending" } });
   } catch (error) {
     if (conn) await conn.rollback().catch(() => {});
     if (error instanceof OrderValidationError) return NextResponse.json({ error: error.message }, { status: 400 });

@@ -122,27 +122,29 @@ export async function GET(request: Request) {
         createdAt: o.created_at,
       })),
     ]
-      // Reseller orders, POS delivery orders, and COD customer orders need explicit
-      // admin approval — they stay out of "All Orders" until accepted/rejected from
-      // Pending Orders. Customer orders paid via OnePay skip this (already paid).
+      // Every delivery order needs explicit admin approval, regardless of how it
+      // was paid. POS pickup sales are the only orders completed immediately.
       .filter((o) => {
         const isPending = o.type === "pos"
-          ? "deliveryStatus" in o && o.deliveryStatus === "pending"
+          ? "deliveryStatus" in o && ["pending", "accepted"].includes(o.deliveryStatus || "")
           : o.type === "reseller"
-            ? o.status === "pending"
-            : o.type === "customer" && o.paymentMethod === "cod" && o.status === "pending";
+            ? ["pending", "confirmed"].includes(o.status) && !o.koombiyoStatus
+            : o.type === "customer" && ["pending", "confirmed"].includes(o.status) && !o.koombiyoStatus;
         const isRejected = o.type === "pos"
           ? "deliveryStatus" in o && o.deliveryStatus === "cancelled"
           : o.status === "cancelled" || o.status === "rejected";
         const isCompleted = o.type === "pos"
-          ? "deliveryStatus" in o && (o.deliveryStatus === "delivered")
+          ? ("fulfillmentType" in o && o.fulfillmentType === "pickup" && o.status === "completed") ||
+            ("deliveryStatus" in o && o.deliveryStatus === "delivered")
           : o.status === "delivered" || o.status === "completed";
+        const isPendingDelivery = o.type === "pos"
+          ? "deliveryStatus" in o && ["out_for_delivery"].includes(o.deliveryStatus || "")
+          : Boolean(o.koombiyoStatus) && !["delivered", "completed", "returned", "cancelled", "rejected"].includes(o.status);
         if (view === "pending") return isPending;
+        if (view === "delivering") return isPendingDelivery;
         if (view === "completed") return isCompleted;
         if (view === "rejected") return isRejected;
-        if (o.type === "reseller" && o.status === "pending") return false;
-        if (o.type === "pos" && "deliveryStatus" in o && o.deliveryStatus === "pending") return false;
-        if (o.type === "customer" && o.paymentMethod === "cod" && o.status === "pending") return false;
+        if (isPending) return false;
         return true;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -299,6 +301,9 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const admin = await requireAdminSection("sales");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (admin.adminRole !== "super") {
+    return NextResponse.json({ error: "Only a Super Admin can delete orders" }, { status: 403 });
+  }
 
   let body: { type?: string; orderRef?: string };
   try {
@@ -321,8 +326,6 @@ export async function DELETE(request: Request) {
       );
       const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
       if (!order) throw new Error("Order not found");
-      if (order.status !== "pending") throw new Error("Only pending orders can be deleted");
-      if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
       await conn.execute("UPDATE orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
     } else if (body.type === "reseller") {
       const [rows] = await conn.execute(
@@ -331,17 +334,17 @@ export async function DELETE(request: Request) {
       );
       const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
       if (!order) throw new Error("Order not found");
-      if (order.status !== "pending") throw new Error("Only pending orders can be deleted");
-      if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
-      const [items] = await conn.execute(
-        "SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?",
-        [order.id]
-      );
-      for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
-        if (item.variant_id) {
-          await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
-        } else if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
-        else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+      if (order.status === "pending" && !order.koombiyo_status) {
+        const [items] = await conn.execute(
+          "SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?",
+          [order.id]
+        );
+        for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
+          if (item.variant_id) {
+            await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+          } else if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+          else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+        }
       }
       await conn.execute("UPDATE reseller_orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
     } else {
@@ -352,14 +355,14 @@ export async function DELETE(request: Request) {
       );
       const order = (rows as { id: number; fulfillment_type: string; delivery_status: string | null; koombiyo_status: string | null }[])[0];
       if (!order) throw new Error("Order not found");
-      if (order.fulfillment_type !== "delivery" || order.delivery_status !== "pending") throw new Error("Only pending POS delivery orders can be deleted");
-      if (order.koombiyo_status) throw new Error("A courier-booked order cannot be deleted");
-      const [items] = await conn.execute("SELECT product_slug, variant_id, quantity FROM pos_sale_items WHERE sale_id = ?", [order.id]);
-      for (const item of items as { product_slug: string; variant_id: number | null; quantity: number }[]) {
-        if (item.variant_id) {
-          await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
-          await conn.execute("UPDATE products p JOIN product_variants v ON v.product_id = p.id SET p.stock = p.stock + ? WHERE v.id = ?", [item.quantity, item.variant_id]);
-        } else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+      if (order.fulfillment_type === "delivery" && order.delivery_status === "pending" && !order.koombiyo_status) {
+        const [items] = await conn.execute("SELECT product_slug, variant_id, quantity FROM pos_sale_items WHERE sale_id = ?", [order.id]);
+        for (const item of items as { product_slug: string; variant_id: number | null; quantity: number }[]) {
+          if (item.variant_id) {
+            await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+            await conn.execute("UPDATE products p JOIN product_variants v ON v.product_id = p.id SET p.stock = p.stock + ? WHERE v.id = ?", [item.quantity, item.variant_id]);
+          } else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+        }
       }
       await conn.execute("UPDATE pos_sales SET deleted_at = NOW() WHERE id = ?", [order.id]);
     }

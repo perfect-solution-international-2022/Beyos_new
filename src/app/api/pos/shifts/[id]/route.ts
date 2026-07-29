@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdminSection } from "@/lib/admin";
 import { cashSalesTotal } from "@/lib/pos";
 
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
@@ -58,7 +58,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const admin = await requireAdmin();
+  const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let b: { closingFloat?: number };

@@ -38,6 +38,7 @@ export default function CheckoutPage() {
     name: "",
     email: "",
     phone: "",
+    phone2: "",
     address: "",
     district: "",
     districtId: 0,
@@ -351,6 +352,18 @@ export default function CheckoutPage() {
                 onChange={update("phone")}
                 className="input"
                 placeholder="+94 7X XXX XXXX"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-navy-800">
+                2nd Phone Number
+              </label>
+              <input
+                value={form.phone2}
+                onChange={update("phone2")}
+                className="input"
+                inputMode="tel"
+                placeholder="Optional"
               />
             </div>
             <div className="sm:col-span-2">

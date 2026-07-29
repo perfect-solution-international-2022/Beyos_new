@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/lib/utils";
 import ResellerStatusBadge from "@/components/ResellerStatusBadge";
 import { useToast } from "@/context/ToastProvider";
+import { useAuth } from "@/context/AuthProvider";
 
 interface Order {
   type: "customer" | "reseller" | "pos";
@@ -51,25 +52,19 @@ const methodLabel: Record<string, string> = {
   pos_card: "POS Card",
 };
 
-type OrdersView = "all" | "pending" | "completed" | "rejected";
+type OrdersView = "all" | "pending" | "delivering" | "completed" | "rejected";
 
 const viewTitle: Record<OrdersView, string> = {
   all: "All Orders",
   pending: "Pending Orders",
+  delivering: "Pending Delivering",
   completed: "Completed Orders",
   rejected: "Rejected Orders",
 };
 
-function canArchiveOrder(order: Order): boolean {
-  if (order.koombiyoStatus || order.koombiyoWaybillId) return false;
-  if (order.type === "pos") {
-    return order.fulfillmentType === "delivery" && order.deliveryStatus === "pending";
-  }
-  return order.status === "pending";
-}
-
 export default function AdminOrdersView({ view = "all" }: { view?: OrdersView }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -275,7 +270,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                       <span className="text-xs text-navy-800/50">{methodLabel[o.paymentMethod] ?? o.paymentMethod}</span>
                       <div className="flex items-center gap-2">
                         <span className={`badge capitalize ${paymentBadge[o.paymentStatus] ?? "bg-navy-50 text-navy-800"}`}>
-                          {o.paymentStatus}
+                          {o.paymentMethod === "onepay" && o.paymentStatus === "paid" ? "Payment successful" : o.paymentStatus}
                         </span>
                         {o.paymentStatus !== "paid" && o.type === "customer" && (
                           <button
@@ -310,7 +305,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                         )}
                       </div>
                     ) : (o.type === "reseller" && o.status === "pending") ||
-                      (o.type === "customer" && o.paymentMethod === "cod" && o.status === "pending") ? (
+                      (o.type === "customer" && o.status === "pending") ? (
                       <span className="text-xs text-navy-800/45">Review to accept/reject</span>
                     ) : (
                       <select
@@ -333,7 +328,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                       >
                         {pendingOnly ? "Review order" : "View details"}
                       </Link>
-                      {canArchiveOrder(o) && (
+                      {user?.adminRole === "super" && (
                         <button type="button" onClick={() => setDeleteTarget(o)} title="Move order to Trash" aria-label={`Move ${o.orderRef} to Trash`} className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
                         </button>
@@ -350,7 +345,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/55 p-4" onClick={() => setDeleteTarget(null)}>
           <div role="dialog" aria-modal="true" aria-labelledby="delete-order-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-50 text-red-600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg></div>
-            <h2 id="delete-order-title" className="mt-4 text-lg font-bold text-navy-800">Archive pending order?</h2>
+            <h2 id="delete-order-title" className="mt-4 text-lg font-bold text-navy-800">Archive this order?</h2>
             <p className="mt-2 text-sm leading-6 text-navy-800/60">Order <strong>#{deleteTarget.orderRef}</strong> will move to Trash. Reserved stock will be returned where applicable.</p>
             <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setDeleteTarget(null)} className="rounded-lg border border-navy-800/15 px-4 py-2 text-sm font-semibold text-navy-800">Cancel</button><button type="button" disabled={saving === deleteTarget.orderRef + ":delete"} onClick={deletePendingOrder} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">{saving === deleteTarget.orderRef + ":delete" ? "Archiving..." : "Archive order"}</button></div>
           </div>

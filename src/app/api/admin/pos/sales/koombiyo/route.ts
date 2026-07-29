@@ -7,6 +7,7 @@ interface PosSaleRow {
   receipt_number: string;
   customer_name: string | null;
   customer_phone: string | null;
+  customer_phone_2: string | null;
   total: string;
   fulfillment_type: string | null;
   delivery_address: string | null;
@@ -14,6 +15,7 @@ interface PosSaleRow {
   delivery_city: string | null;
   delivery_city_id: number | null;
   koombiyo_waybill_id: string | null;
+  delivery_status: string | null;
 }
 
 export async function POST(request: Request) {
@@ -32,8 +34,8 @@ export async function POST(request: Request) {
 
   try {
     const rows = await query<PosSaleRow>(
-      `SELECT receipt_number, customer_name, customer_phone, total, fulfillment_type,
-              delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id
+      `SELECT receipt_number, customer_name, customer_phone, customer_phone_2, total, fulfillment_type,
+              delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id, delivery_status
        FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1`,
       [body.receiptNumber]
     );
@@ -41,6 +43,9 @@ export async function POST(request: Request) {
     const sale = rows[0];
     if (sale.fulfillment_type !== "delivery") {
       return NextResponse.json({ error: "This sale is not a delivery order" }, { status: 400 });
+    }
+    if (sale.delivery_status !== "accepted") {
+      return NextResponse.json({ error: "Accept this delivery order before requesting a waybill or submitting it to the courier" }, { status: 409 });
     }
 
     if (body.action === "request-waybill") {
@@ -66,7 +71,7 @@ export async function POST(request: Request) {
       districtId: sale.delivery_district_id ?? undefined,
       cityId: sale.delivery_city_id ?? undefined,
       codAmount: 0,
-      specialNote: body.specialNote,
+      specialNote: [sale.customer_phone_2 ? `2nd phone: ${sale.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
     });
     await query(
       `UPDATE pos_sales SET koombiyo_status = 'Booked', koombiyo_response = ?, koombiyo_updated_at = NOW(),
