@@ -9,10 +9,23 @@ const SLIDE_MS = 3000;
 
 export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
   const [current, setCurrent] = useState(0);
+  const [loadedSlides, setLoadedSlides] = useState<number[]>([0]);
 
   useEffect(() => {
     if (slides.length < 2) return;
     const timer = window.setTimeout(() => setCurrent((value) => (value + 1) % slides.length), SLIDE_MS);
+    return () => window.clearTimeout(timer);
+  }, [current, slides.length]);
+
+  // Keep the first hero request uncontested, then warm only the next slide.
+  // Hidden slides are otherwise still considered in-viewport by browsers and
+  // can consume several megabytes during the initial page load.
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const next = (current + 1) % slides.length;
+    const timer = window.setTimeout(() => {
+      setLoadedSlides((loaded) => loaded.includes(next) ? loaded : [...loaded, next]);
+    }, 1200);
     return () => window.clearTimeout(timer);
   }, [current, slides.length]);
 
@@ -27,7 +40,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
     >
       {slides.map((slide, index) => (
         <div key={slide.id} aria-hidden={index !== current} className={`absolute inset-0 transition-opacity duration-[1400ms] ease-out ${index === current ? "z-0 opacity-100" : "pointer-events-none opacity-0"}`}>
-          <Image
+          {loadedSlides.includes(index) && <Image
             src={slide.image}
             alt={slide.alt}
             fill
@@ -37,7 +50,7 @@ export default function HeroCarousel({ slides }: { slides: HeroSlide[] }) {
             quality={75}
             sizes="100vw"
             className={`object-cover transition-transform duration-[8000ms] ease-out ${index === current ? "scale-[1.045]" : "scale-100"}`}
-          />
+          />}
         </div>
       ))}
 

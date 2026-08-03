@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ResellerStatusBadge from "@/components/ResellerStatusBadge";
 
@@ -94,7 +95,7 @@ export default function ResellerDashboard() {
               ) : (
                 recent.map((o) => (
                   <tr key={o.orderRef} className="border-b border-navy-800/5 last:border-0">
-                    <td className="py-4 pr-4 font-semibold text-navy-800">{o.orderRef}</td>
+                    <td className="py-4 pr-4 font-semibold text-navy-800"><Link href={`/reseller/orders/${encodeURIComponent(o.orderRef)}`} className="hover:text-brand hover:underline">{o.orderRef}</Link></td>
                     <td className="py-4 pr-4 text-navy-800/60">
                       {new Date(o.createdAt).toLocaleDateString("en-GB")}
                     </td>

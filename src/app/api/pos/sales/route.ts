@@ -154,7 +154,7 @@ export async function POST(request: Request) {
       let variant: any = null;
       if (line.variantId) {
         const [variantRows] = await conn.execute(
-          "SELECT id, sku, price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          "SELECT id, sku, price, sale_price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
           [line.variantId, product.id]
         );
         variant = (variantRows as any[])[0];
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
         throw new Error(`Not enough stock for ${product.name} (${product.stock} left)`);
       }
 
-      const unitPrice = Number(variant?.price ?? product.price);
+      const unitPrice = Number(variant ? (variant.sale_price ?? variant.price) : product.price);
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
       totalWeightKg += Number(product.weight_kg || 0) * qty;

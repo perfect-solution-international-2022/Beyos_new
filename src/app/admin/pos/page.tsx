@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { formatPrice } from "@/lib/utils";
 import { useToast } from "@/context/ToastProvider";
 import { useAuth } from "@/context/AuthProvider";
@@ -12,7 +13,33 @@ interface ProductVariant {
   sku: string;
   attributeSummary: string;
   price: number;
+  salePrice: number | null;
   stock: number;
+  image: string | null;
+}
+
+const VARIANT_GROUP_LABELS = ["Size", "Colour"];
+
+function variantTokens(variant: ProductVariant): string[] {
+  return variant.attributeSummary.split(" / ").map((value) => value.trim()).filter(Boolean);
+}
+
+function variantOptionGroups(variants: ProductVariant[]): string[][] {
+  const groupCount = Math.max(0, ...variants.map((variant) => variantTokens(variant).length));
+  const groups = Array.from({ length: groupCount }, () => [] as string[]);
+  variants.forEach((variant) => variantTokens(variant).forEach((value, index) => {
+    if (!groups[index].includes(value)) groups[index].push(value);
+  }));
+  return groups;
+}
+
+function colourSwatch(value: string): string {
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, "");
+  const aliases: Record<string, string> = {
+    navy: "#172554", cream: "#fff7e6", beige: "#d6c6a8", maroon: "#7f1d1d",
+    olive: "#6b7b32", charcoal: "#374151", grey: "#9ca3af", gray: "#9ca3af",
+  };
+  return aliases[normalized] ?? normalized;
 }
 
 interface Product {
@@ -20,6 +47,7 @@ interface Product {
   sku: string;
   name: string;
   price: number;
+  salePrice: number | null;
   stock: number;
   image: string | null;
   sizes: string[];
@@ -34,6 +62,8 @@ interface CartLine {
   variantId: number | null;
   sku: string;
   name: string;
+  image: string | null;
+  variation: string;
   price: number;
   stock: number;
   sizes: string[];
@@ -71,13 +101,27 @@ interface Receipt {
 
 function mapProduct(p: any): Product {
   return {
-    slug: p.slug, sku: p.sku, name: p.name, price: p.price, stock: p.stock,
+    slug: p.slug, sku: p.sku, name: p.name, price: Number(p.price), salePrice: p.salePrice == null ? null : Number(p.salePrice), stock: p.stock,
     image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [], weightKg: Number(p.weightKg) || 0,
     productType: p.productType === "variable" ? "variable" : "simple",
     variants: (p.variants ?? []).map((v: any) => ({
-      id: v.id, sku: v.sku, attributeSummary: v.attributeSummary, price: Number(v.price), stock: Number(v.stock),
+      id: v.id, sku: v.sku, attributeSummary: v.attributeSummary, price: Number(v.price), salePrice: v.salePrice == null ? null : Number(v.salePrice), stock: Number(v.stock), image: v.image ?? null,
     })),
   };
+}
+
+function PosPrice({ regularPrice, salePrice, compact = false }: { regularPrice: number; salePrice: number | null; compact?: boolean }) {
+  if (salePrice == null) {
+    return <p className="font-bold text-[#ff8746]">{formatPrice(regularPrice)}</p>;
+  }
+  return (
+    <div className={compact ? "leading-tight" : "text-right leading-tight"}>
+      <p className="text-xs font-medium text-[#9ca3af] line-through">Regular {formatPrice(regularPrice)}</p>
+      <p className={compact ? "mt-1 font-bold text-[#ff8746]" : "mt-1 text-2xl font-bold text-[#ff7426]"}>
+        Selling {formatPrice(salePrice)}
+      </p>
+    </div>
+  );
 }
 
 export default function AdminPosRegisterPage() {
@@ -165,6 +209,8 @@ function AdminPosRegister() {
                 variantId: item.variantId ?? null,
                 sku: item.sku || variant?.sku || product?.sku || "",
                 name: item.name,
+                image: variant?.image || product?.image || null,
+                variation: variant?.attributeSummary || [item.size, item.color].filter(Boolean).join(" / "),
                 price: item.unitPrice,
                 stock: (variant?.stock ?? product?.stock ?? 0) + item.quantity,
                 sizes: [],
@@ -322,12 +368,17 @@ function AdminPosRegister() {
   };
 
   const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
+  const [selectedVariantOptions, setSelectedVariantOptions] = useState<string[]>([]);
+  const selectedPickerVariant = variantPickerProduct?.variants.find(
+    (variant) => variant.attributeSummary === selectedVariantOptions.join(" / ")
+  );
 
   const addLineToCart = (p: Product, variant: ProductVariant | null) => {
-    const size = variant?.attributeSummary || "";
-    const color = "";
+    const options = variant ? variantTokens(variant) : [];
+    const size = options[0] || "";
+    const color = options[1] || "";
     const stock = variant?.stock ?? p.stock;
-    const price = variant?.price ?? p.price;
+    const price = variant ? (variant.salePrice ?? variant.price) : (p.salePrice ?? p.price);
     const sku = variant?.sku || p.sku;
     setCart((prev) => {
       const totalForLine = prev
@@ -339,7 +390,8 @@ function AdminPosRegister() {
         return prev.map((l) => (l === existing ? { ...l, quantity: l.quantity + 1 } : l));
       }
       return [...prev, {
-        slug: p.slug, variantId: variant?.id ?? null, sku, name: p.name, price, stock,
+        slug: p.slug, variantId: variant?.id ?? null, sku, name: p.name,
+        image: variant?.image || p.image, variation: variant?.attributeSummary || "", price, stock,
         sizes: [], colors: [], size, color, quantity: 1, weightKg: p.weightKg,
       }];
     });
@@ -348,6 +400,8 @@ function AdminPosRegister() {
   const addToCart = (p: Product) => {
     if (p.productType === "variable") {
       setVariantPickerProduct(p);
+      const firstAvailable = p.variants.find((variant) => variant.stock > 0) ?? p.variants[0];
+      setSelectedVariantOptions(firstAvailable ? variantTokens(firstAvailable) : []);
       return;
     }
     addLineToCart(p, null);
@@ -546,7 +600,10 @@ function AdminPosRegister() {
                   <p className="mt-2 text-xs text-[#9ca3af]">SKU : {p.sku || "—"}</p>
                   <p className="mt-2 text-xs text-[#6b7280]">{p.stock} Pcs{p.productType === "variable" ? ` · ${p.variants.length} variation${p.variants.length === 1 ? "" : "s"}` : ""}</p>
                   <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-                    <p className="font-bold text-[#ff8746]">{formatPrice(p.price)}{p.productType === "variable" ? "+" : ""}</p>
+                    <div>
+                      <PosPrice regularPrice={p.price} salePrice={p.salePrice} compact />
+                      {p.productType === "variable" && <p className="mt-0.5 text-[10px] text-[#9ca3af]">Price varies by option</p>}
+                    </div>
                     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#ff8746] text-xl font-light text-white transition group-hover:bg-[#f5851f]">
                       {p.productType === "variable" ? "…" : "+"}
                     </span>
@@ -582,12 +639,21 @@ function AdminPosRegister() {
               cart.map((l, idx) => (
                 <div key={idx} className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-3 text-sm">
                   <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-[#374151]">{l.name}</p>
-                    <p className="text-xs text-[#6b7280]">{formatPrice(l.price)} each</p>
-                    {l.variantId != null && l.size && (
-                      <p className="mt-1 inline-block rounded-md bg-white px-2 py-1 text-xs font-medium text-[#374151] ring-1 ring-[#e5e7eb]">{l.size}</p>
-                    )}
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-[#e5e7eb] bg-white">
+                      {l.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={l.image} alt={l.variation ? `${l.name} - ${l.variation}` : l.name} className="h-full w-full object-contain" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center"><ProductImagePlaceholder /></span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-[#374151]">{l.name}</p>
+                      <p className="text-xs text-[#6b7280]">{formatPrice(l.price)} each</p>
+                      {l.variantId != null && l.variation && (
+                        <p className="mt-1 inline-block rounded-md bg-white px-2 py-1 text-xs font-medium text-[#374151] ring-1 ring-[#e5e7eb]">{l.variation}</p>
+                      )}
                     {(l.sizes.length > 0 || l.colors.length > 0) && (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {l.sizes.length > 0 && (
@@ -612,6 +678,7 @@ function AdminPosRegister() {
                         )}
                       </div>
                     )}
+                    </div>
                   </div>
                   <button onClick={() => removeLine(idx)} aria-label={`Remove ${l.name}`} className="text-lg leading-none text-[#9ca3af] hover:text-red-500">×</button>
                   </div>
@@ -749,34 +816,68 @@ function AdminPosRegister() {
 
       {variantPickerProduct && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4" onClick={() => setVariantPickerProduct(null)}>
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <h2 className="text-lg font-bold text-[#252525]">{variantPickerProduct.name}</h2>
-            <p className="mt-1 text-xs text-[#6b7280]">Choose a variation to add</p>
-            <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6" onClick={(event) => event.stopPropagation()}>
+            <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-8">
+              <div className="relative flex min-h-64 overflow-hidden rounded-xl bg-[#f4f4f4] md:min-h-[460px]">
+                {(selectedPickerVariant?.image || variantPickerProduct.image) ? (
+                  <Image key={selectedPickerVariant?.image || variantPickerProduct.image} src={selectedPickerVariant?.image || variantPickerProduct.image || ""} alt={`${variantPickerProduct.name} ${selectedPickerVariant?.attributeSummary || ""}`} fill sizes="(max-width: 767px) 100vw, 45vw" className="object-cover" priority />
+                ) : (
+                  <span className="m-auto scale-150"><ProductImagePlaceholder /></span>
+                )}
+              </div>
+              <div className="flex min-w-0 flex-col py-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f5851f]">Select variation</p>
+                <h2 className="mt-2 text-2xl font-bold leading-tight text-[#252525]">{variantPickerProduct.name}</h2>
+                <p className="mt-2 text-sm text-[#6b7280]">Choose your preferred size and colour.</p>
+            <div className="mt-7 space-y-6">
               {variantPickerProduct.variants.length === 0 ? (
                 <p className="py-6 text-center text-sm text-[#9ca3af]">No variations available for this product.</p>
               ) : (
-                variantPickerProduct.variants.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    disabled={v.stock <= 0}
-                    onClick={() => { addLineToCart(variantPickerProduct, v); setVariantPickerProduct(null); }}
-                    className="flex w-full items-center justify-between rounded-lg border border-[#e5e7eb] px-4 py-3 text-left transition hover:border-[#f5851f] hover:bg-[#fff7ed] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <span>
-                      <span className="block text-sm font-semibold text-[#374151]">{v.attributeSummary || v.sku}</span>
-                      <span className="text-xs text-[#9ca3af]">{v.stock} in stock</span>
-                    </span>
-                    <span className="font-bold text-[#ff8746]">{formatPrice(v.price)}</span>
-                  </button>
+                variantOptionGroups(variantPickerProduct.variants).map((values, groupIndex) => (
+                  <div key={groupIndex}>
+                    <div className="flex items-center gap-2 text-sm font-bold text-[#374151]">
+                      {groupIndex === 0 ? <SizeIcon /> : groupIndex === 1 ? <ColourIcon /> : null}
+                      <span>{VARIANT_GROUP_LABELS[groupIndex] ?? `Option ${groupIndex + 1}`}</span>
+                      {selectedVariantOptions[groupIndex] && <span className="font-medium text-[#9ca3af]">· {selectedVariantOptions[groupIndex]}</span>}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {values.map((value) => {
+                        const candidate = selectedVariantOptions.map((option, index) => index === groupIndex ? value : option);
+                        const exact = variantPickerProduct.variants.find((variant) => variant.attributeSummary === candidate.join(" / ") && variant.stock > 0);
+                        const available = exact ?? variantPickerProduct.variants.find((variant) => variantTokens(variant)[groupIndex] === value && variant.stock > 0);
+                        const selected = selectedVariantOptions[groupIndex] === value;
+                        return (
+                          <button key={value} type="button" disabled={!available}
+                            onClick={() => setSelectedVariantOptions(available ? variantTokens(available) : candidate)}
+                            className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-35 ${selected ? "border-[#f5851f] bg-[#fff7ed] text-[#ea580c] ring-2 ring-[#fed7aa]" : "border-[#e5e7eb] bg-white text-[#374151] hover:border-[#f5851f]"}`}>
+                            {groupIndex === 1 && <span className="h-5 w-5 rounded-full border border-black/15 shadow-inner" style={{ backgroundColor: colourSwatch(value) }} />}
+                            {value}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))
               )}
             </div>
-            <div className="mt-5 flex justify-end">
+            {(() => {
+              const selectedVariant = variantPickerProduct.variants.find((variant) => variant.attributeSummary === selectedVariantOptions.join(" / "));
+              if (!selectedVariant) return null;
+              return <div className="mt-7 border-y border-[#e5e7eb] py-4"><div className="flex items-end justify-between gap-4"><span className="text-sm font-medium text-[#16a34a]">{selectedVariant.stock} in stock</span><PosPrice regularPrice={selectedVariant.price} salePrice={selectedVariant.salePrice} /></div><p className="mt-1 text-xs text-[#9ca3af]">SKU: {selectedVariant.sku || variantPickerProduct.sku}</p></div>;
+            })()}
+            <div className="mt-auto flex justify-end gap-3 pt-6">
               <button type="button" onClick={() => setVariantPickerProduct(null)} className="px-2 py-3 text-sm font-semibold text-[#ff7426]">Cancel</button>
+              <button type="button"
+                disabled={!variantPickerProduct.variants.some((variant) => variant.attributeSummary === selectedVariantOptions.join(" / ") && variant.stock > 0)}
+                onClick={() => {
+                  const variant = variantPickerProduct.variants.find((item) => item.attributeSummary === selectedVariantOptions.join(" / ") && item.stock > 0);
+                  if (variant) { addLineToCart(variantPickerProduct, variant); setVariantPickerProduct(null); }
+                }}
+                className="min-w-36 rounded-lg bg-[#ff8746] px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#f5851f] disabled:cursor-not-allowed disabled:opacity-40">Add to cart</button>
+            </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 
@@ -855,6 +956,33 @@ function PosSearchIcon() {
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0 text-[#9ca3af]">
       <circle cx="11" cy="11" r="7" />
       <path d="m20 20-4-4" />
+    </svg>
+  );
+}
+
+function SizeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 7.5 7.5 3l3 3 3-3L21 7.5l-3 4-2-1V21H8V10.5l-2 1-3-4Z" />
+    </svg>
+  );
+}
+
+function ProductImagePlaceholder() {
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[#9ca3af]" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="9" cy="9" r="1.5" />
+      <path d="m4 17 4.5-4.5 3 3 2-2L20 19" />
+    </svg>
+  );
+}
+
+function ColourIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.2-3.15 1.8 1.8 0 0 1 1.2-3.15H18A3 3 0 0 0 21 12a9 9 0 0 0-9-9Z" />
+      <circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none" /><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none" /><circle cx="15" cy="7.5" r="1" fill="currentColor" stroke="none" />
     </svg>
   );
 }

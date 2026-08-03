@@ -60,7 +60,7 @@ export interface HomepagePromotion extends Promotion {
   imageUrl: string | null;
 }
 
-export async function getActiveHomepagePromotion(): Promise<HomepagePromotion | null> {
+export async function getActiveHomepagePromotions(): Promise<HomepagePromotion[]> {
   const rows = await query<PromotionRow & { has_image: number }>(
     `SELECT p.*, (p.image_data IS NOT NULL) AS has_image
      FROM promotions p
@@ -70,15 +70,15 @@ export async function getActiveHomepagePromotion(): Promise<HomepagePromotion | 
        AND (p.usage_limit IS NULL OR p.usage_limit > (
          SELECT COUNT(*) FROM promotion_usages u WHERE u.promotion_id = p.id
        ))
-     ORDER BY p.end_date IS NULL, p.end_date ASC, p.created_at DESC
-     LIMIT 1`
+     ORDER BY p.end_date IS NULL, p.end_date ASC, p.created_at DESC`
   );
-  if (!rows[0]) return null;
-  const promotion = mapRow(rows[0]);
-  return {
-    ...promotion,
-    imageUrl: rows[0].has_image ? `/api/promotions/${promotion.id}/image` : null,
-  };
+  return rows.map((row) => {
+    const promotion = mapRow(row);
+    return {
+      ...promotion,
+      imageUrl: row.has_image ? `/api/promotions/${promotion.id}/image` : null,
+    };
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ResellerStatusBadge from "@/components/ResellerStatusBadge";
 
@@ -84,7 +85,7 @@ export default function PendingOrdersPage() {
             ) : (
               filtered.map((o) => (
                 <tr key={o.orderRef} className="border-b border-navy-800/5 last:border-0">
-                  <td className="px-6 py-4 font-semibold text-brand">#{o.orderRef}</td>
+                  <td className="px-6 py-4 font-semibold text-brand"><Link href={`/reseller/orders/${encodeURIComponent(o.orderRef)}`} className="hover:underline">#{o.orderRef}</Link></td>
                   <td className="px-6 py-4 text-navy-800">{o.customerName}</td>
                   <td className="px-6 py-4 font-semibold text-navy-800">{formatPrice(o.amount)}</td>
                   <td className="px-6 py-4 text-navy-800/60">{new Date(o.createdAt).toLocaleDateString("en-GB")}</td>

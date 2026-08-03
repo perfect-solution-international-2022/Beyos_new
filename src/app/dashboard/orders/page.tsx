@@ -176,6 +176,9 @@ export default function OrdersPage() {
                       <span className="text-sm font-bold text-navy-800">
                         {formatPrice(o.total)}
                       </span>
+                      <span className="inline-flex min-w-[92px] items-center justify-center rounded-lg border border-brand/25 bg-brand/5 px-3 py-2 text-xs font-bold text-brand">
+                        {open ? "Hide Details" : "View Details"}
+                      </span>
                       <svg
                         width="18"
                         height="18"

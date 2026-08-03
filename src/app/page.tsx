@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 import { getHeroSlides } from "@/lib/hero-slides";
 import RecentlyViewed from "@/components/RecentlyViewed";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
-import { getActiveHomepagePromotion } from "@/lib/promotions";
+import { getActiveHomepagePromotions } from "@/lib/promotions";
 import ProductRail from "@/components/ProductRail";
 import LimitedOffer from "@/components/LimitedOffer";
 import ShopTheLook from "@/components/ShopTheLook";
@@ -105,14 +105,14 @@ const getHomePageData = unstable_cache(
     getBestSellingProducts(8),
     getHomeCategories(),
     getHeroSlides(),
-    getActiveHomepagePromotion(),
+    getActiveHomepagePromotions(),
   ]),
-  ["homepage-data-v1"],
+  ["homepage-data-v2"],
   { revalidate: 60 }
 );
 
 export default async function HomePage() {
-  const [featured, newArrivals, bestSellers, homeCategories, heroSlides, activePromotion] = await getHomePageData();
+  const [featured, newArrivals, bestSellers, homeCategories, heroSlides, activePromotions] = await getHomePageData();
 
   return (
     <main className="home-premium-background overflow-hidden">
@@ -160,7 +160,7 @@ export default async function HomePage() {
         <CategoryCarousel categories={homeCategories} />
       </section>
 
-      {activePromotion && <LimitedOffer promotion={activePromotion} />}
+      {activePromotions.length > 0 && <LimitedOffer promotions={activePromotions} />}
 
       {/* Featured products */}
       <section className="mt-20 bg-[#f2f5f8]/80 py-16 sm:mt-24 sm:py-24">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import ResellerStatusBadge from "@/components/ResellerStatusBadge";
 
@@ -8,11 +9,13 @@ interface Order {
   orderRef: string;
   customerName: string;
   amount: number;
+  profit: number;
   status: string;
   rejectReason: string | null;
   paymentStatus: string;
   quantity: number;
   createdAt: string;
+  koombiyoWaybillId: string | null;
 }
 
 export default function AllOrdersPage() {
@@ -115,28 +118,34 @@ export default function AllOrdersPage() {
                 <th className="px-6 py-4">Order Date</th>
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4">Amount</th>
+                <th className="px-6 py-4">Profit</th>
+                <th className="px-6 py-4">Waybill</th>
                 <th className="px-6 py-4">Order Status</th>
                 <th className="px-6 py-4">Reject Reason</th>
                 <th className="px-6 py-4">Payment</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+                <tr><td colSpan={10} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
               ) : error ? (
-                <tr><td colSpan={7} className="px-6 py-10 text-center text-red-500">{error}</td></tr>
+                <tr><td colSpan={10} className="px-6 py-10 text-center text-red-500">{error}</td></tr>
               ) : current.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
+                <tr><td colSpan={10} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
               ) : (
                 current.map((o) => (
                   <tr key={o.orderRef} className="border-b border-navy-800/5 last:border-0">
-                    <td className="px-6 py-4 font-semibold text-brand">#{o.orderRef}</td>
+                    <td className="px-6 py-4 font-semibold text-brand"><Link href={`/reseller/orders/${encodeURIComponent(o.orderRef)}`} className="hover:underline">#{o.orderRef}</Link></td>
                     <td className="px-6 py-4 text-navy-800/60">{new Date(o.createdAt).toLocaleDateString("en-GB")}</td>
                     <td className="px-6 py-4 text-navy-800">{o.customerName}</td>
                     <td className="px-6 py-4 font-bold text-navy-800">{formatPrice(o.amount)}</td>
+                    <td className="px-6 py-4 font-bold text-emerald-600">{formatPrice(o.profit)}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-navy-800/65">{o.koombiyoWaybillId || "Not assigned"}</td>
                     <td className="px-6 py-4"><ResellerStatusBadge status={o.status} /></td>
                     <td className="px-6 py-4 text-navy-800/50">{o.rejectReason || "—"}</td>
                     <td className="px-6 py-4 capitalize text-navy-800/60">{o.paymentStatus}</td>
+                    <td className="px-6 py-4 text-right"><Link href={`/reseller/orders/${encodeURIComponent(o.orderRef)}`} className="inline-flex rounded-lg border border-brand/25 px-3 py-2 text-xs font-bold text-brand hover:bg-brand/5">View details</Link></td>
                   </tr>
                 ))
               )}
