@@ -23,6 +23,8 @@ interface Order {
   fulfillmentType?: string;
   deliveryStatus?: string | null;
   cashierName?: string;
+  enteredByName: string;
+  enteredByType: string;
   createdAt: string;
 }
 
@@ -96,7 +98,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
         (o) =>
           (typeFilter === "all" || o.type === typeFilter) &&
           (!unpaidOnly || (o.type === "customer" && o.paymentStatus !== "paid")) &&
-          (!search || `${o.orderRef} ${o.customerName} ${o.customerPhone || ""}`.toLowerCase().includes(search.toLowerCase()))
+          (!search || `${o.orderRef} ${o.customerName} ${o.customerPhone || ""} ${o.enteredByName || ""}`.toLowerCase().includes(search.toLowerCase()))
       ),
     [orders, search, typeFilter, unpaidOnly]
   );
@@ -205,7 +207,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
       )}
 
       <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-navy-800/5 bg-white p-5 shadow-sm sm:flex-row sm:items-center">
-        <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-xs" placeholder="Search order, customer or phone…" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} className="input sm:max-w-xs" placeholder="Search order, customer, phone or user…" />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="input sm:max-w-[180px]">
           <option value="all">All Types</option>
           <option value="customer">Customer</option>
@@ -234,6 +236,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
               <th className="px-6 py-4">Order ID</th>
               <th className="px-6 py-4">Type</th>
               <th className="px-6 py-4">Customer</th>
+              <th className="px-6 py-4">Entered by</th>
               <th className="px-6 py-4">Amount</th>
               <th className="px-6 py-4">Date</th>
               <th className="px-6 py-4">Status</th>
@@ -245,9 +248,9 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={10} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={11} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={10} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
+              <tr><td colSpan={11} className="px-6 py-10 text-center text-navy-800/50">No orders found</td></tr>
             ) : (
               filtered.map((o) => (
                 <tr
@@ -261,6 +264,12 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                   <td className="px-6 py-4 text-navy-800">
                     <p className="font-medium">{o.customerName}</p>
                     {o.customerPhone && <p className="mt-0.5 text-xs text-navy-800/45">{o.customerPhone}</p>}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex min-w-[120px] items-center gap-2">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold uppercase text-brand">{(o.enteredByName || "?").slice(0, 1)}</span>
+                      <div><p className="font-semibold text-navy-800">{o.enteredByName || "Unknown user"}</p><p className="text-xs text-navy-800/45">{o.enteredByType}</p></div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 font-bold text-navy-800">{formatPrice(o.amount)}</td>
                   <td className="px-6 py-4 text-navy-800/60">{new Date(o.createdAt).toLocaleDateString("en-GB")}</td>

@@ -26,11 +26,14 @@ export async function GET(request: Request) {
       koombiyo_waybill_id: string | null;
       koombiyo_status: string | null;
       koombiyo_updated_at: string | null;
+      entered_by_name: string | null;
       created_at: string;
     }>(
       `SELECT order_ref, customer_name, customer_phone, total, status, payment_method, payment_status,
-              payment_ref, koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
-       FROM orders WHERE deleted_at IS NULL ORDER BY created_at DESC`
+              payment_ref, koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at,
+              u.name AS entered_by_name, o.created_at
+       FROM orders o LEFT JOIN users u ON u.id = o.user_id
+       WHERE o.deleted_at IS NULL ORDER BY o.created_at DESC`
     );
     const reseller = await query<{
       order_ref: string;
@@ -42,11 +45,14 @@ export async function GET(request: Request) {
       koombiyo_waybill_id: string | null;
       koombiyo_status: string | null;
       koombiyo_updated_at: string | null;
+      entered_by_name: string;
       created_at: string;
     }>(
       `SELECT order_ref, customer_name, customer_phone, amount, status, payment_status,
-              koombiyo_waybill_id, koombiyo_status, koombiyo_updated_at, created_at
-       FROM reseller_orders WHERE deleted_at IS NULL ORDER BY created_at DESC`
+              ro.koombiyo_waybill_id, ro.koombiyo_status, ro.koombiyo_updated_at,
+              u.name AS entered_by_name, ro.created_at
+       FROM reseller_orders ro JOIN users u ON u.id = ro.reseller_id
+       WHERE ro.deleted_at IS NULL ORDER BY ro.created_at DESC`
     );
     const pos = await query<{
       receipt_number: string;
@@ -65,9 +71,10 @@ export async function GET(request: Request) {
       `SELECT s.receipt_number, s.customer_name, s.customer_phone, s.total,
               s.payment_method, s.status, s.fulfillment_type, s.delivery_status,
               s.koombiyo_waybill_id, s.koombiyo_status,
-              c.name AS cashier_name, s.created_at
+              COALESCE(u.name, NULLIF(c.name, '__BEYOS_POS__'), 'Unknown user') AS cashier_name, s.created_at
        FROM pos_sales s
        JOIN pos_cashiers c ON c.id = s.cashier_id
+       LEFT JOIN users u ON u.id = s.created_by
        WHERE s.deleted_at IS NULL
        ORDER BY s.created_at DESC`
     );
@@ -86,6 +93,8 @@ export async function GET(request: Request) {
         koombiyoWaybillId: o.koombiyo_waybill_id,
         koombiyoStatus: o.koombiyo_status,
         koombiyoUpdatedAt: o.koombiyo_updated_at,
+        enteredByName: o.entered_by_name || "Guest checkout",
+        enteredByType: o.entered_by_name ? "Customer account" : "Online guest",
         createdAt: o.created_at,
       })),
       ...reseller.map((o) => ({
@@ -101,6 +110,8 @@ export async function GET(request: Request) {
         koombiyoWaybillId: o.koombiyo_waybill_id,
         koombiyoStatus: o.koombiyo_status,
         koombiyoUpdatedAt: o.koombiyo_updated_at,
+        enteredByName: o.entered_by_name,
+        enteredByType: "Reseller account",
         createdAt: o.created_at,
       })),
       ...pos.map((o) => ({
@@ -119,6 +130,8 @@ export async function GET(request: Request) {
         fulfillmentType: o.fulfillment_type || "pickup",
         deliveryStatus: o.fulfillment_type === "delivery" ? (o.delivery_status || "pending") : null,
         cashierName: o.cashier_name,
+        enteredByName: o.cashier_name,
+        enteredByType: "POS user",
         createdAt: o.created_at,
       })),
     ]
@@ -321,20 +334,28 @@ export async function DELETE(request: Request) {
 
     if (body.type === "customer") {
       const [rows] = await conn.execute(
-        "SELECT id, status, koombiyo_status FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
+        "SELECT id, inventory_reverted_at FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [body.orderRef]
       );
-      const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
+      const order = (rows as { id: number; inventory_reverted_at: string | null }[])[0];
       if (!order) throw new Error("Order not found");
-      await conn.execute("UPDATE orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
+      if (!order.inventory_reverted_at) {
+        const [items] = await conn.execute("SELECT product_id, product_slug, variant_id, quantity FROM order_items WHERE order_id = ?", [order.id]);
+        for (const item of items as { product_id: number | null; product_slug: string; variant_id: number | null; quantity: number }[]) {
+          if (item.variant_id) await conn.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [item.quantity, item.variant_id]);
+          if (item.product_id) await conn.execute("UPDATE products SET stock = stock + ? WHERE id = ?", [item.quantity, item.product_id]);
+          else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
+        }
+      }
+      await conn.execute("UPDATE orders SET deleted_at = NOW(), inventory_reverted_at = COALESCE(inventory_reverted_at, NOW()) WHERE id = ?", [order.id]);
     } else if (body.type === "reseller") {
       const [rows] = await conn.execute(
-        "SELECT id, status, koombiyo_status FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
+        "SELECT id, inventory_reverted_at FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [body.orderRef]
       );
-      const order = (rows as { id: number; status: string; koombiyo_status: string | null }[])[0];
+      const order = (rows as { id: number; inventory_reverted_at: string | null }[])[0];
       if (!order) throw new Error("Order not found");
-      if (order.status === "pending" && !order.koombiyo_status) {
+      if (!order.inventory_reverted_at) {
         const [items] = await conn.execute(
           "SELECT product_id, product_slug, variant_id, quantity FROM reseller_order_items WHERE order_id = ?",
           [order.id]
@@ -346,16 +367,16 @@ export async function DELETE(request: Request) {
           else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
         }
       }
-      await conn.execute("UPDATE reseller_orders SET deleted_at = NOW() WHERE id = ?", [order.id]);
+      await conn.execute("UPDATE reseller_orders SET deleted_at = NOW(), inventory_reverted_at = COALESCE(inventory_reverted_at, NOW()) WHERE id = ?", [order.id]);
     } else {
       const [rows] = await conn.execute(
-        `SELECT id, fulfillment_type, delivery_status, koombiyo_status
+        `SELECT id, inventory_reverted_at
          FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE`,
         [body.orderRef]
       );
-      const order = (rows as { id: number; fulfillment_type: string; delivery_status: string | null; koombiyo_status: string | null }[])[0];
+      const order = (rows as { id: number; inventory_reverted_at: string | null }[])[0];
       if (!order) throw new Error("Order not found");
-      if (order.fulfillment_type === "delivery" && order.delivery_status === "pending" && !order.koombiyo_status) {
+      if (!order.inventory_reverted_at) {
         const [items] = await conn.execute("SELECT product_slug, variant_id, quantity FROM pos_sale_items WHERE sale_id = ?", [order.id]);
         for (const item of items as { product_slug: string; variant_id: number | null; quantity: number }[]) {
           if (item.variant_id) {
@@ -364,7 +385,7 @@ export async function DELETE(request: Request) {
           } else await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
         }
       }
-      await conn.execute("UPDATE pos_sales SET deleted_at = NOW() WHERE id = ?", [order.id]);
+      await conn.execute("UPDATE pos_sales SET deleted_at = NOW(), inventory_reverted_at = COALESCE(inventory_reverted_at, NOW()) WHERE id = ?", [order.id]);
     }
 
     await conn.commit();

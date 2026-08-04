@@ -36,7 +36,7 @@ try {
   await db.query("DROP TRIGGER IF EXISTS trg_products_stock_movement");
   await db.query(`CREATE TRIGGER trg_products_stock_movement AFTER UPDATE ON products FOR EACH ROW
     BEGIN
-      IF NEW.stock <> OLD.stock THEN
+      IF NEW.stock <> OLD.stock AND COALESCE(@skip_stock_movement, 0) = 0 THEN
         INSERT INTO stock_movements
           (product_id, product_name, sku, movement_type, quantity_before, quantity_change, quantity_after,
            reference_type, reference_id, note, created_by)

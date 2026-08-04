@@ -29,6 +29,7 @@ const sections: Section[] = [
       { label: "Hero Slides", icon: "image", href: "/admin/hero-slides" },
       { label: "Attributes", icon: "sliders", href: "/admin/attributes" },
       { label: "Inventory", icon: "box", children: [
+        { label: "Stock In / Out", href: "/admin/inventory/stock-in-out" },
         { label: "Product Stock", href: "/admin/inventory" },
         { label: "Movement History", href: "/admin/inventory/movements" },
         { label: "Low Stock Alerts", href: "/admin/inventory/low-stock" },

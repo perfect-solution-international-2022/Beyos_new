@@ -17,14 +17,15 @@ export async function GET(request: Request) {
     const conditions: string[] = ["s.deleted_at IS NULL"];
     const params: unknown[] = [];
     if (search) {
-      conditions.push("(s.receipt_number LIKE ? OR s.customer_name LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`);
+      conditions.push("(s.receipt_number LIKE ? OR s.customer_name LIKE ? OR u.name LIKE ?)");
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const rows = await query<any>(
-      `SELECT s.*, c.name AS cashier_name FROM pos_sales s
-       JOIN pos_cashiers c ON c.id = s.cashier_id ${where}
+      `SELECT s.*, COALESCE(u.name, NULLIF(c.name, '__BEYOS_POS__'), 'Unknown user') AS cashier_name FROM pos_sales s
+       JOIN pos_cashiers c ON c.id = s.cashier_id
+       LEFT JOIN users u ON u.id = s.created_by ${where}
        ORDER BY s.created_at DESC LIMIT 200`,
       params
     );
@@ -202,12 +203,12 @@ export async function POST(request: Request) {
     const deliveryStatus = fulfillmentType === "delivery" ? "pending" : null;
     const [saleResult] = await conn.execute(
       `INSERT INTO pos_sales
-        (receipt_number, shift_id, cashier_id, customer_name, customer_phone, customer_phone_2,
+        (receipt_number, shift_id, cashier_id, created_by, customer_name, customer_phone, customer_phone_2,
          subtotal, discount_amount, tax_amount, total, payment_method, amount_tendered, change_due, status,
          fulfillment_type, delivery_address, delivery_district, delivery_district_id, delivery_city, delivery_city_id, delivery_status, delivery_fee)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
       [
-        receiptNumber, shiftId, cashierId,
+        receiptNumber, shiftId, cashierId, admin.id,
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         (b.customerPhone2 ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,

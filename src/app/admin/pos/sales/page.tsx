@@ -30,6 +30,7 @@ const DELIVERY_STATUS_STYLES: Record<string, string> = {
 
 interface SaleRow {
   receiptNumber: string;
+  cashierName: string;
   customerName: string | null;
   subtotal: number;
   discountAmount: number;
@@ -111,6 +112,7 @@ export default function AdminPosSalesPage() {
             <tr className="border-b border-navy-800/10 text-xs font-semibold uppercase tracking-wide text-navy-800/50">
               <th className="px-6 py-4">Receipt</th>
               <th className="px-6 py-4">Customer</th>
+              <th className="px-6 py-4">Entered by</th>
               <th className="px-6 py-4">Payment</th>
               <th className="px-6 py-4">Fulfillment</th>
               <th className="px-6 py-4">Date</th>
@@ -119,9 +121,9 @@ export default function AdminPosSalesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">No sales found</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">No sales found</td></tr>
             ) : (
               sales.map((s) => (
                 <tr
@@ -131,6 +133,7 @@ export default function AdminPosSalesPage() {
                 >
                   <td className="px-6 py-3 font-mono text-navy-800/80">{s.receiptNumber}</td>
                   <td className="px-6 py-3 text-navy-800/70">{s.customerName || "Walk-in"}</td>
+                  <td className="px-6 py-3 font-semibold text-navy-800/70">{s.cashierName || "Unknown user"}</td>
                   <td className="px-6 py-3">
                     <span className={`badge ${s.paymentMethod === "cash" ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"}`}>
                       {s.paymentMethod}

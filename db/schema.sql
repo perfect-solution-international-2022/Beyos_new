@@ -276,6 +276,7 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   receipt_number  VARCHAR(40) NOT NULL UNIQUE,
   shift_id        INT NOT NULL,
   cashier_id      INT NOT NULL,
+  created_by      INT NULL,
   customer_name   VARCHAR(160) NULL,
   customer_phone  VARCHAR(40) NULL,
   customer_phone_2 VARCHAR(40) NULL,
@@ -304,6 +305,8 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_possale_shift FOREIGN KEY (shift_id) REFERENCES pos_shifts(id) ON DELETE CASCADE,
   CONSTRAINT fk_possale_cashier FOREIGN KEY (cashier_id) REFERENCES pos_cashiers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_possale_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_possale_created_by (created_by),
   INDEX idx_possale_shift (shift_id)
 ) ENGINE=InnoDB;
 

@@ -15,8 +15,10 @@ export async function GET(
 
   try {
     const rows = await query<any>(
-      `SELECT s.*, c.name AS cashier_name FROM pos_sales s
-       JOIN pos_cashiers c ON c.id = s.cashier_id WHERE s.receipt_number = ? AND s.deleted_at IS NULL LIMIT 1`,
+      `SELECT s.*, COALESCE(u.name, NULLIF(c.name, '__BEYOS_POS__'), 'Unknown user') AS cashier_name FROM pos_sales s
+       JOIN pos_cashiers c ON c.id = s.cashier_id
+       LEFT JOIN users u ON u.id = s.created_by
+       WHERE s.receipt_number = ? AND s.deleted_at IS NULL LIMIT 1`,
       [receiptNumber]
     );
     const sale = rows[0];
