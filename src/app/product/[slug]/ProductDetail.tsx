@@ -124,16 +124,16 @@ export default function ProductDetail({ product }: { product: Product }) {
   };
 
   return (
-    <div className="grid gap-10 lg:grid-cols-2">
+    <div className="grid min-w-0 gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
       {/* Gallery */}
-      <div className="flex flex-col-reverse gap-4 sm:flex-row">
+      <div className="flex min-w-0 flex-col-reverse gap-3 sm:flex-row sm:gap-4">
         {product.images.length > 1 && (
-          <div className="flex gap-3 sm:flex-col">
+          <div className="no-scrollbar flex max-w-full snap-x gap-3 overflow-x-auto pb-1 sm:max-h-[min(42rem,80vh)] sm:flex-col sm:overflow-x-visible sm:overflow-y-auto sm:pb-0">
             {product.images.map((img) => (
               <button
                 key={img}
                 onClick={() => setActiveImage(img)}
-                className={`h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-navy-50 ring-2 transition ${
+                className={`h-20 w-16 shrink-0 snap-start overflow-hidden rounded-xl bg-navy-50 ring-2 transition ${
                   activeImage === img ? "ring-brand" : "ring-transparent"
                 }`}
               >
@@ -148,7 +148,7 @@ export default function ProductDetail({ product }: { product: Product }) {
             ))}
           </div>
         )}
-        <div className="premium-panel relative flex-1 overflow-hidden rounded-3xl bg-navy-50">
+        <div className="premium-panel relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-navy-50 sm:rounded-3xl">
           <div className="aspect-square w-full">
             <button
               type="button"
@@ -171,15 +171,15 @@ export default function ProductDetail({ product }: { product: Product }) {
       </div>
 
       {/* Info */}
-      <div className="premium-panel glass-edge rounded-3xl bg-white/50 p-5 sm:p-7 lg:p-8">
+      <div className="premium-panel glass-edge min-w-0 rounded-2xl bg-white/50 p-4 sm:rounded-3xl sm:p-7 lg:p-8">
         <p className="text-sm font-semibold uppercase tracking-wider text-brand">
           {product.category}
         </p>
-        <h1 className="mt-2 font-display text-4xl font-bold text-navy-800">
+        <h1 className="mt-2 break-words font-display text-3xl font-bold leading-tight text-navy-800 sm:text-4xl">
           {product.name}
         </h1>
 
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <div className="flex gap-0.5 text-brand">
             {Array.from({ length: 5 }).map((_, i) => (
               <svg
@@ -200,8 +200,8 @@ export default function ProductDetail({ product }: { product: Product }) {
           </span>
         </div>
 
-        <div className="mt-5 flex items-center gap-3">
-          <span className="text-3xl font-bold text-navy-800">
+        <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-2xl font-bold text-navy-800 sm:text-3xl">
             {formatPrice(currentPrice)}
           </span>
           {comparePrice && comparePrice > currentPrice && (
@@ -335,13 +335,13 @@ export default function ProductDetail({ product }: { product: Product }) {
         </ul>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t border-white/70 bg-white/65 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_-14px_35px_rgba(9,23,34,.13)] backdrop-blur-2xl lg:hidden">
-        <div className="mx-auto flex max-w-lg items-center gap-3">
+      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t border-white/70 bg-white/65 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_-14px_35px_rgba(9,23,34,.13)] backdrop-blur-2xl sm:px-4 sm:py-3 lg:hidden">
+        <div className="mx-auto flex min-w-0 max-w-lg items-center gap-2 sm:gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-navy-800/55">{selectedVariant?.attributeSummary || product.name}</p>
             <p className="text-lg font-bold text-navy-800">{formatPrice(currentPrice)}</p>
           </div>
-          <button onClick={handleAdd} disabled={currentStock < 1 || (product.productType === "variable" && !selectedVariant)} className="btn-primary min-h-11 shrink-0 px-5 py-2.5">
+          <button onClick={handleAdd} disabled={currentStock < 1 || (product.productType === "variable" && !selectedVariant)} className="btn-primary min-h-11 shrink-0 px-4 py-2.5 text-xs min-[360px]:px-5 min-[360px]:text-sm">
             {currentStock < 1 ? "Out of Stock" : added ? "Added" : "Add to Cart"}
           </button>
         </div>

@@ -31,7 +31,7 @@ export default function RecentlyViewed({ excludeSlug }: { excludeSlug?: string }
   return (
     <section className="container-x mt-20">
       <SectionHeader eyebrow="Continue Shopping" title="Recently Viewed" />
-      <div className="grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-x-4 gap-y-8 min-[360px]:grid-cols-2 sm:gap-x-5 md:grid-cols-3 lg:grid-cols-4">
         {products.map((product) => <ProductCard key={product.id} product={product} />)}
       </div>
     </section>

@@ -87,20 +87,20 @@ export default function Footer() {
           ))}
         </div>
 
-        <div className="flex flex-col gap-5 border-t border-white/10 py-6 text-xs text-white/40 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-5 border-t border-white/10 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-6 text-xs text-white/40 md:flex-row md:items-center md:justify-between lg:py-6">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <p>© {new Date().getFullYear()} Beyos Clothing. All rights reserved.</p>
             <Link href="/privacy" className="transition hover:text-white">Privacy & Cookies</Link>
             <Link href="/contact" className="transition hover:text-white">Terms & Conditions</Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span>Secure shopping</span>
             <div className="flex items-center gap-1.5">
               <span className="rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 font-bold text-white/65">COD</span>
               <span className="rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 font-bold text-white/65">OnePay</span>
             </div>
-            <span className="hidden h-5 w-px bg-white/10 sm:block" />
-            <a href="https://perfectsolutioninternational.com" target="_blank" rel="noopener noreferrer" className="hidden items-center gap-2 transition hover:opacity-90 sm:flex">
+            <span className="h-5 w-px bg-white/10" />
+            <a href="https://perfectsolutioninternational.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 transition hover:opacity-90">
               <span>Built by</span><Image src="/images/logo/psi-logo.png" alt="Perfect Solution International" width={90} height={28} className="h-6 w-auto object-contain" />
             </a>
           </div>

@@ -38,7 +38,7 @@ export default function CartDrawer() {
 
       {/* Panel */}
       <aside
-        className={`glass-shell fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-white/60 bg-white/72 shadow-[inset_1px_0_0_rgba(255,255,255,.9),-24px_0_70px_rgba(9,23,34,.22)] backdrop-blur-2xl transition-transform duration-300 ${
+        className={`glass-shell fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-md flex-col border-l border-white/60 bg-white/72 shadow-[inset_1px_0_0_rgba(255,255,255,.9),-24px_0_70px_rgba(9,23,34,.22)] backdrop-blur-2xl transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
@@ -80,12 +80,12 @@ export default function CartDrawer() {
                 {items.map((item) => (
                   <li
                     key={`${item.productId}-${item.size}-${item.color}`}
-                    className="flex gap-4 py-4"
+                    className="flex min-w-0 gap-3 py-4 sm:gap-4"
                   >
                     <Link
                       href={`/product/${item.slug}`}
                       onClick={closeCart}
-                      className="h-24 w-20 shrink-0 overflow-hidden rounded-lg bg-navy-50"
+                      className="h-20 w-16 shrink-0 overflow-hidden rounded-lg bg-navy-50 min-[360px]:h-24 min-[360px]:w-20"
                     >
                       <Image
                         src={item.image}
@@ -95,12 +95,12 @@ export default function CartDrawer() {
                         className="h-full w-full object-cover"
                       />
                     </Link>
-                    <div className="flex flex-1 flex-col">
+                    <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex justify-between gap-2">
                         <Link
                           href={`/product/${item.slug}`}
                           onClick={closeCart}
-                          className="text-sm font-semibold text-navy-800 hover:text-brand"
+                          className="min-w-0 break-words text-sm font-semibold text-navy-800 hover:text-brand"
                         >
                           {item.name}
                         </Link>
@@ -120,7 +120,7 @@ export default function CartDrawer() {
                       <p className="mt-0.5 text-xs text-navy-800/50">
                         {item.size} · {item.color}
                       </p>
-                      <div className="mt-auto flex items-center justify-between pt-2">
+                      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
                         <div className="flex items-center rounded-full border border-navy-800/15">
                           <button
                             onClick={() =>
@@ -169,7 +169,7 @@ export default function CartDrawer() {
               </ul>
             </div>
 
-            <div className="border-t border-navy-800/10 px-4 py-5 sm:px-6">
+            <div className="border-t border-navy-800/10 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 sm:px-6">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-navy-800/60">Subtotal</span>
                 <span className="text-lg font-bold text-navy-800">

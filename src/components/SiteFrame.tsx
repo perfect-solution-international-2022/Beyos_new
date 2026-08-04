@@ -60,7 +60,7 @@ export default function SiteFrame({ children }: { children: React.ReactNode }) {
   return (
     <>
       {maintenance && isAdminPreview && (
-        <div className="fixed left-1/2 top-3 z-[100] flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-[#ff891e]/30 bg-[#0d263d] px-4 py-2 text-xs font-semibold text-white shadow-xl">
+        <div className="fixed left-1/2 top-3 z-[100] flex max-w-[calc(100vw-1.5rem)] -translate-x-1/2 items-center gap-2 truncate whitespace-nowrap rounded-full border border-[#ff891e]/30 bg-[#0d263d] px-4 py-2 text-xs font-semibold text-white shadow-xl">
           <span className="h-2 w-2 animate-pulse rounded-full bg-[#ff891e]" />
           Admin preview · Maintenance mode is on
         </div>

@@ -87,12 +87,12 @@ export default async function ProductPage({
   };
 
   return (
-    <div className="container-x py-10">
+    <div className="container-x pb-24 pt-6 sm:py-10 lg:pb-10">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c") }}
       />
-      <nav className="mb-8 text-sm text-navy-800/50">
+      <nav className="mb-5 flex min-w-0 items-center overflow-hidden text-sm text-navy-800/50 sm:mb-8">
         <Link href="/" className="hover:text-brand">
           Home
         </Link>
@@ -101,15 +101,15 @@ export default async function ProductPage({
           Shop
         </Link>
         <span className="mx-1">/</span>
-        <span className="text-navy-800">{product.name}</span>
+        <span className="truncate text-navy-800">{product.name}</span>
       </nav>
 
       <ProductDetail product={product} />
 
       {related.length > 0 && (
-        <section className="mt-24">
+        <section className="mt-16 sm:mt-24">
           <SectionHeader eyebrow="You May Also Like" title="Related Products" />
-          <div className="grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-8 min-[360px]:grid-cols-2 sm:gap-x-5 md:grid-cols-3 lg:grid-cols-4">
             {related.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

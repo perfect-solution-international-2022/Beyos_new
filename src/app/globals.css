@@ -14,10 +14,15 @@
 
 html {
   scroll-behavior: smooth;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 body {
   @apply bg-[#f7f9fb] text-navy-800 antialiased;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 .home-premium-background {
