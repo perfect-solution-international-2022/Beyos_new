@@ -88,6 +88,21 @@ export async function POST(request: Request) {
       if (order.koombiyo_status) {
         return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
       }
+      const orderItems = await query<{ name: string; variation: string; sku: string }>(
+        isReseller
+          ? `SELECT oi.name, COALESCE(oi.variant_summary, '') AS variation, COALESCE(oi.sku, p.sku, '') AS sku
+             FROM reseller_order_items oi LEFT JOIN products p ON p.id = oi.product_id
+             WHERE oi.order_id = (SELECT id FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1)`
+          : `SELECT oi.name, TRIM(CONCAT_WS(' / ', NULLIF(oi.size, ''), NULLIF(oi.color, ''))) AS variation,
+                    COALESCE(pv.sku, p.sku, '') AS sku
+             FROM order_items oi LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+             LEFT JOIN products p ON p.id = oi.product_id
+             WHERE oi.order_id = (SELECT id FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1)`,
+        [order.order_ref]
+      );
+      const description = orderItems.map((item) =>
+        [item.name, item.variation && `Variation: ${item.variation}`, `SKU: ${item.sku || "—"}`].filter(Boolean).join(" | ")
+      ).join("; ");
       const response = await submitOrder({
         waybillId: order.koombiyo_waybill_id,
         orderRef: order.order_ref,
@@ -95,6 +110,7 @@ export async function POST(request: Request) {
         receiverStreet: `${order.address}${order.city ? `, ${order.city}` : ""}`,
         receiverPhone: order.customer_phone,
         codAmount: order.payment_status === "paid" ? 0 : Number(order.total),
+        description,
         specialNote: [order.customer_phone_2 ? `2nd phone: ${order.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
         districtId: order.district_id ?? undefined,
         cityId: order.city_id ?? undefined,

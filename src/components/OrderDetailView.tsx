@@ -7,6 +7,7 @@ import InvoiceView from "@/components/InvoiceView";
 
 interface OrderItem {
   name: string;
+  sku?: string;
   size?: string;
   color?: string;
   quantity: number;

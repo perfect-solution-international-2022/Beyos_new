@@ -5,6 +5,7 @@ import { formatPrice } from "@/lib/utils";
 
 export interface InvoiceItem {
   name: string;
+  sku?: string;
   size?: string;
   color?: string;
   quantity: number;
@@ -102,6 +103,7 @@ export default function InvoiceView({ order }: { order: InvoiceData }) {
                   {(it.size || it.color) && (
                     <span className="block text-xs text-navy-800/50">{[it.size, it.color].filter(Boolean).join(" / ")}</span>
                   )}
+                  <span className="block text-xs text-navy-800/50">SKU: {it.sku || "—"}</span>
                 </td>
                 <td className="px-2 py-3 text-right text-navy-800/70">{formatPrice(it.unitPrice)}</td>
                 <td className="px-2 py-3 text-right text-navy-800/70">{it.quantity}</td>

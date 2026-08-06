@@ -14,7 +14,14 @@ export async function GET(
   const buyerRows = await query<any>(`SELECT * FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [ref]);
   if (buyerRows[0]) {
     const o = buyerRows[0];
-    const items = await query<any>(`SELECT * FROM order_items WHERE order_id = ?`, [o.id]);
+    const items = await query<any>(
+      `SELECT oi.*, COALESCE(pv.sku, p.sku, '') AS sku
+       FROM order_items oi
+       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+       LEFT JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = ?`,
+      [o.id]
+    );
     return NextResponse.json({
       order: {
         type: "customer",
@@ -38,7 +45,7 @@ export async function GET(
         koombiyoUpdatedAt: o.koombiyo_updated_at,
         createdAt: o.created_at,
         items: items.map((i) => ({
-          name: i.name, size: i.size, color: i.color,
+          name: i.name, sku: i.sku || "", size: i.size, color: i.color,
           quantity: i.quantity, unitPrice: Number(i.unit_price), lineTotal: Number(i.line_total),
         })),
       },
@@ -84,7 +91,7 @@ export async function GET(
         koombiyoUpdatedAt: o.koombiyo_updated_at,
         createdAt: o.created_at,
         items: items.map((i) => ({
-          name: i.name, size: i.variant_summary, color: "",
+          name: i.name, sku: i.sku || "", size: i.variant_summary, color: "",
           quantity: i.quantity, unitPrice: Number(i.selling_price), lineTotal: Number(i.line_total),
         })),
       },
@@ -124,7 +131,7 @@ export async function GET(
         cashierName: o.cashier_name,
         createdAt: o.created_at,
         items: items.map((i) => ({
-          name: i.name, size: i.size, color: i.color,
+          name: i.name, sku: i.sku || "", size: i.size, color: i.color,
           quantity: i.quantity, unitPrice: Number(i.unit_price), lineTotal: Number(i.line_total),
         })),
       },

@@ -62,6 +62,14 @@ export async function POST(request: Request) {
     if (!sale.customer_phone || !sale.delivery_address) {
       return NextResponse.json({ error: "Missing delivery details for this sale" }, { status: 400 });
     }
+    const orderItems = await query<{ name: string; variation: string; sku: string }>(
+      `SELECT name, TRIM(CONCAT_WS(' / ', NULLIF(size, ''), NULLIF(color, ''))) AS variation, sku
+       FROM pos_sale_items WHERE sale_id = (SELECT id FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1)`,
+      [sale.receipt_number]
+    );
+    const description = orderItems.map((item) =>
+      [item.name, item.variation && `Variation: ${item.variation}`, `SKU: ${item.sku || "—"}`].filter(Boolean).join(" | ")
+    ).join("; ");
     const response = await submitOrder({
       waybillId: sale.koombiyo_waybill_id,
       orderRef: sale.receipt_number,
@@ -71,6 +79,7 @@ export async function POST(request: Request) {
       districtId: sale.delivery_district_id ?? undefined,
       cityId: sale.delivery_city_id ?? undefined,
       codAmount: 0,
+      description,
       specialNote: [sale.customer_phone_2 ? `2nd phone: ${sale.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
     });
     await query(

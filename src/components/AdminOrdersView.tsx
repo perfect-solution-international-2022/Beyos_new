@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import ResellerStatusBadge from "@/components/ResellerStatusBadge";
 import { useToast } from "@/context/ToastProvider";
 import { useAuth } from "@/context/AuthProvider";
+import InvoiceView, { type InvoiceData } from "@/components/InvoiceView";
 
 interface Order {
   type: "customer" | "reseller" | "pos";
@@ -74,6 +75,8 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
   const [unpaidOnly, setUnpaidOnly] = useState(false);
   const [saving, setSaving] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [invoice, setInvoice] = useState<InvoiceData | null>(null);
+  const [loadingInvoice, setLoadingInvoice] = useState("");
   const pendingOnly = view === "pending";
 
   const load = () => {
@@ -166,6 +169,20 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
       toast(cause instanceof Error ? cause.message : "Could not delete order", "error");
     } finally {
       setSaving("");
+    }
+  };
+
+  const previewInvoice = async (orderRef: string) => {
+    setLoadingInvoice(orderRef);
+    try {
+      const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderRef)}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load bill");
+      setInvoice(data.order);
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not load bill", "error");
+    } finally {
+      setLoadingInvoice("");
     }
   };
 
@@ -337,6 +354,14 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                       >
                         {pendingOnly ? "Review order" : "View details"}
                       </Link>
+                      <button
+                        type="button"
+                        onClick={() => previewInvoice(o.orderRef)}
+                        disabled={loadingInvoice === o.orderRef}
+                        className="rounded-lg border border-navy-800/15 px-3 py-1.5 text-xs font-semibold text-navy-800 transition hover:border-brand hover:text-brand"
+                      >
+                        {loadingInvoice === o.orderRef ? "Loading…" : "Print"}
+                      </button>
                       {user?.adminRole === "super" && (
                         <button type="button" onClick={() => setDeleteTarget(o)} title="Move order to Trash" aria-label={`Move ${o.orderRef} to Trash`} className="flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2">
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
@@ -350,6 +375,17 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
           </tbody>
         </table>
       </div>
+      {invoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={() => setInvoice(null)}>
+          <div role="dialog" aria-modal="true" aria-label={`Bill ${invoice.orderRef}`} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(event) => event.stopPropagation()}>
+            <InvoiceView order={invoice} />
+            <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
+              <button type="button" onClick={() => setInvoice(null)} className="btn-outline">Close</button>
+              <button type="button" onClick={() => window.print()} className="btn-primary">Print</button>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/55 p-4" onClick={() => setDeleteTarget(null)}>
           <div role="dialog" aria-modal="true" aria-labelledby="delete-order-title" className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
