@@ -92,4 +92,11 @@ public/images/            # Logos, hero images, product & category art
 - Checkout uses Cash-on-Delivery mock; integrate a payment gateway (Stripe / PayHere) for live payments.
 - Fonts use system stacks so the app runs fully offline. To use Google Fonts (Inter / Playfair Display),
   re-add `next/font/google` in `src/app/layout.tsx` (requires network at build time).
+
+### Courier status sync
+
+Koombiyo does not push status changes to this application, so production needs a cron job to call the protected sync route every 15 minutes. Set a long `COURIER_SYNC_SECRET` in `.env.local`, then add this on the server (replace the domain and secret):
+
+```cron
+*/15 * * * * curl --fail --silent --show-error -X POST -H 'Authorization: Bearer YOUR_COURIER_SYNC_SECRET' https://your-domain.example/api/internal/courier-sync >/dev/null
 ```

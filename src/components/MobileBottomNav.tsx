@@ -13,6 +13,14 @@ export default function MobileBottomNav() {
   const totalItems = useCart((s) => s.totalItems());
   const { user } = useAuth();
 
+  const accountHref = !user
+    ? "/login"
+    : user.role === "admin"
+      ? "/admin"
+      : user.role === "reseller"
+        ? "/reseller"
+        : "/dashboard";
+
   useEffect(() => setMounted(true), []);
 
   const isActive = (href: string) =>
@@ -56,9 +64,9 @@ export default function MobileBottomNav() {
       </button>
 
       <Link
-        href={user ? "/dashboard" : "/login"}
+        href={accountHref}
         className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium ${
-          isActive("/dashboard") || isActive("/login")
+          isActive("/admin") || isActive("/reseller") || isActive("/dashboard") || isActive("/login")
             ? "text-brand-600"
             : "text-navy-800/75"
         }`}

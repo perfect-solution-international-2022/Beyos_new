@@ -29,9 +29,6 @@ interface Order {
   createdAt: string;
 }
 
-const CUSTOMER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "returned", "cancelled"];
-const RESELLER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "returned", "cancelled", "rejected"];
-
 const paymentBadge: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",
   unpaid: "bg-amber-100 text-amber-700",
@@ -77,6 +74,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState("");
+  const [syncingCourier, setSyncingCourier] = useState(false);
   const pendingOnly = view === "pending";
 
   const load = () => {
@@ -111,25 +109,6 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
     paid: orders.filter((order) => order.paymentStatus === "paid").length,
     total: orders.reduce((sum, order) => sum + order.amount, 0),
   }), [orders]);
-
-  const updateStatus = async (o: Order, status: string) => {
-    setSaving(o.orderRef);
-    try {
-      const response = await fetch("/api/admin/orders", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: o.type, orderRef: o.orderRef, status }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not update order status");
-      setOrders((prev) => prev.map((x) => (x.orderRef === o.orderRef ? { ...x, status } : x)));
-      toast(`Order ${o.orderRef} updated`);
-    } catch (cause) {
-      toast(cause instanceof Error ? cause.message : "Could not update order status", "error");
-    } finally {
-      setSaving("");
-    }
-  };
 
   const markPaid = async (o: Order) => {
     setSaving(o.orderRef + ":pay");
@@ -183,6 +162,27 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
       toast(cause instanceof Error ? cause.message : "Could not load bill", "error");
     } finally {
       setLoadingInvoice("");
+    }
+  };
+
+  const syncAllCourierUpdates = async () => {
+    setSyncingCourier(true);
+    try {
+      const response = await fetch("/api/admin/orders/courier-sync", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not sync courier updates");
+      load();
+      if (data.skipped) {
+        toast("A courier sync is already running");
+      } else if (data.failed) {
+        toast(`Synced ${data.synced} orders; ${data.failed} could not be checked`, "error");
+      } else {
+        toast(`Courier sync complete: ${data.changed} update${data.changed === 1 ? "" : "s"} found`);
+      }
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not sync courier updates", "error");
+    } finally {
+      setSyncingCourier(false);
     }
   };
 
@@ -243,6 +243,14 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           )}
+        </button>
+        <button
+          type="button"
+          onClick={syncAllCourierUpdates}
+          disabled={syncingCourier}
+          className="sm:ml-auto rounded-lg bg-brand px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {syncingCourier ? "Syncing courier…" : "Sync all courier updates"}
         </button>
       </div>
 
@@ -334,16 +342,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                       (o.type === "customer" && o.status === "pending") ? (
                       <span className="text-xs text-navy-800/45">Review to accept/reject</span>
                     ) : (
-                      <select
-                        value={o.status}
-                        disabled={saving === o.orderRef}
-                        onChange={(e) => updateStatus(o, e.target.value)}
-                        className="rounded-lg border border-navy-800/15 bg-white px-2 py-1.5 text-xs font-medium capitalize text-navy-800 outline-none focus:border-brand"
-                      >
-                        {(o.type === "reseller" ? RESELLER_STATUSES : CUSTOMER_STATUSES).map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                      <span className="text-xs text-navy-800/45">Updated automatically by courier</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">

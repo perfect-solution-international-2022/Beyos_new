@@ -13,6 +13,10 @@ const CSRF_EXEMPT_PATHS = new Set([
   // not trusted: the handler independently verifies the transaction with
   // OnePay before changing payment state.
   "/api/payments/onepay/callback",
+  // This endpoint is called by the server's cron job and verifies its own
+  // bearer secret before doing any work. A cron job does not send a browser
+  // Origin/Referer header, so the normal browser CSRF check cannot apply.
+  "/api/internal/courier-sync",
 ]);
 
 function normalizedOrigin(value: string | null | undefined): string | null {
