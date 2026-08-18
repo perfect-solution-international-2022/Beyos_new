@@ -34,38 +34,50 @@ function billPrice(amount: number) {
   return `Rs ${amount.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+const paymentLabels: Record<string, string> = {
+  cash: "Cash",
+  card: "Card",
+  cod: "COD",
+  reseller: "Reseller Account",
+  onepay: "OnePay Card",
+  pos_cash: "Cash",
+  pos_card: "Card",
+};
+
 export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }) {
   const date = new Date(receipt.createdAt);
 
   return (
-    <div className="receipt-print pos-receipt-print mx-auto w-full max-w-[520px] rounded-[28px] bg-[#f7f7f8] p-8 text-[#1a1a2e] shadow-[0_1px_3px_rgba(0,0,0,0.08)] print:w-[80mm] print:max-w-[80mm] print:rounded-none print:p-[4mm] print:shadow-none">
+    <div className="receipt-print pos-receipt-print mx-auto w-full max-w-[460px] rounded-[30px] border border-navy-900/10 bg-[#fdfdfc] px-8 py-9 text-[#101828] shadow-[0_24px_70px_rgba(16,24,40,0.13)] print:w-[80mm] print:max-w-[80mm] print:rounded-none print:border-0 print:p-[4mm] print:shadow-none">
       {/* Brand header */}
-      <div className="flex items-center gap-4">
-        <Image src="/images/logo.png" alt="Beyos Clothing" width={80} height={80} className="h-16 w-16 shrink-0 object-contain" />
-        <div>
-          <p className="text-2xl font-extrabold tracking-tight">
+      <div className="text-center">
+        <Image src="/images/logo.png" alt="Beyos Clothing" width={96} height={96} className="mx-auto h-[74px] w-[74px] object-contain" />
+        <div className="mt-2">
+          <p className="text-[22px] font-black tracking-[0.08em]">
             <span className="text-navy-900">BEYOS</span> <span className="text-brand">CLOTHING</span>
           </p>
-          <p className="mt-0.5 text-xs font-medium uppercase tracking-[0.25em] text-navy-800/50">Style Is Forever</p>
+          <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.38em] text-navy-800/45">Style Is Forever</p>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-start gap-x-6 gap-y-2 border-t border-b border-dashed border-navy-800/15 py-3 text-xs text-navy-800/70">
-        <span>Kendagaha junction, Elpitiya 80458</span>
-        <span>+94 74 319 1200</span>
+      <div className="mt-5 border-y border-navy-900/10 py-3 text-center text-[11px] leading-5 text-navy-800/60">
+        <p>Kendagaha Junction · Elpitiya 80458</p>
+        <p>+94 74 319 1200</p>
       </div>
 
       {/* Title */}
-      <p className="receipt-print-title mt-6 text-center text-xl font-extrabold tracking-[0.15em] text-navy-900">RECEIPT BILL</p>
+      <div className="receipt-print-title mt-6 text-center">
+        <p className="text-[10px] font-bold uppercase tracking-[0.34em] text-brand">Official Receipt</p>
+      </div>
 
       {/* Bill meta */}
       <div className="receipt-print-meta mt-4 rounded-2xl border border-navy-800/10 bg-white px-5 py-4 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-navy-800/60">Bill No</span>
-          <span className="font-semibold text-navy-900">{receipt.receiptNumber}</span>
+          <span className="text-navy-800/50">Order ID</span>
+          <span className="font-bold text-navy-950">#{receipt.receiptNumber}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-navy-800/60">Date</span>
+          <span className="text-navy-800/50">Date</span>
           <span className="font-semibold text-navy-900">
             {date.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })}
           </span>
@@ -94,31 +106,26 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
       </div>
 
       {/* Items table */}
-      <div className="mt-5 overflow-hidden rounded-2xl border border-navy-800/10 print:hidden">
+      <div className="mt-5 overflow-hidden rounded-xl border border-navy-800/10 print:hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-navy-900 text-left text-xs font-semibold uppercase tracking-wide text-white">
-              <th className="w-8 px-4 py-3">No.</th>
-              <th className="px-2 py-3">Product</th>
-              <th className="px-2 py-3">SKU</th>
-              <th className="px-2 py-3 text-right">Price</th>
-              <th className="px-2 py-3 text-right">Qty</th>
-              <th className="px-4 py-3 text-right">Subtotal</th>
+            <tr className="bg-navy-950 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-white">
+              <th className="px-4 py-3">Item</th>
+              <th className="w-10 py-3 text-center">Qty</th>
+              <th className="px-4 py-3 text-right">Amount</th>
             </tr>
           </thead>
           <tbody className="bg-white">
             {receipt.items.map((it, i) => (
               <tr key={i} className="border-t border-navy-800/10 align-top">
-                <td className="px-4 py-3 text-navy-800/70">{i + 1}</td>
-                <td className="px-2 py-3">
+                <td className="px-4 py-3.5">
                   <span className="font-semibold text-navy-900">{it.name}</span>
-                  {(it.size || it.color) && (
-                    <span className="block text-xs text-navy-800/50">{[it.size, it.color].filter(Boolean).join(" / ")}</span>
+                  {(it.size || it.color || it.sku) && (
+                    <span className="mt-0.5 block text-[10px] text-navy-800/45">{[it.sku, it.size, it.color].filter(Boolean).join(" · ")}</span>
                   )}
+                  <span className="mt-0.5 block text-[10px] text-navy-800/45">{billPrice(it.unitPrice)} each</span>
                 </td>
-                <td className="px-2 py-3 text-navy-800/70">{it.sku || "—"}</td>
-                <td className="px-2 py-3 text-right text-navy-800/70">{billPrice(it.unitPrice)}</td>
-                <td className="px-2 py-3 text-right text-navy-800/70">{it.quantity}</td>
+                <td className="py-3.5 text-center text-navy-800/70">{it.quantity}</td>
                 <td className="px-4 py-3 text-right font-semibold text-navy-900">{billPrice(it.lineTotal)}</td>
               </tr>
             ))}
@@ -184,15 +191,17 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
           <span className="text-lg font-extrabold text-white">{billPrice(receipt.total)}</span>
         </div>
 
-        {receipt.paymentMethod === "card" && (
-          <div className="flex justify-between">
-            <span className="text-navy-800/70">Payment Method</span>
-            <span className="font-semibold text-navy-900">Card</span>
-          </div>
-        )}
+        <div className="flex justify-between border-t border-dashed border-navy-800/15 pt-2.5">
+          <span className="text-navy-800/60">Payment</span>
+          <span className="font-semibold text-navy-900">{paymentLabels[receipt.paymentMethod] ?? receipt.paymentMethod}</span>
+        </div>
       </div>
 
-      <p className="receipt-print-thanks mt-7 text-center text-sm font-bold tracking-[0.1em] text-navy-900">THANK YOU FOR YOUR PURCHASE!</p>
+      <div className="receipt-print-thanks mt-8 border-t border-navy-900/10 pt-6 text-center">
+        <p className="text-sm font-black tracking-[0.16em] text-navy-950">THANK YOU</p>
+        <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-navy-800/45">For choosing Beyos Clothing</p>
+        <p className="mt-4 text-[10px] leading-4 text-navy-800/50">Please keep this receipt for exchanges.</p>
+      </div>
     </div>
   );
 }

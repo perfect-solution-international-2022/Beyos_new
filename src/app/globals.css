@@ -303,8 +303,7 @@ body {
     width: 100%;
   }
 
-  /* Use the printer's 80 mm thermal roll for POS receipts. This is scoped
-     to POS only; the normal customer invoice remains an A4-style print. */
+  /* Use the printer's 80 mm thermal roll for POS and order receipts. */
   .pos-receipt-print {
     page: pos-receipt;
     box-sizing: border-box;
@@ -326,12 +325,9 @@ body {
 
   .pos-receipt-print .receipt-print-title {
     margin-top: 5mm;
-    border-top: 2px solid #000 !important;
-    border-bottom: 2px solid #000 !important;
+    border-top: 1.5px solid #000 !important;
+    border-bottom: 1.5px solid #000 !important;
     padding: 2.5mm 0;
-    font-size: 17px;
-    font-weight: 800;
-    letter-spacing: 0.16em;
   }
 
   .pos-receipt-print .receipt-print-meta {
@@ -365,9 +361,6 @@ body {
   .pos-receipt-print .receipt-print-thanks {
     border-top: 1.5px solid #000 !important;
     padding-top: 3mm;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
   }
 
 }
