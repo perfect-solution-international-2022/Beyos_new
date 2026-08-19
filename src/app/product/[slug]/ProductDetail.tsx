@@ -335,7 +335,7 @@ export default function ProductDetail({ product }: { product: Product }) {
         </ul>
       </div>
 
-      <div className="fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-30 border-t border-white/70 bg-white/65 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_-14px_35px_rgba(9,23,34,.13)] backdrop-blur-2xl sm:px-4 sm:py-3 lg:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-30 border-t border-white/70 bg-white/65 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,.9),0_-14px_35px_rgba(9,23,34,.13)] backdrop-blur-2xl sm:px-4 sm:py-3 lg:hidden">
         <div className="mx-auto flex min-w-0 max-w-lg items-center gap-2 sm:gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs text-navy-800/55">{selectedVariant?.attributeSummary || product.name}</p>
