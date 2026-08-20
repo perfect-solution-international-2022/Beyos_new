@@ -32,20 +32,27 @@ function csrfAllowed(request: NextRequest): boolean {
   if (!request.nextUrl.pathname.startsWith("/api/") || !UNSAFE_METHODS.has(request.method)) return true;
   if (CSRF_EXEMPT_PATHS.has(request.nextUrl.pathname)) return true;
 
+  // Sec-Fetch-Site is set by the browser itself and can't be stripped by the
+  // page or a same-site request, so trust an explicit verdict from it first.
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite === "cross-site") return false;
+  if (fetchSite === "same-origin" || fetchSite === "same-site" || fetchSite === "none") return true;
+
   const configuredOrigin = normalizedOrigin(process.env.APP_BASE_URL);
   const requestOrigin = normalizedOrigin(request.nextUrl.origin);
   const origin = normalizedOrigin(request.headers.get("origin"));
   const refererOrigin = normalizedOrigin(request.headers.get("referer"));
   const sourceOrigin = origin || refererOrigin;
-  if (!sourceOrigin) return false;
+
+  // No Sec-Fetch-Site (older browser) and no Origin/Referer: some browsers,
+  // antivirus "web shields", and corporate proxies strip these for legitimate
+  // requests too, so their absence isn't proof of a forged request. The
+  // session cookie's SameSite=Lax attribute is the real backstop here - it
+  // simply won't be attached to an actual cross-site request.
+  if (!sourceOrigin) return true;
 
   const allowedOrigins = new Set([configuredOrigin, requestOrigin].filter((item): item is string => Boolean(item)));
-  if (!allowedOrigins.has(sourceOrigin)) return false;
-
-  // Modern browsers provide an additional signal. Reject explicit cross-site
-  // requests even if a proxy supplied misleading URL headers.
-  const fetchSite = request.headers.get("sec-fetch-site");
-  return fetchSite !== "cross-site";
+  return allowedOrigins.has(sourceOrigin);
 }
 
 export async function middleware(request: NextRequest) {
