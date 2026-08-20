@@ -363,6 +363,11 @@ body {
     padding-top: 3mm;
   }
 
+  .pos-receipt-print .receipt-print-barcode svg {
+    max-width: 68mm;
+    height: auto;
+  }
+
 }
 
 @page pos-receipt {

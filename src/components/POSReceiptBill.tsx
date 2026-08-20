@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import ReceiptBarcode from "@/components/ReceiptBarcode";
 
 export interface ReceiptBillItem {
   name: string;
@@ -195,6 +196,10 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
           <span className="text-navy-800/60">Payment</span>
           <span className="font-semibold text-navy-900">{paymentLabels[receipt.paymentMethod] ?? receipt.paymentMethod}</span>
         </div>
+      </div>
+
+      <div className="receipt-print-barcode mt-6 text-center">
+        <ReceiptBarcode value={receipt.receiptNumber} />
       </div>
 
       <div className="receipt-print-thanks mt-8 border-t border-navy-900/10 pt-6 text-center">
