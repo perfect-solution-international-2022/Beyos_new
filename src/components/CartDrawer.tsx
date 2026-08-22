@@ -38,7 +38,7 @@ export default function CartDrawer() {
 
       {/* Panel */}
       <aside
-        className={`glass-shell fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-md flex-col border-l border-white/60 bg-white/72 shadow-[inset_1px_0_0_rgba(255,255,255,.9),-24px_0_70px_rgba(9,23,34,.22)] backdrop-blur-2xl transition-transform duration-300 ${
+        className={`glass-shell fixed right-0 top-0 z-50 flex h-[100dvh] w-full max-w-md flex-col border-l border-white/60 bg-white shadow-[inset_1px_0_0_rgba(255,255,255,.9),-24px_0_70px_rgba(9,23,34,.22)] transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >

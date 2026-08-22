@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   try {
     const result = await query<any>(
       "INSERT INTO pos_customers (name, phone, address, city, district, province, postal_code) VALUES (?,?,?,?,?,?,?)",
-      [name, phone, address, city, district, null, postalCode || null]
+      [name, phone, address, city, district, "", postalCode || null]
     );
     return NextResponse.json({ customer: {
       id: `pos-${Number((result as any).insertId)}`, name, email: "", phone, addressLine1: address,

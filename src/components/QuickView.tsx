@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Product } from "@/lib/types";
 import { formatPrice } from "@/lib/utils";
 import { useCart } from "@/store/cart";
@@ -29,15 +30,18 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
   const stock = variant?.stock ?? product.stock;
   const image = variant?.image || product.image;
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onClose();
+    const onKeyDown = (event: KeyboardEvent) => event.key === "Escape" && onCloseRef.current();
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = "";
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, []);
 
   const add = () => {
     addItem({
@@ -57,10 +61,10 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
     onClose();
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[105] flex items-end justify-center bg-navy-900/55 p-0 backdrop-blur-sm sm:items-center sm:p-5" onClick={onClose}>
-      <div role="dialog" aria-modal="true" aria-label={`Quick view ${product.name}`} className="glass-shell max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-white/60 bg-white/78 shadow-[inset_0_1px_0_rgba(255,255,255,.95),0_35px_100px_rgba(9,23,34,.35)] backdrop-blur-2xl sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/60 bg-white/65 px-5 py-4 backdrop-blur-2xl">
+      <div role="dialog" aria-modal="true" aria-label={`Quick view ${product.name}`} className="glass-shell max-h-[92dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-white/60 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,.95),0_35px_100px_rgba(9,23,34,.35)] sm:rounded-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-navy-800/10 bg-white px-5 py-4">
           <p className="font-semibold text-navy-800">Quick View</p>
           <button type="button" onClick={onClose} aria-label="Close quick view" className="flex h-10 w-10 items-center justify-center rounded-full bg-navy-50 text-2xl text-navy-800">×</button>
         </div>
@@ -102,6 +106,7 @@ export default function QuickView({ product, onClose }: { product: Product; onCl
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

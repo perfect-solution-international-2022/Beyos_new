@@ -28,10 +28,10 @@ export default function CookieConsent() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-navy-900/20 p-3 backdrop-blur-[2px] sm:p-6">
-      <aside aria-label="Cookie consent" className="liquid-glass glass-edge w-full max-w-2xl overflow-hidden rounded-[24px] shadow-[0_30px_100px_rgba(9,23,34,0.32)]">
+    <div className="pointer-events-none fixed inset-0 z-[100] flex items-end justify-center bg-navy-900/20 p-3 backdrop-blur-[2px] sm:p-6">
+      <aside aria-label="Cookie consent" className="liquid-glass glass-edge pointer-events-auto w-full max-w-2xl overflow-hidden rounded-[24px] shadow-[0_30px_100px_rgba(9,23,34,0.32)]">
         <div className="h-1.5 bg-gradient-to-r from-brand-700 via-brand to-brand-100" />
-        <div className="p-5 sm:p-7">
+        <div className="max-h-[70dvh] overflow-y-auto p-4 sm:p-7">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 ring-1 ring-brand/15"><CookieIcon /></div>
             <div>
@@ -46,7 +46,7 @@ export default function CookieConsent() {
               <CookieChoice icon="chart" title="Analytics cookies" description="Help us understand visits and page performance so we can make the website faster and easier to use." enabled={analytics} onChange={setAnalytics} />
             </div>
           ) : (
-            <div className="mt-5 grid grid-cols-3 gap-2 text-center text-[11px] font-semibold text-navy-800/65 sm:text-xs">
+            <div className="mt-5 hidden grid-cols-3 gap-2 text-center text-xs font-semibold text-navy-800/65 sm:grid">
               <div className="rounded-xl bg-navy-50 px-2 py-3"><span className="block text-base">🛒</span>Remember cart</div>
               <div className="rounded-xl bg-navy-50 px-2 py-3"><span className="block text-base">🔐</span>Secure sign-in</div>
               <div className="rounded-xl bg-navy-50 px-2 py-3"><span className="block text-base">✨</span>Improve experience</div>

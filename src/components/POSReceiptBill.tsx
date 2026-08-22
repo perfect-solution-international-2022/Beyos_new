@@ -51,19 +51,14 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
   return (
     <div className="receipt-print pos-receipt-print mx-auto w-full max-w-[460px] rounded-[30px] border border-navy-900/10 bg-[#fdfdfc] px-8 py-9 text-[#101828] shadow-[0_24px_70px_rgba(16,24,40,0.13)] print:w-[80mm] print:max-w-[80mm] print:rounded-none print:border-0 print:p-[4mm] print:shadow-none">
       {/* Brand header */}
-      <div className="text-center">
-        <Image src="/images/logo.png" alt="Beyos Clothing" width={96} height={96} className="mx-auto h-[74px] w-[74px] object-contain" />
-        <div className="mt-2">
+      <div className="flex items-center justify-center gap-3">
+        <Image src="/images/logo.png" alt="Beyos Clothing" width={96} height={96} className="h-[64px] w-[64px] shrink-0 object-contain print:brightness-0" />
+        <div className="text-left">
           <p className="text-[22px] font-black tracking-[0.08em]">
             <span className="text-navy-900">BEYOS</span> <span className="text-brand">CLOTHING</span>
           </p>
           <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.38em] text-navy-800/45">Style Is Forever</p>
         </div>
-      </div>
-
-      <div className="mt-5 border-y border-navy-900/10 py-3 text-center text-[11px] leading-5 text-navy-800/60">
-        <p>Kendagaha Junction · Elpitiya 80458</p>
-        <p>+94 74 319 1200</p>
       </div>
 
       {/* Title */}
@@ -78,14 +73,10 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
           <span className="font-bold text-navy-950">#{receipt.receiptNumber}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-navy-800/50">Date</span>
+          <span className="text-navy-800/50">Date and Time</span>
           <span className="font-semibold text-navy-900">
             {date.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })}
-          </span>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-navy-800/60">Time</span>
-          <span className="font-semibold text-navy-900">
+            {" "}
             {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true })}
           </span>
         </div>
@@ -206,6 +197,8 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
         <p className="text-sm font-black tracking-[0.16em] text-navy-950">THANK YOU</p>
         <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-navy-800/45">For choosing Beyos Clothing</p>
         <p className="mt-4 text-[10px] leading-4 text-navy-800/50">Please keep this receipt for exchanges.</p>
+        <p className="mt-4 text-[9px] leading-4 text-navy-800/45">Yakkatuwa Road, Kurundugaha</p>
+        <p className="text-[9px] leading-4 text-navy-800/45">+94 74 319 1200</p>
       </div>
     </div>
   );
