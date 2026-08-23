@@ -68,6 +68,7 @@ export async function POST(request: Request) {
 
   let b: {
     items?: SaleLine[];
+    customerId?: number | string | null;
     customerName?: string;
     customerPhone?: string;
     customerPhone2?: string;
@@ -87,6 +88,7 @@ export async function POST(request: Request) {
   if (!Array.isArray(b.items) || b.items.length === 0) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
+  const customerId = Number(b.customerId) || null;
   const paymentMethod = b.paymentMethod === "card" ? "card" : "cash";
   const fulfillmentType = b.fulfillmentType === "delivery" ? "delivery" : "pickup";
   const deliveryAddress = (b.deliveryAddress ?? "").trim();
@@ -136,6 +138,17 @@ export async function POST(request: Request) {
       shiftId = Number((shiftResult as any).insertId);
     }
 
+    // Wholesale pricing only applies for a real, currently-flagged wholesale
+    // customer — never trust a client-sent wholesale flag.
+    let isWholesaleCustomer = false;
+    if (customerId) {
+      const [customerRows] = await conn.execute(
+        "SELECT is_wholesale_customer FROM users WHERE id = ? AND role = 'buyer' AND deleted_at IS NULL LIMIT 1",
+        [customerId]
+      );
+      isWholesaleCustomer = !!(customerRows as any[])[0]?.is_wholesale_customer;
+    }
+
     let subtotal = 0;
     let totalWeightKg = 0;
     const lineItems: {
@@ -145,7 +158,7 @@ export async function POST(request: Request) {
 
     for (const line of b.items) {
       const [rows] = await conn.execute(
-        "SELECT id, slug, sku, name, price, stock, weight_kg FROM products WHERE slug = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
+        "SELECT id, slug, sku, name, price, wholesale_price, stock, weight_kg FROM products WHERE slug = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [line.slug]
       );
       const product = (rows as any[])[0];
@@ -155,7 +168,7 @@ export async function POST(request: Request) {
       let variant: any = null;
       if (line.variantId) {
         const [variantRows] = await conn.execute(
-          "SELECT id, sku, price, sale_price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          "SELECT id, sku, price, sale_price, wholesale_price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
           [line.variantId, product.id]
         );
         variant = (variantRows as any[])[0];
@@ -167,7 +180,12 @@ export async function POST(request: Request) {
         throw new Error(`Not enough stock for ${product.name} (${product.stock} left)`);
       }
 
-      const unitPrice = Number(variant ? (variant.sale_price ?? variant.price) : product.price);
+      const baseUnitPrice = Number(variant ? (variant.sale_price ?? variant.price) : product.price);
+      const wholesalePrice = (variant ? variant.wholesale_price : product.wholesale_price) == null
+        ? null : Number(variant ? variant.wholesale_price : product.wholesale_price);
+      const unitPrice = isWholesaleCustomer && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < baseUnitPrice
+        ? wholesalePrice
+        : baseUnitPrice;
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
       totalWeightKg += Number(product.weight_kg || 0) * qty;
@@ -203,12 +221,12 @@ export async function POST(request: Request) {
     const deliveryStatus = fulfillmentType === "delivery" ? "pending" : null;
     const [saleResult] = await conn.execute(
       `INSERT INTO pos_sales
-        (receipt_number, shift_id, cashier_id, created_by, customer_name, customer_phone, customer_phone_2,
+        (receipt_number, shift_id, cashier_id, created_by, customer_id, customer_name, customer_phone, customer_phone_2,
          subtotal, discount_amount, tax_amount, total, payment_method, amount_tendered, change_due, status,
          fulfillment_type, delivery_address, delivery_district, delivery_district_id, delivery_city, delivery_city_id, delivery_status, delivery_fee)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
       [
-        receiptNumber, shiftId, cashierId, admin.id,
+        receiptNumber, shiftId, cashierId, admin.id, customerId,
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         (b.customerPhone2 ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,

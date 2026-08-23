@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
+import { hashPassword } from "@/lib/auth";
+import crypto from "crypto";
 
 interface CustomerRow {
-  id: string; name: string; email: string; phone: string | null;
+  id: number; name: string; email: string; phone: string | null;
   address_line1: string | null; address_line2: string | null; city: string | null;
   district: string | null; province: string | null; postal_code: string | null;
+  is_wholesale_customer: number;
 }
 
 export async function GET(request: Request) {
@@ -18,21 +21,17 @@ export async function GET(request: Request) {
 
   try {
     const rows = await query<CustomerRow>(
-      `SELECT * FROM (
-         SELECT CONCAT('user-', id) id, name, email, phone, address_line1, address_line2, city, district, province, postal_code
-         FROM users WHERE role = 'buyer' AND deleted_at IS NULL AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
-         UNION ALL
-         SELECT CONCAT('pos-', id) id, name, '' email, phone, address address_line1, NULL address_line2, city, district, province, postal_code
-         FROM pos_customers WHERE name LIKE ? OR phone LIKE ?
-       ) customers
+      `SELECT id, name, email, phone, address_line1, address_line2, city, district, province, postal_code, is_wholesale_customer
+       FROM users
+       WHERE role = 'buyer' AND deleted_at IS NULL AND (name LIKE ? OR email LIKE ? OR phone LIKE ?)
        ORDER BY CASE WHEN name LIKE ? THEN 0 ELSE 1 END, name ASC LIMIT 10`,
-      [term, term, term, term, term, `${search.slice(0, 100)}%`]
+      [term, term, term, `${search.slice(0, 100)}%`]
     );
     return NextResponse.json({ customers: rows.map((row) => ({
-      id: row.id, name: row.name, email: row.email, phone: row.phone || "",
-      addressLine1: row.address_line1 || "", addressLine2: row.address_line2 || "",
-      city: row.city || "", district: row.district || "", province: row.province || "",
-      postalCode: row.postal_code || "",
+      id: `user-${row.id}`, name: row.name, email: row.email.endsWith("@no-login.beyosclothing.internal") ? "" : row.email,
+      phone: row.phone || "", addressLine1: row.address_line1 || "", addressLine2: row.address_line2 || "",
+      city: row.city || "", district: row.district || "", province: row.province || "", postalCode: row.postal_code || "",
+      isWholesaleCustomer: !!row.is_wholesale_customer,
     })) });
   } catch (error) {
     console.error("POS customer search failed:", error);
@@ -59,14 +58,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Enter a valid Sri Lankan mobile number" }, { status: 400 });
   }
 
+  const nameParts = name.split(/\s+/);
+  const firstName = nameParts[0] || name;
+  const lastName = nameParts.slice(1).join(" ");
+  const email = `pos-${crypto.randomBytes(6).toString("hex")}@no-login.beyosclothing.internal`;
+  const passwordHash = await hashPassword(crypto.randomBytes(24).toString("hex"));
+
   try {
     const result = await query<any>(
-      "INSERT INTO pos_customers (name, phone, address, city, district, province, postal_code) VALUES (?,?,?,?,?,?,?)",
-      [name, phone, address, city, district, "", postalCode || null]
+      `INSERT INTO users (name, first_name, last_name, email, password_hash, role, account_source, reseller_status, phone, address_line1, city, district, postal_code)
+       VALUES (?,?,?,?,?, 'buyer', 'pos', 'approved', ?,?,?,?,?)`,
+      [name, firstName, lastName, email, passwordHash, phone, address, city, district, postalCode || null]
     );
+    const id = Number((result as any).insertId);
     return NextResponse.json({ customer: {
-      id: `pos-${Number((result as any).insertId)}`, name, email: "", phone, addressLine1: address,
-      addressLine2: "", city, district, province: "", postalCode,
+      id: `user-${id}`, name, email: "", phone, addressLine1: address,
+      addressLine2: "", city, district, province: "", postalCode, isWholesaleCustomer: false,
     } }, { status: 201 });
   } catch (error) {
     console.error("POS customer creation failed:", error);

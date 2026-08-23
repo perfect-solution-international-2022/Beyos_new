@@ -15,9 +15,12 @@ export async function GET(
 
   try {
     const rows = await query<any>(
-      `SELECT s.*, COALESCE(u.name, NULLIF(c.name, '__BEYOS_POS__'), 'Unknown user') AS cashier_name FROM pos_sales s
+      `SELECT s.*, COALESCE(u.name, NULLIF(c.name, '__BEYOS_POS__'), 'Unknown user') AS cashier_name,
+              cu.is_wholesale_customer AS customer_is_wholesale_customer
+       FROM pos_sales s
        JOIN pos_cashiers c ON c.id = s.cashier_id
        LEFT JOIN users u ON u.id = s.created_by
+       LEFT JOIN users cu ON cu.id = s.customer_id
        WHERE s.receipt_number = ? AND s.deleted_at IS NULL LIMIT 1`,
       [receiptNumber]
     );
@@ -33,6 +36,8 @@ export async function GET(
       receipt: {
         receiptNumber: sale.receipt_number,
         cashierName: sale.cashier_name,
+        customerId: sale.customer_id,
+        customerIsWholesaleCustomer: !!sale.customer_is_wholesale_customer,
         customerName: sale.customer_name || "Walk-in Customer",
         customerPhone: sale.customer_phone || "",
         customerPhone2: sale.customer_phone_2 || "",
@@ -155,6 +160,7 @@ export async function PUT(
 
   let b: {
     items?: EditSaleLine[];
+    customerId?: number | string | null;
     customerName?: string;
     customerPhone?: string;
     discountAmount?: number;
@@ -173,6 +179,7 @@ export async function PUT(
   if (!Array.isArray(b.items) || b.items.length === 0) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
+  const customerId = Number(b.customerId) || null;
   const paymentMethod = b.paymentMethod === "card" ? "card" : "cash";
   const fulfillmentType = b.fulfillmentType === "delivery" ? "delivery" : "pickup";
   const deliveryAddress = (b.deliveryAddress ?? "").trim();
@@ -217,6 +224,17 @@ export async function PUT(
     }
     await conn.execute("DELETE FROM pos_sale_items WHERE sale_id = ?", [sale.id]);
 
+    // Wholesale pricing only applies for a real, currently-flagged wholesale
+    // customer — never trust a client-sent wholesale flag.
+    let isWholesaleCustomer = false;
+    if (customerId) {
+      const [customerRows] = await conn.execute(
+        "SELECT is_wholesale_customer FROM users WHERE id = ? AND role = 'buyer' AND deleted_at IS NULL LIMIT 1",
+        [customerId]
+      );
+      isWholesaleCustomer = !!(customerRows as any[])[0]?.is_wholesale_customer;
+    }
+
     let subtotal = 0;
     let totalWeightKg = 0;
     const lineItems: {
@@ -226,7 +244,7 @@ export async function PUT(
 
     for (const line of b.items) {
       const [rows] = await conn.execute(
-        "SELECT id, slug, sku, name, price, stock, weight_kg FROM products WHERE slug = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
+        "SELECT id, slug, sku, name, price, wholesale_price, stock, weight_kg FROM products WHERE slug = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE",
         [line.slug]
       );
       const product = (rows as any[])[0];
@@ -236,7 +254,7 @@ export async function PUT(
       let variant: any = null;
       if (line.variantId) {
         const [variantRows] = await conn.execute(
-          "SELECT id, sku, price, sale_price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          "SELECT id, sku, price, sale_price, wholesale_price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
           [line.variantId, product.id]
         );
         variant = (variantRows as any[])[0];
@@ -248,7 +266,12 @@ export async function PUT(
         throw new Error(`Not enough stock for ${product.name} (${product.stock} left)`);
       }
 
-      const unitPrice = Number(variant ? (variant.sale_price ?? variant.price) : product.price);
+      const baseUnitPrice = Number(variant ? (variant.sale_price ?? variant.price) : product.price);
+      const wholesalePrice = (variant ? variant.wholesale_price : product.wholesale_price) == null
+        ? null : Number(variant ? variant.wholesale_price : product.wholesale_price);
+      const unitPrice = isWholesaleCustomer && wholesalePrice != null && wholesalePrice > 0 && wholesalePrice < baseUnitPrice
+        ? wholesalePrice
+        : baseUnitPrice;
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
       totalWeightKg += Number(product.weight_kg || 0) * qty;
@@ -284,12 +307,12 @@ export async function PUT(
     const deliveryStatus = fulfillmentType === "delivery" ? "pending" : null;
     await conn.execute(
       `UPDATE pos_sales SET
-        customer_name = ?, customer_phone = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
+        customer_id = ?, customer_name = ?, customer_phone = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
         total = ?, payment_method = ?, amount_tendered = ?, change_due = ?,
         fulfillment_type = ?, delivery_address = ?, delivery_district = ?, delivery_district_id = ?, delivery_city = ?, delivery_city_id = ?, delivery_status = ?, delivery_fee = ?
        WHERE id = ?`,
       [
-        (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
+        customerId, (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
         fulfillmentType, deliveryAddress || null, deliveryDistrict || null, deliveryDistrictId || null,
         deliveryCity || null, deliveryCityId || null, deliveryStatus, deliveryFee,

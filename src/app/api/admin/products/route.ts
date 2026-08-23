@@ -87,10 +87,10 @@ export async function GET(request: Request) {
 
     if (compact) {
       const [rows, variants] = await Promise.all([
-        query<any>(`SELECT id, slug, sku, name, category, price, compare_at_price, stock, low_stock_threshold,
+        query<any>(`SELECT id, slug, sku, name, category, price, compare_at_price, wholesale_price, stock, low_stock_threshold,
                            image, sizes, colors, weight_kg, product_type
                     FROM products WHERE deleted_at IS NULL ORDER BY created_at DESC, id DESC`),
-        query<any>(`SELECT id, product_id, sku, attribute_summary, price, sale_price, stock, low_stock_threshold, image
+        query<any>(`SELECT id, product_id, sku, attribute_summary, price, sale_price, wholesale_price, stock, low_stock_threshold, image
                     FROM product_variants ORDER BY id ASC`),
       ]);
       const vByP = new Map<number, any[]>();
@@ -102,6 +102,7 @@ export async function GET(request: Request) {
           attributeSummary: variant.attribute_summary,
           price: Number(variant.price),
           salePrice: num(variant.sale_price),
+          wholesalePrice: num(variant.wholesale_price),
           stock: Number(variant.stock),
           image: variant.image,
           lowStockThreshold: Number(variant.low_stock_threshold) || 10,
@@ -117,6 +118,7 @@ export async function GET(request: Request) {
           category: row.category,
           price: row.compare_at_price ? Number(row.compare_at_price) : Number(row.price),
           salePrice: row.compare_at_price ? Number(row.price) : null,
+          wholesalePrice: num(row.wholesale_price),
           stock: Number(row.stock),
           lowStockThreshold: Number(row.low_stock_threshold) || 10,
           image: row.image,

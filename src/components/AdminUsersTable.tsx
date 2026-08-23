@@ -6,6 +6,7 @@ import { useToast } from "@/context/ToastProvider";
 
 interface AdminUser {
   id: number;
+  accountSource?: "web" | "pos";
   name: string;
   firstName: string;
   lastName: string;
@@ -152,7 +153,7 @@ export default function AdminUsersTable({
     const headers = ["Customer ID", "Name", "First Name", "Last Name", "Email", "Phone", "Address Line 1", "Address Line 2", "City", "District", "Province", "Postal Code", "Account Status", "Wholesale Since", "Last Login", "Registered At"];
     const rows = filtered.map((user) => [user.id, user.name, user.firstName, user.lastName, user.email, user.phone, user.addressLine1, user.addressLine2, user.city, user.district, user.province, user.postalCode, user.accountStatus, user.wholesaleSince, user.lastLoginAt, user.createdAt]);
     const csv = [headers, ...rows].map((row) => row.map(escape).join(",")).join("\r\n");
-    const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
+    const url = URL.createObjectURL(new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = `wholesale-customers-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -200,7 +201,7 @@ export default function AdminUsersTable({
   const del = async (u: AdminUser) => {
     const ok = await confirm({
       title: "Archive user?",
-      message: `Move ${u.name} (${u.email}) to Trash? You can restore this account later.`,
+      message: `Move ${u.name} (${u.email || "no email on file"}) to Trash? You can restore this account later.`,
       confirmText: "Archive",
       danger: true,
     });
@@ -311,7 +312,7 @@ export default function AdminUsersTable({
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-white">{u.name.charAt(0).toUpperCase()}</span>
-                      <span className="min-w-0"><span className="block font-medium text-navy-800">{u.name}</span><span className="block truncate text-xs text-navy-800/45">{u.email}</span></span>
+                      <span className="min-w-0"><span className="block font-medium text-navy-800">{u.name}</span><span className="block truncate text-xs text-navy-800/45">{u.accountSource === "pos" ? "No website account" : u.email}</span></span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-navy-800/60"><span className="block">{u.phone || "No phone"}</span><span className="mt-0.5 block text-xs text-navy-800/40">{u.city || "No location"}</span></td>
@@ -323,12 +324,14 @@ export default function AdminUsersTable({
                     {manage ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {u.accountSource === "pos" && <span className="badge bg-navy-50 text-navy-800/60">POS</span>}
                         {u.isWholesaleCustomer && <span className="badge bg-emerald-100 text-emerald-700">Wholesale</span>}
                         {u.adminRole && <span className="text-xs text-navy-800/45">{adminRoleLabel[u.adminRole]}</span>}
                       </div>
                     ) : (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`badge capitalize ${roleBadge[u.role] ?? "bg-navy-50 text-navy-800"}`}>{u.role}</span>
+                        {u.accountSource === "pos" && <span className="badge bg-navy-50 text-navy-800/60">POS</span>}
                         {u.isWholesaleCustomer && <span className="badge bg-emerald-100 text-emerald-700">Wholesale</span>}
                         {u.role === "admin" && u.adminRole && (
                           <span className="badge bg-navy-50 text-navy-800">{adminRoleLabel[u.adminRole]}</span>
@@ -426,6 +429,7 @@ function UserDetailModal({
   onDelete: () => void;
 }) {
   const [profile, setProfile] = useState({ firstName: user.firstName || user.name.split(" ")[0] || "", lastName: user.lastName || user.name.split(" ").slice(1).join(" "), email: user.email, phone: user.phone || "", city: user.city || "" });
+  const isPos = user.accountSource === "pos";
   const statusStyle = user.resellerStatus === "approved"
     ? "bg-emerald-100 text-emerald-700"
     : user.resellerStatus === "rejected"
@@ -440,7 +444,7 @@ function UserDetailModal({
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-navy-800 text-lg font-bold text-white">{user.name.charAt(0).toUpperCase()}</span>
             <div className="min-w-0">
               <h2 className="truncate text-xl font-bold text-navy-800">{user.name}</h2>
-              <p className="truncate text-sm text-navy-800/50">{user.email}</p>
+              <p className="truncate text-sm text-navy-800/50">{isPos ? "No website account — added via POS" : user.email}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close user details" title="Close" className="flex h-9 w-9 shrink-0 items-center justify-center text-2xl text-navy-800/45 hover:text-navy-800">×</button>
@@ -449,13 +453,14 @@ function UserDetailModal({
         <div className="grid gap-x-8 gap-y-6 px-5 py-6 sm:grid-cols-2 sm:px-7">
           <Detail label="User ID" value={`#${user.id}`} />
           <Detail label="Joined" value={new Date(user.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })} />
-          <Detail label="Email"><a href={`mailto:${user.email}`} className="break-all font-medium text-brand hover:underline">{user.email}</a></Detail>
+          <Detail label="Email">{user.email ? <a href={`mailto:${user.email}`} className="break-all font-medium text-brand hover:underline">{user.email}</a> : <span>Not provided</span>}</Detail>
           <Detail label="Phone">{user.phone ? <a href={`tel:${user.phone}`} className="font-medium text-brand hover:underline">{user.phone}</a> : <span>Not provided</span>}</Detail>
           <Detail label="Location" value={user.city || "Not provided"} />
           <Detail label="Address" value={[user.addressLine1, user.addressLine2, user.city, user.district, user.province, user.postalCode].filter(Boolean).join(", ") || "Not provided"} />
           <Detail label="Account role">
             <div className="flex flex-wrap gap-2">
               <span className={`badge capitalize ${roleBadge[user.role] ?? "bg-navy-50 text-navy-800"}`}>{user.role}</span>
+              {isPos && <span className="badge bg-navy-50 text-navy-800/60">POS</span>}
               {user.adminRole && <span className="badge bg-navy-50 text-navy-800">{adminRoleLabel[user.adminRole]}</span>}
             </div>
           </Detail>
@@ -463,10 +468,11 @@ function UserDetailModal({
 
         <div className="border-t border-navy-800/10 px-5 py-6 sm:px-7">
           <h3 className="font-bold text-navy-800">Profile</h3>
+          {isPos && <p className="mt-1 text-xs text-navy-800/50">Added as a walk-in customer at the POS. Add an email here if they later want a website account.</p>}
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field label="First name"><input className="input" value={profile.firstName} onChange={(event) => setProfile((current) => ({ ...current, firstName: event.target.value }))} /></Field>
             <Field label="Last name"><input className="input" value={profile.lastName} onChange={(event) => setProfile((current) => ({ ...current, lastName: event.target.value }))} /></Field>
-            <Field label="Email"><input type="email" className="input" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} /></Field>
+            <Field label="Email"><input type="email" className="input" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} placeholder={isPos ? "Optional" : undefined} /></Field>
             <Field label="Phone"><input className="input" value={profile.phone} onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))} /></Field>
             <Field label="City"><input className="input" value={profile.city} onChange={(event) => setProfile((current) => ({ ...current, city: event.target.value }))} /></Field>
           </div>
@@ -487,7 +493,7 @@ function UserDetailModal({
           <div className="flex flex-col gap-4 border-t border-emerald-100 bg-emerald-50/60 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
             <div>
               <p className="text-sm font-bold text-navy-800">Wholesale customer</p>
-              <p className="mt-1 text-xs leading-5 text-navy-800/55">Wholesale-priced products apply from one item. Products without a wholesale price keep their normal sale or regular price.</p>
+              <p className="mt-1 text-xs leading-5 text-navy-800/55">Wholesale-priced products apply from one item, whether the sale happens on the website or at the POS. Products without a wholesale price keep their normal sale or regular price.</p>
               {user.wholesaleSince && <p className="mt-1 text-xs text-emerald-700">Enabled {new Date(user.wholesaleSince).toLocaleDateString("en-GB")}</p>}
             </div>
             <button type="button" disabled={saving} onClick={() => onChangeWholesale(!user.isWholesaleCustomer)} className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${user.isWholesaleCustomer ? "bg-red-100 text-red-700" : "bg-emerald-600 text-white"}`}>{user.isWholesaleCustomer ? "Remove wholesale" : "Make wholesale"}</button>

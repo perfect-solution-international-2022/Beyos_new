@@ -14,6 +14,7 @@ interface ProductVariant {
   attributeSummary: string;
   price: number;
   salePrice: number | null;
+  wholesalePrice: number | null;
   stock: number;
   image: string | null;
 }
@@ -48,6 +49,7 @@ interface Product {
   name: string;
   price: number;
   salePrice: number | null;
+  wholesalePrice: number | null;
   stock: number;
   image: string | null;
   sizes: string[];
@@ -65,6 +67,7 @@ interface CartLine {
   image: string | null;
   variation: string;
   price: number;
+  wholesalePrice: number | null;
   stock: number;
   sizes: string[];
   colors: string[];
@@ -76,7 +79,7 @@ interface CartLine {
 
 interface Customer {
   id: string; name: string; email: string; phone: string; addressLine1: string; addressLine2: string;
-  city: string; district: string; province: string; postalCode: string;
+  city: string; district: string; province: string; postalCode: string; isWholesaleCustomer: boolean;
 }
 
 interface CourierOption { id: number; name: string; }
@@ -101,13 +104,22 @@ interface Receipt {
 
 function mapProduct(p: any): Product {
   return {
-    slug: p.slug, sku: p.sku, name: p.name, price: Number(p.price), salePrice: p.salePrice == null ? null : Number(p.salePrice), stock: p.stock,
+    slug: p.slug, sku: p.sku, name: p.name, price: Number(p.price), salePrice: p.salePrice == null ? null : Number(p.salePrice),
+    wholesalePrice: p.wholesalePrice == null ? null : Number(p.wholesalePrice), stock: p.stock,
     image: p.image, sizes: p.sizes ?? [], colors: p.colors ?? [], weightKg: Number(p.weightKg) || 0,
     productType: p.productType === "variable" ? "variable" : "simple",
     variants: (p.variants ?? []).map((v: any) => ({
-      id: v.id, sku: v.sku, attributeSummary: v.attributeSummary, price: Number(v.price), salePrice: v.salePrice == null ? null : Number(v.salePrice), stock: Number(v.stock), image: v.image ?? null,
+      id: v.id, sku: v.sku, attributeSummary: v.attributeSummary, price: Number(v.price), salePrice: v.salePrice == null ? null : Number(v.salePrice),
+      wholesalePrice: v.wholesalePrice == null ? null : Number(v.wholesalePrice), stock: Number(v.stock), image: v.image ?? null,
     })),
   };
+}
+
+/** Wholesale price applies only for a selected customer flagged as wholesale, and only when it actually undercuts the regular/sale price. */
+function effectiveLinePrice(line: Pick<CartLine, "price" | "wholesalePrice">, customerWholesale: boolean): number {
+  return customerWholesale && line.wholesalePrice != null && line.wholesalePrice > 0 && line.wholesalePrice < line.price
+    ? line.wholesalePrice
+    : line.price;
 }
 
 function PosPrice({ regularPrice, salePrice, compact = false }: { regularPrice: number; salePrice: number | null; compact?: boolean }) {
@@ -151,6 +163,7 @@ function AdminPosRegister() {
   const [customerSearching, setCustomerSearching] = useState(false);
   const [customerMenuOpen, setCustomerMenuOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerWholesale, setCustomerWholesale] = useState(false);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
@@ -212,6 +225,7 @@ function AdminPosRegister() {
                 image: variant?.image || product?.image || null,
                 variation: variant?.attributeSummary || [item.size, item.color].filter(Boolean).join(" / "),
                 price: item.unitPrice,
+                wholesalePrice: variant?.wholesalePrice ?? product?.wholesalePrice ?? null,
                 stock: (variant?.stock ?? product?.stock ?? 0) + item.quantity,
                 sizes: [],
                 colors: [],
@@ -225,6 +239,8 @@ function AdminPosRegister() {
         setCustomerName(r.customerName === "Walk-in Customer" ? "" : r.customerName || "");
         setCustomerPhone(r.customerPhone || "");
         setCustomerPhone2(r.customerPhone2 || "");
+        setSelectedCustomerId(r.customerId ? `user-${r.customerId}` : null);
+        setCustomerWholesale(!!r.customerIsWholesaleCustomer);
         setDiscountAmount(String(r.discountAmount || 0));
         const rate = r.subtotal - r.discountAmount > 0 ? (r.taxAmount / (r.subtotal - r.discountAmount)) * 100 : 0;
         setTaxRate(rate ? String(Math.round(rate * 100) / 100) : "0");
@@ -264,6 +280,7 @@ function AdminPosRegister() {
 
   const selectCustomer = async (customer: Customer) => {
     setSelectedCustomerId(customer.id);
+    setCustomerWholesale(customer.isWholesaleCustomer);
     setCustomerSearch(customer.name);
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone);
@@ -308,7 +325,7 @@ function AdminPosRegister() {
     return products.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)).slice(0, 30);
   }, [products, search]);
 
-  const subtotal = cart.reduce((s, l) => s + l.price * l.quantity, 0);
+  const subtotal = cart.reduce((s, l) => s + effectiveLinePrice(l, customerWholesale) * l.quantity, 0);
   const discount = Math.min(Math.max(0, Number(discountAmount) || 0), subtotal);
   const taxable = subtotal - discount;
   const rate = Math.max(0, Number(taxRate) || 0);
@@ -379,6 +396,7 @@ function AdminPosRegister() {
     const color = options[1] || "";
     const stock = variant?.stock ?? p.stock;
     const price = variant ? (variant.salePrice ?? variant.price) : (p.salePrice ?? p.price);
+    const wholesalePrice = variant ? variant.wholesalePrice : p.wholesalePrice;
     const sku = variant?.sku || p.sku;
     setCart((prev) => {
       const totalForLine = prev
@@ -391,7 +409,7 @@ function AdminPosRegister() {
       }
       return [...prev, {
         slug: p.slug, variantId: variant?.id ?? null, sku, name: p.name,
-        image: variant?.image || p.image, variation: variant?.attributeSummary || "", price, stock,
+        image: variant?.image || p.image, variation: variant?.attributeSummary || "", price, wholesalePrice, stock,
         sizes: [], colors: [], size, color, quantity: 1, weightKg: p.weightKg,
       }];
     });
@@ -453,7 +471,7 @@ function AdminPosRegister() {
     setCustomerSearch("");
     setCustomerResults([]);
     setCustomerMenuOpen(false);
-    setSelectedCustomerId(null);
+    setSelectedCustomerId(null); setCustomerWholesale(false);
     setFulfillmentType("pickup");
     setDeliveryAddress("");
     setDeliveryCity("");
@@ -474,6 +492,7 @@ function AdminPosRegister() {
         method: editReceipt ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           items: cart.map((l) => ({ slug: l.slug, variantId: l.variantId, size: l.size, color: l.color, quantity: l.quantity })),
+          customerId: selectedCustomerId ? Number(selectedCustomerId.replace(/^user-/, "")) : null,
           customerName, customerPhone, customerPhone2, discountAmount: discount, taxRate: rate,
           fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryDistrict, deliveryDistrictId, deliveryCity, deliveryCityId,
         }),
@@ -520,14 +539,19 @@ function AdminPosRegister() {
                 const value = event.target.value;
                 setCustomerSearch(value);
                 setCustomerName(value);
-                setSelectedCustomerId(null);
+                setSelectedCustomerId(null); setCustomerWholesale(false);
                 setCustomerMenuOpen(true);
               }}
               placeholder="Search / Select Customer"
               autoComplete="off"
               className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm text-[#374151] outline-none placeholder:text-[#9ca3af]"
             />
-            {selectedCustomerId && <span title="Existing customer selected" className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
+            {selectedCustomerId && (
+              <span
+                title={customerWholesale ? "Wholesale customer selected" : "Existing customer selected"}
+                className={`h-2.5 w-2.5 rounded-full ${customerWholesale ? "bg-[#f5851f]" : "bg-emerald-500"}`}
+              />
+            )}
           </div>
           {customerMenuOpen && customerSearch.trim() && !selectedCustomerId && (
             <div className="absolute left-0 top-[calc(100%+6px)] z-50 max-h-72 w-[360px] overflow-y-auto rounded-xl border border-[#e5e7eb] bg-white p-1.5 shadow-xl">
@@ -650,7 +674,10 @@ function AdminPosRegister() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-[#374151]">{l.name}</p>
-                      <p className="text-xs text-[#6b7280]">{formatPrice(l.price)} each</p>
+                      <p className="text-xs text-[#6b7280]">{formatPrice(effectiveLinePrice(l, customerWholesale))} each</p>
+                      {customerWholesale && l.wholesalePrice != null && l.wholesalePrice > 0 && l.wholesalePrice < l.price && (
+                        <p className="mt-0.5 text-xs font-semibold text-emerald-600">Wholesale price applied</p>
+                      )}
                       {l.variantId != null && l.variation && (
                         <p className="mt-1 inline-block rounded-md bg-white px-2 py-1 text-xs font-medium text-[#374151] ring-1 ring-[#e5e7eb]">{l.variation}</p>
                       )}
@@ -697,7 +724,7 @@ function AdminPosRegister() {
                       />
                       <button onClick={() => updateQty(idx, 1)} className="h-8 w-8 text-[#6b7280] hover:bg-[#f3f4f6]">+</button>
                     </div>
-                    <p className="font-bold text-[#1f2937]">{formatPrice(l.price * l.quantity)}</p>
+                    <p className="font-bold text-[#1f2937]">{formatPrice(effectiveLinePrice(l, customerWholesale) * l.quantity)}</p>
                   </div>
                 </div>
               ))
@@ -716,7 +743,7 @@ function AdminPosRegister() {
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Customer name</label>
-              <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); }} className="input" placeholder="Optional" />
+              <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); setCustomerWholesale(false); }} className="input" placeholder="Optional" />
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Phone</label>
@@ -889,7 +916,7 @@ function AdminPosRegister() {
             <div className="mt-5 rounded-xl bg-[#f7f8fa] p-6">
               <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
                 <DeliveryField label="Customer Name">
-                  <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); }} className="delivery-input" />
+                  <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); setCustomerWholesale(false); }} className="delivery-input" />
                 </DeliveryField>
                 <DeliveryField label="Phone Number">
                   <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value.replace(/[^0-9+]/g, ""))} className="delivery-input" />
