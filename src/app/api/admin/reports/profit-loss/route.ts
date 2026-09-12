@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAdminSection } from "@/lib/admin";
+import { estimateUnitCost } from "@/lib/report-costs";
 
 function parseRange(searchParams: URLSearchParams) {
   const end = searchParams.get("end") || new Date().toISOString().slice(0, 10);
@@ -10,12 +11,9 @@ function parseRange(searchParams: URLSearchParams) {
   return { start, end };
 }
 
-// Same cost model as the Sales Report / Lost Profit Report, so figures stay
-// comparable across reports: production_cost when recorded, else a 55% of
-// unit-price estimate for customer/POS lines; reseller_price as cost for
-// reseller lines (their markup is the profit).
-const estimateCost = (unitPrice: number, prodCost: string | null) =>
-  prodCost !== null ? Number(prodCost) : unitPrice * 0.55;
+// Reseller lines use reseller_price as cost (their markup is the profit);
+// customer/POS lines use the shared estimate.
+const estimateCost = estimateUnitCost;
 
 interface Line { slug: string; name: string; units: number; revenue: number; cost: number; date: string; }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAdminSection } from "@/lib/admin";
+import { estimateUnitCost as estimateCost } from "@/lib/report-costs";
 
 function parseRange(searchParams: URLSearchParams) {
   const end = searchParams.get("end") || new Date().toISOString().slice(0, 10);
@@ -79,9 +80,6 @@ export async function GET(request: Request) {
          AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );
-
-    const estimateCost = (unitPrice: number, prodCost: string | null) =>
-      prodCost !== null ? Number(prodCost) : unitPrice * 0.55; // fallback estimate when no cost is recorded
 
     // ---- Summary ----
     let revenue = 0, profit = 0, unitsSold = 0, customerRevenue = 0, resellerRevenue = 0, posRevenue = 0;
