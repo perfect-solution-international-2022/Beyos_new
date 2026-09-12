@@ -1,5 +1,6 @@
 "use client";
 
+import DeliveryOfferNotice from "./DeliveryOfferNotice";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -59,6 +60,7 @@ export default function CartDrawer() {
           </button>
         </div>
 
+        <DeliveryOfferNotice items={items} />
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-navy-50 text-navy-800/40">

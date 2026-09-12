@@ -1,4 +1,6 @@
 "use client";
+import { useShippingEstimate } from "@/hooks/useShippingEstimate";
+import DeliveryOfferNotice from "@/components/DeliveryOfferNotice";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -22,7 +24,6 @@ export default function CartPage() {
   const [promoError, setPromoError] = useState("");
   const [discount, setDiscount] = useState(0);
   const [freeShippingPromo, setFreeShippingPromo] = useState(false);
-  const [shipping, setShipping] = useState(0);
 
   useEffect(() => setMounted(true), []);
 
@@ -94,33 +95,7 @@ export default function CartPage() {
 
   const discountedSubtotal = Math.max(0, subtotal - discount);
 
-  // Weight-based shipping is computed server-side (admin-configured pricing).
-  useEffect(() => {
-    if (subtotal === 0) {
-      setShipping(0);
-      return;
-    }
-    let cancelled = false;
-    fetch("/api/shipping/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: items.map((i) => ({ slug: i.slug, quantity: i.quantity, variantId: i.variantId })),
-        discountedSubtotal,
-        freeShipping: freeShippingPromo,
-      }),
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!cancelled) setShipping(Number(d.shipping) || 0);
-      })
-      .catch(() => {
-        if (!cancelled) setShipping(0);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [items, subtotal, discountedSubtotal, freeShippingPromo]);
+  const { fee: shipping, offerName: deliveryOfferName, error: deliveryError, loading: deliveryLoading } = useShippingEstimate(items, "website", { discountedSubtotal, freeShipping: freeShippingPromo });
 
   const total = discountedSubtotal + shipping;
 
@@ -135,6 +110,8 @@ export default function CartPage() {
       <h1 className="font-display text-3xl font-bold text-navy-800 sm:text-4xl">
         Shopping Cart
       </h1>
+      {(deliveryLoading || deliveryError) && <p role="status">{deliveryError || "Calculating delivery…"}</p>}
+      <DeliveryOfferNotice items={items} appliedName={deliveryOfferName} />
       <CheckoutProgress current={0} />
 
       {items.length === 0 ? (

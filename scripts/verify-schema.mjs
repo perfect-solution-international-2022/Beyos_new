@@ -1,6 +1,7 @@
 import { openDatabase } from "./db-connection.mjs";
 
 const required = {
+  delivery_offer_snapshots: ["channel", "order_reference", "delivery_fee", "offer_name"],
   users: ["id", "role", "admin_role", "session_version", "account_status", "is_wholesale_customer", "wholesale_since"],
   orders: ["id", "order_ref", "user_id", "customer_phone_2", "payment_ref", "payment_status", "paid_at", "inventory_reverted_at", "deleted_at"],
   order_items: ["order_id", "product_slug", "product_id", "variant_id", "quantity"],

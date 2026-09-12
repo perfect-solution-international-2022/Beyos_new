@@ -34,6 +34,7 @@ const PAYMENT_METHODS = [
 ] as const;
 
 const blank = {
+  duplicateSourceId: 0, copyStock: false, duplicateStock: "0", duplicateVariantStocks: [] as string[],
   id: 0, name: "", slug: "", sku: "", category: "men", productType: "simple",
   shortDescription: "", description: "",
   regularPrice: "", salePrice: "", resellerPrice: "", wholesalePrice: "",
@@ -111,7 +112,8 @@ export default function AdminProductsPage() {
     toast(`Deleted “${p.name}”`);
   };
 
-  const openEdit = (p: any) => {
+  const openEdit = (p: any, duplicate = false) => {
+    const copySuffix = duplicate ? crypto.randomUUID().replace(/-/g, "").slice(0, 12) : "";
     const arr = (v: unknown) => (Array.isArray(v) ? v.join(", ") : "");
     const str = (v: unknown) => (v === null || v === undefined || v === "" ? "" : String(v));
     setEditing({
@@ -125,15 +127,24 @@ export default function AdminProductsPage() {
       tags: Array.isArray(p.tags) ? p.tags.join(", ") : "",
       paymentMethods: Array.isArray(p.paymentMethods) ? p.paymentMethods : [],
       weightKg: str(p.weightKg), lengthCm: str(p.lengthCm), widthCm: str(p.widthCm), heightCm: str(p.heightCm),
-      variants: (p.variants ?? []).map((v: any) => ({
+      variants: (p.variants ?? []).map((v: any, index: number) => ({
         sku: v.sku, attributeSummary: v.attributeSummary, price: str(v.price), salePrice: str(v.salePrice),
         resellerPrice: str(v.resellerPrice), wholesalePrice: str(v.wholesalePrice),
         productionCost: str(v.productionCost), stockStatus: v.stockStatus || "in_stock", stock: str(v.stock),
         lowStockThreshold: str(v.lowStockThreshold || 10), weightKg: str(v.weightKg), lengthCm: str(v.lengthCm),
         widthCm: str(v.widthCm), heightCm: str(v.heightCm), image: v.image || "", isDefault: !!v.isDefault,
+        ...(duplicate ? { sku: `${String(v.sku || "VAR").slice(0, 35)}-${copySuffix}-${index + 1}`, stock: "0", stockStatus: "out_of_stock" } : {}),
       })),
       links: p.links ?? [],
       selectedAttrValues: {},
+      ...(duplicate ? {
+        id: 0, duplicateSourceId: p.id, copyStock: false,
+        name: `${String(p.name).slice(0, 193)} (Copy)`,
+        slug: `${String(p.slug).slice(0, 115)}-copy-${copySuffix}`,
+        sku: `${String(p.sku || "BEY").slice(0, 40)}-${copySuffix}`,
+        isPublish: false, stock: "0", stockStatus: "out_of_stock",
+        duplicateStock: str(p.stock), duplicateVariantStocks: (p.variants ?? []).map((v: any) => str(v.stock)),
+      } : {}),
     });
   };
 
@@ -194,6 +205,7 @@ export default function AdminProductsPage() {
                   <td className="px-6 py-3"><span className={p.stock === 0 ? "text-red-500" : "text-navy-800/70"}>{p.stock}</span></td>
                   <td className="px-6 py-3">
                     <div className="flex justify-end gap-2">
+                      <button onClick={() => openEdit(p, true)} className="rounded-lg bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100">Duplicate</button>
                       <button onClick={() => openEdit(p)} className="rounded-lg bg-navy-50 px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100">Edit</button>
                       <button onClick={() => del(p)} className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100">Delete</button>
                     </div>
@@ -371,13 +383,21 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-navy-800/10 px-6 py-4">
-          <h2 className="text-lg font-bold text-navy-800">{isEdit ? "Edit Product" : "Create Product"}</h2>
+          <h2 className="text-lg font-bold text-navy-800">{isEdit ? "Edit Product" : form.duplicateSourceId ? "Duplicate Product" : "Create Product"}</h2>
           <button onClick={onClose} aria-label="Close" className="text-navy-800/40 hover:text-navy-800">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
           </button>
         </div>
 
         <div className={embedded ? "px-6 py-6" : "max-h-[76vh] overflow-y-auto px-6 py-5"}>
+          {form.duplicateSourceId > 0 && <div className="mb-5 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm">
+            <p>This is a new copy. Review its details, then save. Images are copied independently when you save; the original product stays unchanged.</p>
+            <label className="mt-3 flex items-center gap-2"><input type="checkbox" checked={form.copyStock} onChange={e => {
+              const checked = e.target.checked;
+              setForm(current => ({ ...current, copyStock: checked, stock: checked ? data.duplicateStock : "0", stockStatus: checked && Number(data.duplicateStock) > 0 ? "in_stock" : "out_of_stock", variants: current.variants.map((v,i) => ({ ...v, stock: checked ? data.duplicateVariantStocks[i] ?? "0" : "0", stockStatus: checked && Number(data.duplicateVariantStocks[i]) > 0 ? "in_stock" : "out_of_stock" })) }));
+            }} />Copy stock quantities</label>
+            <p className="mt-2 text-xs">Stock starts at zero unless selected. The copy starts unpublished; you can publish it after reviewing.</p>
+          </div>}
           {/* Top: identity */}
           <div className="space-y-4">
             <F label="Product Name" error={fieldErrors.name}><input value={form.name} onChange={(e) => set("name")(e.target.value)} className="input" placeholder="e.g. Classic Crew T-Shirt" required maxLength={TEXT_LIMITS.name} aria-invalid={Boolean(fieldErrors.name)} /></F>
@@ -726,7 +746,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
         <div className="flex justify-end gap-3 border-t border-navy-800/10 px-6 py-4">
           <button onClick={onClose} className="btn-outline">Cancel</button>
-          <button onClick={save} disabled={saving || uploadingImages} className="btn-primary">{uploadingImages ? "Uploading images…" : saving ? "Saving…" : isEdit ? "Save Changes" : "Create Product"}</button>
+          <button onClick={save} disabled={saving || uploadingImages} className="btn-primary">{uploadingImages ? "Uploading images…" : saving ? "Saving…" : isEdit ? "Save Changes" : form.duplicateSourceId ? "Save as new product" : "Create Product"}</button>
         </div>
       </div>
     </div>

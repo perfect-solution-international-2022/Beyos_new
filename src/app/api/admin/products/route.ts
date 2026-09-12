@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { query } from "@/lib/db";
+import { randomUUID } from "node:crypto";
+import { cloneProductImages } from "@/lib/product-duplicate";
+import { pool, query } from "@/lib/db";
 import { requireAdminSection, requireAdminAnySection, requireSuperAdmin } from "@/lib/admin";
 
 function slugify(name: string): string {
@@ -23,24 +25,24 @@ function uploadedImageIds(values: unknown[]): number[] {
   return [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))];
 }
 
-async function associateImages(productId: number, featured: unknown, gallery: unknown) {
-  const ids = uploadedImageIds([featured, ...csv(gallery)]);
+async function associateImages(productId: number, featured: unknown, gallery: unknown, variants: any[] = [], execute = query) {
+  const ids = uploadedImageIds([featured, ...csv(gallery), ...variants.map(v => v.image)]);
   if (ids.length) {
-    await query(
+    await execute(
       `UPDATE product_images SET product_id = ? WHERE id IN (${ids.map(() => "?").join(",")})`,
       [productId, ...ids]
     );
-    await query(
+    await execute(
       `DELETE FROM product_images WHERE product_id = ? AND id NOT IN (${ids.map(() => "?").join(",")})`,
       [productId, ...ids]
     );
   } else {
-    await query("DELETE FROM product_images WHERE product_id = ?", [productId]);
+    await execute("DELETE FROM product_images WHERE product_id = ?", [productId]);
   }
 }
 
-async function saveVariants(productId: number, variants: any[]) {
-  await query("DELETE FROM product_variants WHERE product_id = ?", [productId]);
+async function saveVariants(productId: number, variants: any[], execute = query) {
+  await execute("DELETE FROM product_variants WHERE product_id = ?", [productId]);
   for (const v of variants ?? []) {
     const extendedSql = `INSERT INTO product_variants
         (product_id, sku, attribute_summary, price, sale_price, reseller_price, wholesale_price,
@@ -48,13 +50,13 @@ async function saveVariants(productId: number, variants: any[]) {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
     const common = [productId, (v.sku ?? "").trim(), (v.attributeSummary ?? "").trim(), Number(v.price) || 0];
     try {
-      await query(extendedSql, [...common, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice),
+      await execute(extendedSql, [...common, num(v.salePrice), num(v.resellerPrice), num(v.wholesalePrice),
         num(v.productionCost), v.stockStatus || "in_stock", Number(v.stock) || 0, Number(v.lowStockThreshold) || 10,
         num(v.weightKg), num(v.lengthCm), num(v.widthCm), num(v.heightCm), v.isDefault ? 1 : 0, (v.image ?? "").trim() || null]);
     } catch (error: any) {
       if (error?.code !== "ER_BAD_FIELD_ERROR") throw error;
       // Keep deployments on the original schema functional until the additive migration runs.
-      await query(
+      await execute(
         `INSERT INTO product_variants
           (product_id, sku, attribute_summary, price, reseller_price, wholesale_price, stock, low_stock_threshold, is_default, image)
          VALUES (?,?,?,?,?,?,?,?,?,?)`,
@@ -65,11 +67,11 @@ async function saveVariants(productId: number, variants: any[]) {
   }
 }
 
-async function saveLinks(productId: number, links: any[]) {
-  await query("DELETE FROM product_links WHERE product_id = ?", [productId]);
+async function saveLinks(productId: number, links: any[], execute = query) {
+  await execute("DELETE FROM product_links WHERE product_id = ?", [productId]);
   for (const l of links ?? []) {
     if (!l.linkedProductId || Number(l.linkedProductId) === productId) continue;
-    await query(
+    await execute(
       "INSERT INTO product_links (product_id, linked_product_id, link_type) VALUES (?,?,?)",
       [productId, Number(l.linkedProductId), l.linkType || "related"]
     );
@@ -231,6 +233,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Please select at least one payment method" }, { status: 400 });
   }
 
+  const duplicating = Number.isSafeInteger(b.duplicateSourceId) && b.duplicateSourceId > 0;
+  if (duplicating && b.copyStock !== true) {
+    b.stock = 0; b.stockStatus = "out_of_stock";
+    b.variants = (b.variants ?? []).map((v: any) => ({ ...v, stock: 0, stockStatus: "out_of_stock" }));
+  }
   const name = (b.name ?? "").trim();
   const category = (b.category ?? "").trim() || "men";
   const variants = Array.isArray(b.variants) ? b.variants : [];
@@ -249,19 +256,38 @@ export async function POST(request: Request) {
 
   const requestedSlug = slugify((b.slug ?? "").trim() || name);
   const existingSlug = await query<{ id: number }>("SELECT id FROM products WHERE slug = ? LIMIT 1", [requestedSlug]);
-  const slug = existingSlug.length ? `${requestedSlug}-${Math.random().toString(36).slice(2, 5)}` : requestedSlug;
+  const slug = existingSlug.length ? `${requestedSlug}-${randomUUID().slice(0, 12)}` : requestedSlug;
   const skuSource = b.productType === "variable" && defaultVariant ? defaultVariant.sku : b.sku;
   const sku = (skuSource ?? "").trim() || "BEY-" + Math.floor(1000 + Math.random() * 8999);
-  const image = (b.image ?? "").trim() || "/images/placeholder.svg";
-  const gallery = csv(b.images);
-  const images = JSON.stringify(gallery.length ? gallery : [image]);
+  let image = (b.image ?? "").trim() || "/images/placeholder.svg";
+  let gallery = csv(b.images);
+
   const sizes = JSON.stringify(csv(b.sizes).length ? csv(b.sizes) : ["S", "M", "L", "XL"]);
   const colors = JSON.stringify(csv(b.colors).length ? csv(b.colors) : ["Black", "White"]);
 
+  const conn = await pool.getConnection();
+  const execute: typeof query = async <T = any>(sql: string, params?: Record<string, unknown> | unknown[]): Promise<T[]> => {
+    const [rows] = await conn.execute(sql, params);
+    return rows as T[];
+  };
   try {
-    let productId = 0;
-    try {
-    const res = await query<any>(
+    await conn.beginTransaction();
+    if (duplicating) {
+      const source = await execute("SELECT id FROM products WHERE id = ? AND deleted_at IS NULL FOR UPDATE", [b.duplicateSourceId]);
+      if (!source.length) throw new Error("The source product is no longer available");
+      const skus = [sku, ...variants.map((v: any) => String(v.sku || "").trim()).filter(Boolean)];
+      if (new Set(variants.map((v: any) => v.sku)).size !== variants.length) throw new Error("Variation SKUs must be unique");
+      for (const code of new Set(skus)) {
+        const existing = await execute("SELECT id FROM products WHERE sku = ? UNION ALL SELECT id FROM product_variants WHERE sku = ? LIMIT 1", [code, code]);
+        if (existing.length) throw new Error("A copied SKU is already used. Enter a new SKU before saving.");
+      }
+      const replacements = await cloneProductImages(execute, [image, ...gallery, ...variants.map((v: any) => String(v.image || ""))]);
+      image = replacements.get(image) ?? image;
+      gallery = gallery.map(url => replacements.get(url) ?? url);
+      for (const variant of variants) variant.image = replacements.get(variant.image) ?? variant.image;
+    }
+    const images = JSON.stringify(gallery.length ? gallery : [image]);
+    const res = await execute<any>(
       `INSERT INTO products
         (slug, sku, name, category, product_type, short_description, description, price, compare_at_price,
          production_cost, reseller_price, wholesale_price, sale_start, sale_end,
@@ -286,21 +312,19 @@ export async function POST(request: Request) {
         (b.metaTitle ?? "").trim() || null, (b.metaDescription ?? "").trim() || null, (b.metaKeywords ?? "").trim() || null,
       ]
     );
-    productId = (res as any).insertId;
-    await saveVariants(productId, variants);
-    await saveLinks(productId, b.links);
-    await associateImages(productId, image, gallery);
+    const productId = (res as any).insertId;
+    await saveVariants(productId, variants, execute);
+    await saveLinks(productId, b.links, execute);
+    await associateImages(productId, image, gallery, variants, execute);
+    await conn.commit();
     revalidatePath("/");
     revalidatePath("/shop");
     return NextResponse.json({ ok: true, slug });
-    } catch (error) {
-      if (productId) await query("DELETE FROM products WHERE id = ?", [productId]).catch(() => {});
-      throw error;
-    }
   } catch (err) {
+    await conn.rollback();
     console.error("admin products POST error:", err);
-    return NextResponse.json({ error: "Could not create product" }, { status: 500 });
-  }
+    return NextResponse.json({ error: duplicating && err instanceof Error && !("code" in err) ? err.message : "Could not create product" }, { status: 500 });
+  } finally { conn.release(); }
 }
 
 export async function PATCH(request: Request) {
@@ -389,7 +413,7 @@ export async function PATCH(request: Request) {
     }
     if (b.variants !== undefined) await saveVariants(b.id, b.variants);
     if (b.links !== undefined) await saveLinks(b.id, b.links);
-    if (b.image !== undefined || b.images !== undefined) await associateImages(b.id, b.image, b.images);
+    if (b.image !== undefined || b.images !== undefined) await associateImages(b.id, b.image, b.images, b.variants ?? []);
     revalidatePath("/");
     revalidatePath("/shop");
     return NextResponse.json({ ok: true });

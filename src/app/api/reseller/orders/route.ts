@@ -1,3 +1,5 @@
+import { deliveryOfferQuote } from "@/lib/delivery-offer";
+import { getDeliveryOffer, saveDeliverySnapshot } from "@/lib/delivery-offer-db";
 import { NextResponse } from "next/server";
 import type { PoolConnection } from "mysql2/promise";
 import { pool, query } from "@/lib/db";
@@ -108,8 +110,8 @@ export async function POST(request: Request) {
     );
 
     for (const item of items) {
-      const qty = Math.floor(Number(item.quantity));
-      if (!Number.isFinite(qty) || qty < 1 || qty > 10000) throw new OrderValidationError("Enter a valid quantity");
+      const qty = Number(item.quantity);
+      if (!Number.isSafeInteger(qty) || qty < 1 || qty > 10000) throw new OrderValidationError("Enter a valid quantity");
       const [productRows] = await conn.execute(
         `SELECT id, slug, sku, name, price, reseller_price, wholesale_price,
                 stock, product_type, allow_backorder, weight_kg FROM products
@@ -168,7 +170,8 @@ export async function POST(request: Request) {
       else await conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", [qty, product.id]);
     }
 
-    const deliveryFee = computeDeliveryFee(totalWeightKg, await getDeliveryPricing());
+    const deliveryQuote = deliveryOfferQuote(await getDeliveryOffer(), "reseller", lineItems, computeDeliveryFee(totalWeightKg, await getDeliveryPricing()));
+    const deliveryFee = deliveryQuote.fee;
     const creditLimit = Number(settings.credit_limit || 0);
     if (creditLimit > 0 && merchandiseCost > creditLimit) {
       throw new OrderValidationError(`This order exceeds your reseller credit limit of LKR ${creditLimit.toFixed(2)}`);
@@ -188,6 +191,7 @@ export async function POST(request: Request) {
        Number(customer.districtId) || null, customer.city.trim(), Number(customer.cityId) || null,
        customer.postalCode?.trim() || null, customer.notes?.trim() || null, subtotal, deliveryFee, amount, cost, profit]
     );
+    await saveDeliverySnapshot(conn, "reseller", orderRef, deliveryFee, deliveryQuote.offerName);
     const orderId = (result as { insertId: number }).insertId;
     for (const line of lineItems) {
       await conn.execute(

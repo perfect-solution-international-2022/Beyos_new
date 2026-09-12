@@ -1,4 +1,6 @@
 "use client";
+import { useShippingEstimate } from "@/hooks/useShippingEstimate";
+import DeliveryOfferNotice from "@/components/DeliveryOfferNotice";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -166,7 +168,7 @@ function AdminPosRegister() {
   const [customerWholesale, setCustomerWholesale] = useState(false);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
+  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", district: "", city: "", postalCode: "", isWholesaleCustomer: false });
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">("pickup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
@@ -181,7 +183,6 @@ function AdminPosRegister() {
   const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [deliveryFee, setDeliveryFee] = useState(0);
   const [loadingEdit, setLoadingEdit] = useState(Boolean(editReceipt));
 
   const loadProducts = () =>
@@ -311,7 +312,7 @@ function AdminPosRegister() {
       const data = await response.json();
       if (!response.ok) { toast(data.error || "Could not add customer"); return; }
       await selectCustomer(data.customer);
-      setNewCustomer({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
+      setNewCustomer({ name: "", phone: "", address: "", district: "", city: "", postalCode: "", isWholesaleCustomer: false });
       setNewCustomerDistrictId(0);
       setNewCustomerCities([]);
       setAddCustomerOpen(false);
@@ -330,30 +331,14 @@ function AdminPosRegister() {
   const taxable = subtotal - discount;
   const rate = Math.max(0, Number(taxRate) || 0);
   const tax = Math.round(taxable * (rate / 100) * 100) / 100;
-  const total = Math.round((taxable + tax + (fulfillmentType === "delivery" ? deliveryFee : 0)) * 100) / 100;
 
-  // Weight-based delivery fee is computed server-side (admin-configured pricing).
-  useEffect(() => {
-    if (fulfillmentType !== "delivery" || cart.length === 0) {
-      setDeliveryFee(0);
-      return;
-    }
-    let cancelled = false;
-    fetch("/api/shipping/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: cart.map((l) => ({ slug: l.slug, quantity: l.quantity })) }),
-    })
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setDeliveryFee(Number(d.shipping) || 0); })
-      .catch(() => { if (!cancelled) setDeliveryFee(0); });
-    return () => { cancelled = true; };
-  }, [cart, fulfillmentType]);
+  const { fee: deliveryFee, offerName: deliveryOfferName, error: deliveryError, loading: deliveryLoading } = useShippingEstimate(cart, "pos", { enabled: fulfillmentType === "delivery", wholesale: customerWholesale });
+  const total = Math.round((taxable + tax + (fulfillmentType === "delivery" ? deliveryFee : 0)) * 100) / 100;
   const deliveryDetailsComplete = Boolean(
     customerName.trim() && customerPhone.trim() && deliveryDistrictId && deliveryCityId && deliveryAddress.trim()
   );
   const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryCity, deliveryPostalCode.trim()].filter(Boolean).join(", ");
-  const paymentDisabled = completing || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
+  const paymentDisabled = completing || deliveryLoading || !!deliveryError || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
 
   const toggleFullscreen = async () => {
     try {
@@ -485,6 +470,7 @@ function AdminPosRegister() {
 
   const completeSale = async () => {
     if (cart.length === 0) return;
+    if (deliveryLoading || deliveryError) { toast(deliveryError || "Calculating delivery…"); return; }
     if (fulfillmentType === "delivery" && !deliveryDetailsComplete) { toast("Complete the delivery customer details first"); return; }
     setCompleting(true);
     try {
@@ -642,6 +628,9 @@ function AdminPosRegister() {
         </section>
 
         <aside className="order-1 flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+      {(deliveryLoading || deliveryError) && <p role="status" className="p-3 text-sm">{deliveryError || "Calculating delivery…"}</p>}
+      {fulfillmentType === "delivery" && !customerWholesale && <DeliveryOfferNotice channel="pos" items={cart} appliedName={deliveryOfferName} />}
+
           <div className="flex shrink-0 items-center justify-between border-b border-[#e5e7eb] px-5 py-4">
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#fff4e8] text-[#f5851f]"><CartIcon /></span>
@@ -832,6 +821,15 @@ function AdminPosRegister() {
                   <input value={newCustomer.postalCode} onChange={(event) => setNewCustomer((customer) => ({ ...customer, postalCode: event.target.value.replace(/[^0-9]/g, "").slice(0, 5) }))} className="delivery-input" placeholder="Enter ZIP Code" inputMode="numeric" />
                 </DeliveryField>
               </div>
+              <label className="flex items-center gap-2 text-sm font-medium text-[#252525]">
+                <input
+                  type="checkbox"
+                  checked={newCustomer.isWholesaleCustomer}
+                  onChange={(event) => setNewCustomer((customer) => ({ ...customer, isWholesaleCustomer: event.target.checked }))}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Wholesale customer
+              </label>
             </div>
             <div className="mt-7 flex justify-end gap-5">
               <button type="button" onClick={() => setAddCustomerOpen(false)} className="px-2 py-3 text-sm font-semibold text-[#ff7426]">Cancel</button>

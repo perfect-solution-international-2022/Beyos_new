@@ -1,3 +1,4 @@
+import { courierItemDescription } from "@/lib/courier-description";
 import { NextResponse } from "next/server";
 import { requireAdminSection } from "@/lib/admin";
 import { pool, query } from "@/lib/db";
@@ -14,6 +15,7 @@ interface OrderRow {
   city: string;
   total: string;
   payment_status: string;
+  payment_method?: string;
   koombiyo_waybill_id: string | null;
   koombiyo_status: string | null;
   status: string;
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
            FROM reseller_orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [body.orderRef])
       : await query<OrderRow>(
           `SELECT order_ref, customer_name, customer_phone, customer_phone_2, customer_email, address, city, total,
-                  payment_status, koombiyo_waybill_id, koombiyo_status, status
+                  payment_status, payment_method, koombiyo_waybill_id, koombiyo_status, status
            FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1`, [body.orderRef]);
     if (!rows.length) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     const order = rows[0];
@@ -100,16 +102,24 @@ export async function POST(request: Request) {
              WHERE oi.order_id = (SELECT id FROM orders WHERE order_ref = ? AND deleted_at IS NULL LIMIT 1)`,
         [order.order_ref]
       );
-      const description = orderItems.map((item) =>
-        [item.name, item.variation && `Variation: ${item.variation}`, `SKU: ${item.sku || "—"}`].filter(Boolean).join(" | ")
-      ).join("; ");
+      const description = courierItemDescription(orderItems);
+      // Saved website total and reseller amount already include delivery and discounts.
+      const total = Number(order.total);
+      if (!Number.isFinite(total) || total < 0) {
+        return NextResponse.json({ error: "Invalid order total. Check this order before submitting it to the courier." }, { status: 400 });
+      }
+      const isCardOrder = !isReseller && order.payment_method === "onepay";
+      if (isCardOrder && order.payment_status !== "paid") {
+        return NextResponse.json({ error: "Card payment must be completed before submitting this order to the courier." }, { status: 409 });
+      }
+      const codAmount = isCardOrder ? 0 : total;
       const response = await submitOrder({
         waybillId: order.koombiyo_waybill_id,
         orderRef: order.order_ref,
         receiverName: order.customer_name,
         receiverStreet: `${order.address}${order.city ? `, ${order.city}` : ""}`,
         receiverPhone: order.customer_phone,
-        codAmount: order.payment_status === "paid" ? 0 : Number(order.total),
+        codAmount,
         description,
         specialNote: [order.customer_phone_2 ? `2nd phone: ${order.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
         districtId: order.district_id ?? undefined,

@@ -1,3 +1,5 @@
+import { deliveryOfferQuote } from "@/lib/delivery-offer";
+import { getDeliveryOffer, saveDeliverySnapshot } from "@/lib/delivery-offer-db";
 import { pool } from "@/lib/db";
 import { getProductBySlug } from "@/lib/products-db";
 import { validatePromoCode, recordPromotionUsage, Promotion } from "@/lib/promotions";
@@ -76,7 +78,8 @@ export async function computeOrderTotals(
     }
     const variant = line.variantId ? product.variants?.find((item) => item.id === Number(line.variantId)) : undefined;
     if (line.variantId && !variant) throw new Error(`Unknown product variation for ${product.name}`);
-    const qty = Math.max(1, Number(line.quantity) || 1);
+    const qty = Number(line.quantity);
+    if (!Number.isSafeInteger(qty) || qty < 1 || qty > 10000) throw new Error("Enter a valid item quantity");
     if (variant && variant.stock < qty) throw new Error(`Only ${variant.stock} available for ${variant.attributeSummary}`);
     const regularPrice = variant?.price ?? product.price;
     const salePrice = variant?.salePrice && variant.salePrice > 0 && variant.salePrice < regularPrice ? variant.salePrice : regularPrice;
@@ -114,12 +117,15 @@ export async function computeOrderTotals(
 
   const discountedSubtotal = Math.max(0, subtotal - discount);
   const pricing = await getDeliveryPricing();
-  const shipping = freeShipping || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
+  const standardShipping = freeShipping || discountedSubtotal >= FREE_SHIPPING_THRESHOLD
     ? 0
     : computeDeliveryFee(totalWeightKg, pricing);
+  const deliveryQuote = deliveryOfferQuote(await getDeliveryOffer(), "website", lineItems, standardShipping);
+  const shipping = deliveryQuote.fee;
+  const deliveryOfferName = deliveryQuote.offerName;
   const total = discountedSubtotal + shipping;
 
-  return { subtotal, discount, shipping, total, lineItems, appliedPromotion };
+  return { subtotal, discount, shipping, total, lineItems, appliedPromotion, deliveryOfferName };
 }
 
 export function makeOrderRef(): string {
@@ -142,6 +148,7 @@ export async function createPendingOrder(opts: {
   total: number;
   paymentMethod: "cod" | "onepay";
   appliedPromotion?: Promotion;
+  deliveryOfferName?: string | null;
 }): Promise<{ orderId: number; orderRef: string }> {
   const orderRef = makeOrderRef();
   let conn: PoolConnection | null = null;
@@ -180,6 +187,7 @@ export async function createPendingOrder(opts: {
         opts.discount,
       ]
     );
+    await saveDeliverySnapshot(conn, "website", orderRef, opts.shipping, opts.deliveryOfferName ?? null);
     const orderId = (orderResult as { insertId: number }).insertId;
 
     for (const li of opts.lineItems) {

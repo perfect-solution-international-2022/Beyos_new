@@ -1,3 +1,5 @@
+import { deliveryOfferQuote } from "@/lib/delivery-offer";
+import { getDeliveryOffer, saveDeliverySnapshot } from "@/lib/delivery-offer-db";
 import { NextResponse } from "next/server";
 import { pool, query } from "@/lib/db";
 import { requireAdminSection } from "@/lib/admin";
@@ -249,12 +251,13 @@ export async function PUT(
       );
       const product = (rows as any[])[0];
       if (!product) throw new Error(`Unknown product: ${line.slug}`);
-      const qty = Math.max(1, Number(line.quantity) || 1);
+      const qty = Number(line.quantity);
+    if (!Number.isSafeInteger(qty) || qty < 1 || qty > 10000) throw new Error("Enter a valid item quantity");
 
       let variant: any = null;
       if (line.variantId) {
         const [variantRows] = await conn.execute(
-          "SELECT id, sku, price, sale_price, wholesale_price, stock, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
+          "SELECT id, sku, price, sale_price, wholesale_price, stock, weight_kg, attribute_summary FROM product_variants WHERE id = ? AND product_id = ? LIMIT 1 FOR UPDATE",
           [line.variantId, product.id]
         );
         variant = (variantRows as any[])[0];
@@ -274,7 +277,7 @@ export async function PUT(
         : baseUnitPrice;
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
-      totalWeightKg += Number(product.weight_kg || 0) * qty;
+      totalWeightKg += Number(variant?.weight_kg ?? product.weight_kg ?? 0) * qty;
       lineItems.push({
         slug: product.slug, variantId: variant?.id ?? null, sku: variant?.sku || product.sku, name: product.name,
         size: line.size || variant?.attribute_summary || "", color: line.color || "",
@@ -293,7 +296,12 @@ export async function PUT(
     const taxableAmount = subtotal - discountAmount;
     const taxRate = Math.max(0, Number(b.taxRate) || 0);
     const taxAmount = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
-    const deliveryFee = fulfillmentType === "delivery" ? computeDeliveryFee(totalWeightKg, await getDeliveryPricing()) : 0;
+    const standardDeliveryFee = fulfillmentType === "delivery" ? computeDeliveryFee(totalWeightKg, await getDeliveryPricing()) : 0;
+    // Wholesale customers always pay weight-based delivery — the quantity offer is a retail promotion.
+    const deliveryQuote = isWholesaleCustomer
+      ? { fee: standardDeliveryFee, offerName: null as string | null }
+      : deliveryOfferQuote(await getDeliveryOffer(), "pos", fulfillmentType === "delivery" ? lineItems : [], standardDeliveryFee);
+    const deliveryFee = deliveryQuote.fee;
     const total = Math.round((taxableAmount + taxAmount + deliveryFee) * 100) / 100;
 
     let amountTendered: number | null = null;
@@ -328,6 +336,7 @@ export async function PUT(
       );
     }
 
+    await saveDeliverySnapshot(conn, "pos", receiptNumber, deliveryFee, deliveryQuote.offerName);
     await conn.commit();
 
     return NextResponse.json({

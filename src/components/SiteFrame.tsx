@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import DeliveryOfferNotice from "./DeliveryOfferNotice";
 import Header from "./Header";
 import Footer from "./Footer";
 import MobileBottomNav from "./MobileBottomNav";
@@ -65,6 +66,7 @@ export default function SiteFrame({ children }: { children: React.ReactNode }) {
           Admin preview · Maintenance mode is on
         </div>
       )}
+      <DeliveryOfferNotice announcement />
       <Header />
       <main className="storefront flex-1 pb-24 lg:pb-0">{children}</main>
       <Footer />

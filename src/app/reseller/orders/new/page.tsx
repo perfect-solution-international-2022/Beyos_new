@@ -1,4 +1,6 @@
 "use client";
+import { useShippingEstimate } from "@/hooks/useShippingEstimate";
+import DeliveryOfferNotice from "@/components/DeliveryOfferNotice";
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
@@ -211,22 +213,10 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
   const [courierCities, setCourierCities] = useState<CourierOption[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [deliveryFee, setDeliveryFee] = useState(0);
   useEffect(() => {
     fetch("/api/locations", { cache: "no-store" }).then((r) => r.json()).then((data) => setCourierDistricts(data.districts ?? []));
   }, []);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/shipping/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: cart.map((line) => ({ slug: line.slug, quantity: line.quantity, variantId: line.variantId })) }),
-    })
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) setDeliveryFee(Number(d.shipping) || 0); })
-      .catch(() => { if (!cancelled) setDeliveryFee(0); });
-    return () => { cancelled = true; };
-  }, [cart]);
+  const { fee: deliveryFee, offerName: deliveryOfferName, error: deliveryError, loading: deliveryLoading } = useShippingEstimate(cart, "reseller");
   const profit = cart.reduce((sum, line) => sum + (line.sellingPrice - line.resellerPrice) * line.quantity, 0);
   const total = merchandiseTotal + deliveryFee;
   const update = (key: keyof typeof customer, value: string | number | null) => setCustomer((current) => ({ ...current, [key]: value }));
@@ -242,6 +232,7 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
   };
   const submit = async () => {
     setError("");
+    if (deliveryLoading || deliveryError) return;
     if (!customer.name.trim() || !customer.phone.trim() || !customer.addressLine1.trim() || !customer.districtId || !customer.cityId) { setError("Customer name, phone, district, city and address are required."); return; }
     if (!/^(?:\+94|94|0)?7\d{8}$/.test(customer.phone.replace(/[\s()-]/g, ""))) { setError("Enter a valid Sri Lankan mobile number."); return; }
     if (customer.phone2.trim() && !/^(?:\+94|94|0)?7\d{8}$/.test(customer.phone2.replace(/[\s()-]/g, ""))) { setError("Enter a valid second Sri Lankan mobile number."); return; }
@@ -255,6 +246,8 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
   };
 
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-3" onClick={onClose}><div className="max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7" onClick={(e) => e.stopPropagation()}>
+    {(deliveryLoading || deliveryError) && <p role="status">{deliveryError || "Calculating delivery…"}</p>}
+    <DeliveryOfferNotice channel="reseller" items={cart} appliedName={deliveryOfferName} />
     <div className="flex justify-between"><div><h2 className="text-xl font-bold text-navy-800">Confirm delivery order</h2><p className="text-sm text-navy-800/50">Koombiyo delivery details</p></div><button onClick={onClose} aria-label="Close" className="text-2xl text-navy-800/40">×</button></div>
     <ul className="mt-4 divide-y divide-navy-800/10">{cart.map((line) => <li key={line.key} className="flex items-center gap-3 py-3"><Image src={line.image} alt={line.name} width={48} height={48} className="h-12 w-12 rounded-lg object-contain" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-navy-800">{line.name}</p><p className="text-xs text-navy-800/50">{line.variantSummary || line.sku} · {formatPrice(line.sellingPrice)} × {line.quantity}</p></div><span className="text-sm font-bold">{formatPrice(line.sellingPrice * line.quantity)}</span><button aria-label={`Remove ${line.name}`} onClick={() => onUpdate(cart.filter((item) => item.key !== line.key))} className="text-red-500">×</button></li>)}</ul>
     <div className="mt-3 space-y-1 border-t border-navy-800/10 pt-3 text-sm"><div className="flex justify-between"><span>Merchandise</span><span>{formatPrice(merchandiseTotal)}</span></div><div className="flex justify-between"><span>Delivery</span><span>{formatPrice(deliveryFee)}</span></div><div className="flex justify-between text-emerald-700"><span>Your profit</span><span>{formatPrice(profit)}</span></div><div className="flex justify-between text-lg font-bold text-navy-800"><span>Customer pays</span><span>{formatPrice(total)}</span></div></div>
@@ -271,6 +264,6 @@ function CartModal({ cart, merchandiseTotal, onClose, onUpdate, onCreated }: { c
       <textarea aria-label="Delivery notes" value={customer.notes} onChange={(e) => update("notes", e.target.value)} className="input resize-none sm:col-span-2" rows={2} placeholder="Delivery notes (optional)" />
     </div>
     {error && <p className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</p>}
-    <button onClick={submit} disabled={submitting || !cart.length} className="btn-primary mt-5 w-full disabled:opacity-50">{submitting ? "Placing order…" : `Place delivery order · ${formatPrice(total)}`}</button>
+    <button onClick={submit} disabled={submitting || !cart.length || deliveryLoading || !!deliveryError} className="btn-primary mt-5 w-full disabled:opacity-50">{submitting ? "Placing order…" : `Place delivery order · ${formatPrice(total)}`}</button>
   </div></div>;
 }

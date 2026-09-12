@@ -424,3 +424,19 @@ body {
     animation: none;
   }
 }
+
+/* Two identical groups make the delivery announcements scroll without a gap. */
+.delivery-ticker-track {
+  animation: delivery-ticker-scroll 30s linear infinite;
+}
+.delivery-ticker-group {
+  min-width: calc(100vw - 2.25rem);
+}
+@keyframes delivery-ticker-scroll {
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .delivery-ticker-track { animation: none; }
+  .delivery-ticker-window { overflow-x: auto; }
+  .delivery-ticker-group[aria-hidden="true"] { display: none; }
+}

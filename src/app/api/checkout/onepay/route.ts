@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       total: totals.total,
       paymentMethod: "onepay",
       appliedPromotion: totals.appliedPromotion,
+      deliveryOfferName: totals.deliveryOfferName,
     });
     orderId = created.orderId;
     orderRef = created.orderRef;

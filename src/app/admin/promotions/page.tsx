@@ -1,5 +1,6 @@
 "use client";
 
+import DeliveryOfferEditor from "@/components/DeliveryOfferEditor";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
@@ -112,6 +113,7 @@ export default function AdminPromotionsPage() {
 
   return (
     <div>
+      <DeliveryOfferEditor />
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-navy-800">Promotions</h1>
         <div className="flex gap-2">

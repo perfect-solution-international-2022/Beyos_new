@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       total: totals.total,
       paymentMethod: "cod",
       appliedPromotion: totals.appliedPromotion,
+      deliveryOfferName: totals.deliveryOfferName,
     });
 
     await sendOrderConfirmationSms({

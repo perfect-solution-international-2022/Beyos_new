@@ -42,7 +42,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  let body: { name?: string; phone?: string; address?: string; city?: string; district?: string; province?: string; postalCode?: string };
+  let body: { name?: string; phone?: string; address?: string; city?: string; district?: string; province?: string; postalCode?: string; isWholesaleCustomer?: boolean };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
 
   const name = body.name?.trim() || "";
@@ -51,6 +51,7 @@ export async function POST(request: Request) {
   const district = body.district?.trim() || "";
   const city = body.city?.trim() || "";
   const postalCode = body.postalCode?.trim() || "";
+  const isWholesaleCustomer = !!body.isWholesaleCustomer;
   if (!name || !phone || !address || !district || !city) {
     return NextResponse.json({ error: "Name, phone, address, district and city are required" }, { status: 400 });
   }
@@ -66,14 +67,14 @@ export async function POST(request: Request) {
 
   try {
     const result = await query<any>(
-      `INSERT INTO users (name, first_name, last_name, email, password_hash, role, account_source, reseller_status, phone, address_line1, city, district, postal_code)
-       VALUES (?,?,?,?,?, 'buyer', 'pos', 'approved', ?,?,?,?,?)`,
-      [name, firstName, lastName, email, passwordHash, phone, address, city, district, postalCode || null]
+      `INSERT INTO users (name, first_name, last_name, email, password_hash, role, account_source, reseller_status, phone, address_line1, city, district, postal_code, is_wholesale_customer, wholesale_since)
+       VALUES (?,?,?,?,?, 'buyer', 'pos', 'approved', ?,?,?,?,?, ?, IF(? = 1, NOW(), NULL))`,
+      [name, firstName, lastName, email, passwordHash, phone, address, city, district, postalCode || null, isWholesaleCustomer ? 1 : 0, isWholesaleCustomer ? 1 : 0]
     );
     const id = Number((result as any).insertId);
     return NextResponse.json({ customer: {
       id: `user-${id}`, name, email: "", phone, addressLine1: address,
-      addressLine2: "", city, district, province: "", postalCode, isWholesaleCustomer: false,
+      addressLine2: "", city, district, province: "", postalCode, isWholesaleCustomer,
     } }, { status: 201 });
   } catch (error) {
     console.error("POS customer creation failed:", error);

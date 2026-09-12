@@ -1,5 +1,6 @@
 "use client";
 
+import DeliveryOfferNotice from "@/components/DeliveryOfferNotice";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -268,7 +269,7 @@ export default function ResellerLayout({ children }: { children: React.ReactNode
             </div>
           </div>
         </header>
-        <main className="p-4 sm:p-8">{children}</main>
+        <main className="p-4 sm:p-8"><DeliveryOfferNotice channel="reseller" />{children}</main>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { courierItemDescription } from "@/lib/courier-description";
 import { NextResponse } from "next/server";
 import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
@@ -67,9 +68,11 @@ export async function POST(request: Request) {
        FROM pos_sale_items WHERE sale_id = (SELECT id FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1)`,
       [sale.receipt_number]
     );
-    const description = orderItems.map((item) =>
-      [item.name, item.variation && `Variation: ${item.variation}`, `SKU: ${item.sku || "—"}`].filter(Boolean).join(" | ")
-    ).join("; ");
+    const description = courierItemDescription(orderItems);
+    const codAmount = Number(sale.total);
+    if (!Number.isFinite(codAmount) || codAmount < 0) {
+      return NextResponse.json({ error: "Invalid order total. Check this sale before submitting it to the courier." }, { status: 400 });
+    }
     const response = await submitOrder({
       waybillId: sale.koombiyo_waybill_id,
       orderRef: sale.receipt_number,
@@ -78,7 +81,8 @@ export async function POST(request: Request) {
       receiverPhone: sale.customer_phone,
       districtId: sale.delivery_district_id ?? undefined,
       cityId: sale.delivery_city_id ?? undefined,
-      codAmount: 0,
+      // POS delivery customers pay the full saved total, including delivery, to the courier.
+      codAmount,
       description,
       specialNote: [sale.customer_phone_2 ? `2nd phone: ${sale.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
     });
