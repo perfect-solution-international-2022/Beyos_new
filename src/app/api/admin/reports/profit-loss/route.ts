@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { requireAdminSection } from "@/lib/admin";
 import { estimateUnitCost } from "@/lib/report-costs";
+import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 
 function parseRange(searchParams: URLSearchParams) {
   const end = searchParams.get("end") || new Date().toISOString().slice(0, 10);
@@ -16,6 +17,7 @@ function parseRange(searchParams: URLSearchParams) {
 const estimateCost = estimateUnitCost;
 
 interface Line { slug: string; name: string; units: number; revenue: number; cost: number; date: string; }
+interface DeliveryRow { weight: string | null; date: string; }
 
 export async function GET(request: Request) {
   const admin = await requireAdminSection("finance");
@@ -84,20 +86,75 @@ export async function GET(request: Request) {
       date: l.sale_date,
     }));
 
-    const sourceTotals = (lines: Line[]) => ({
-      revenue: lines.reduce((s, l) => s + l.revenue, 0),
-      cost: lines.reduce((s, l) => s + l.cost, 0),
-      profit: lines.reduce((s, l) => s + (l.revenue - l.cost), 0),
-    });
+    // Delivery is a business cost even when an offer reduces (or removes) the
+    // amount charged to the customer. Always cost it at the configured
+    // weight-based rate, independently of the delivery fee saved on the sale.
+    const [pricing, customerDeliveries, resellerDeliveries, posDeliveries] = await Promise.all([
+      getDeliveryPricing(),
+      query<DeliveryRow>(
+        `SELECT SUM(COALESCE(v.weight_kg, p.weight_kg, 0) * oi.quantity) AS weight,
+                DATE(o.created_at) AS date
+         FROM orders o
+         JOIN order_items oi ON oi.order_id = o.id
+         LEFT JOIN products p ON p.slug = oi.product_slug
+         LEFT JOIN product_variants v ON v.id = oi.variant_id
+         WHERE o.deleted_at IS NULL AND o.status IN ('completed','delivered')
+               AND DATE(o.created_at) BETWEEN ? AND ?
+         GROUP BY o.id, DATE(o.created_at)`,
+        [start, end]
+      ),
+      query<DeliveryRow>(
+        `SELECT SUM(COALESCE(v.weight_kg, p.weight_kg, 0) * roi.quantity) AS weight,
+                DATE(ro.created_at) AS date
+         FROM reseller_orders ro
+         JOIN reseller_order_items roi ON roi.order_id = ro.id
+         LEFT JOIN products p ON p.slug = roi.product_slug
+         LEFT JOIN product_variants v ON v.id = roi.variant_id
+         WHERE ro.deleted_at IS NULL AND ro.status IN ('completed','delivered')
+               AND DATE(ro.created_at) BETWEEN ? AND ?
+         GROUP BY ro.id, DATE(ro.created_at)`,
+        [start, end]
+      ),
+      query<DeliveryRow>(
+        `SELECT SUM(COALESCE(v.weight_kg, p.weight_kg, 0) * psi.quantity) AS weight,
+                DATE(s.created_at) AS date
+         FROM pos_sales s
+         JOIN pos_sale_items psi ON psi.sale_id = s.id
+         LEFT JOIN products p ON p.slug = psi.product_slug
+         LEFT JOIN product_variants v ON v.id = psi.variant_id
+         WHERE s.deleted_at IS NULL AND s.status = 'completed'
+               AND COALESCE(s.delivery_status, '') <> 'cancelled'
+               AND s.fulfillment_type = 'delivery'
+               AND DATE(s.created_at) BETWEEN ? AND ?
+         GROUP BY s.id, DATE(s.created_at)`,
+        [start, end]
+      ),
+    ]);
+
+    const deliveryCost = (rows: DeliveryRow[]) =>
+      rows.reduce((sum, row) => sum + computeDeliveryFee(Number(row.weight ?? 0), pricing), 0);
+    const deliveryCostBySource = {
+      customer: deliveryCost(customerDeliveries),
+      reseller: deliveryCost(resellerDeliveries),
+      pos: deliveryCost(posDeliveries),
+    };
+
+    const sourceTotals = (lines: Line[], shippingCost: number) => {
+      const revenue = lines.reduce((s, l) => s + l.revenue, 0);
+      const cost = lines.reduce((s, l) => s + l.cost, 0) + shippingCost;
+      return { revenue, cost, profit: revenue - cost };
+    };
     const bySource = {
-      customer: sourceTotals(customerLines),
-      reseller: sourceTotals(resellerLineRows),
-      pos: sourceTotals(posLineRows),
+      customer: sourceTotals(customerLines, deliveryCostBySource.customer),
+      reseller: sourceTotals(resellerLineRows, deliveryCostBySource.reseller),
+      pos: sourceTotals(posLineRows, deliveryCostBySource.pos),
     };
 
     const allLines = [...customerLines, ...resellerLineRows, ...posLineRows];
     const totalRevenue = allLines.reduce((s, l) => s + l.revenue, 0);
-    const totalCost = allLines.reduce((s, l) => s + l.cost, 0);
+    const merchandiseCost = allLines.reduce((s, l) => s + l.cost, 0);
+    const totalDeliveryCost = Object.values(deliveryCostBySource).reduce((sum, cost) => sum + cost, 0);
+    const totalCost = merchandiseCost + totalDeliveryCost;
     const grossProfit = totalRevenue - totalCost;
     const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
@@ -108,6 +165,13 @@ export async function GET(request: Request) {
       cur.revenue += l.revenue;
       cur.cost += l.cost;
       trendMap.set(l.date, cur);
+    }
+    for (const rows of [customerDeliveries, resellerDeliveries, posDeliveries]) {
+      for (const row of rows) {
+        const cur = trendMap.get(row.date) ?? { revenue: 0, cost: 0 };
+        cur.cost += computeDeliveryFee(Number(row.weight ?? 0), pricing);
+        trendMap.set(row.date, cur);
+      }
     }
     const trend = Array.from(trendMap.entries())
       .map(([date, v]) => ({ date, revenue: v.revenue, cost: v.cost, profit: v.revenue - v.cost }))
@@ -151,7 +215,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       range: { start, end },
-      summary: { totalRevenue, totalCost, grossProfit, grossMarginPct, totalExpenses, netProfit, netMarginPct },
+      summary: { totalRevenue, merchandiseCost, totalDeliveryCost, totalCost, grossProfit, grossMarginPct, totalExpenses, netProfit, netMarginPct },
       bySource,
       trend,
       productTable,

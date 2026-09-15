@@ -115,9 +115,11 @@ async function syncPosDeliveries(result: CourierSyncResult) {
       const nextStatus = posStatus(mapKoombiyoStatus(tracking.status));
       const changed = sale.delivery_status !== nextStatus || sale.koombiyo_status !== tracking.status;
       await query(
-        `UPDATE pos_sales SET koombiyo_status = ?, koombiyo_response = ?, koombiyo_updated_at = NOW(), delivery_status = ?
+        `UPDATE pos_sales SET koombiyo_status = ?, koombiyo_response = ?, koombiyo_updated_at = NOW(), delivery_status = ?,
+         payment_status = IF(? = 'delivered', 'paid', payment_status),
+         paid_amount = IF(? = 'delivered', total, paid_amount)
          WHERE receipt_number = ? AND deleted_at IS NULL`,
-        [tracking.status, JSON.stringify(tracking.raw), nextStatus, sale.receipt_number]
+        [tracking.status, JSON.stringify(tracking.raw), nextStatus, nextStatus, nextStatus, sale.receipt_number]
       );
       result.synced++;
       if (changed) {

@@ -17,12 +17,16 @@ export interface ReceiptBillData {
   receiptNumber: string;
   items: ReceiptBillItem[];
   customerName: string;
+  whatsappOrderRef?: string | null;
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
   deliveryFee?: number;
   total: number;
   paymentMethod: string;
+  paymentStatus?: "unpaid" | "advance" | "paid";
+  paidAmount?: number;
+  balanceDue?: number;
   amountTendered: number | null;
   changeDue: number | null;
   fulfillmentType?: string;
@@ -38,11 +42,13 @@ function billPrice(amount: number) {
 const paymentLabels: Record<string, string> = {
   cash: "Cash",
   card: "Card",
+  bank_transfer: "Bank Transfer",
   cod: "COD",
   reseller: "Reseller Account",
   onepay: "OnePay Card",
   pos_cash: "Cash",
   pos_card: "Card",
+  pos_bank_transfer: "Bank Transfer",
 };
 
 export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }) {
@@ -80,6 +86,12 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
             {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true })}
           </span>
         </div>
+        {receipt.whatsappOrderRef && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-navy-800/60">WhatsApp Order No.</span>
+            <span className="font-bold text-navy-900">{receipt.whatsappOrderRef}</span>
+          </div>
+        )}
         {receipt.customerName && receipt.customerName !== "Walk-in Customer" && (
           <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <span className="text-navy-800/60">Customer</span>
@@ -186,6 +198,18 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
         <div className="flex justify-between border-t border-dashed border-navy-800/15 pt-2.5">
           <span className="text-navy-800/60">Payment</span>
           <span className="font-semibold text-navy-900">{paymentLabels[receipt.paymentMethod] ?? receipt.paymentMethod}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-navy-800/60">Payment status</span>
+          <span className="font-semibold text-navy-900">{receipt.paymentStatus === "advance" ? "Advance paid" : receipt.paymentStatus === "unpaid" ? "Not paid" : "Fully paid"}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-navy-800/60">Paid amount</span>
+          <span className="font-semibold text-navy-900">{billPrice(receipt.paidAmount ?? receipt.total)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="font-bold text-navy-900">{receipt.fulfillmentType === "delivery" ? "Courier COD balance" : "Balance at pickup"}</span>
+          <span className="font-bold text-brand">{billPrice(receipt.balanceDue ?? 0)}</span>
         </div>
       </div>
 

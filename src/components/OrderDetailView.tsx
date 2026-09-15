@@ -32,10 +32,13 @@ interface OrderDetail {
   profit?: number;
   amountTendered?: number | null;
   changeDue?: number | null;
+  paidAmount?: number;
+  balanceDue?: number;
   customerName: string;
   customerEmail?: string | null;
   customerPhone?: string | null;
   customerPhone2?: string | null;
+  whatsappOrderRef?: string | null;
   address?: string | null;
   city?: string | null;
   district?: string | null;
@@ -68,6 +71,7 @@ const methodLabel: Record<string, string> = {
   reseller: "Reseller",
   pos_cash: "POS Cash",
   pos_card: "POS Card",
+  pos_bank_transfer: "POS Bank Transfer",
 };
 
 // Matches old Beyos's getStatusColor mapping.
@@ -328,6 +332,14 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
                   <span>Change {formatPrice(order.changeDue ?? 0)}</span>
                 </div>
               )}
+              {order.type === "pos" && (
+                <div className="flex justify-between border-t border-navy-800/10 pt-2 text-sm font-semibold">
+                  <span>Paid {formatPrice(order.paidAmount ?? order.total)}</span>
+                  <span className={(order.balanceDue ?? 0) > 0 ? "text-amber-700" : "text-emerald-700"}>
+                    {order.fulfillmentType === "delivery" ? "Courier COD" : "Balance at pickup"} {formatPrice(order.balanceDue ?? 0)}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -390,6 +402,9 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
                 }
               />
               {order.paymentRef && <InfoRow label="Reference" value={order.paymentRef} />}
+              {order.type === "pos" && order.whatsappOrderRef && <InfoRow label="WhatsApp Order No." value={order.whatsappOrderRef} />}
+              {order.type === "pos" && <InfoRow label="Paid Amount" value={formatPrice(order.paidAmount ?? order.total)} />}
+              {order.type === "pos" && <InfoRow label={order.fulfillmentType === "delivery" ? "Courier COD Balance" : "Balance at Pickup"} value={formatPrice(order.balanceDue ?? 0)} />}
             </div>
           </div>
 

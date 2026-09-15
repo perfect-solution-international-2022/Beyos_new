@@ -58,8 +58,11 @@ export async function GET(request: Request) {
       receipt_number: string;
       customer_name: string | null;
       customer_phone: string | null;
+      whatsapp_order_ref: string | null;
       total: string;
       payment_method: string;
+      payment_status: string;
+      paid_amount: string;
       status: string;
       fulfillment_type: string | null;
       delivery_status: string | null;
@@ -68,8 +71,8 @@ export async function GET(request: Request) {
       cashier_name: string;
       created_at: string;
     }>(
-      `SELECT s.receipt_number, s.customer_name, s.customer_phone, s.total,
-              s.payment_method, s.status, s.fulfillment_type, s.delivery_status,
+      `SELECT s.receipt_number, s.customer_name, s.customer_phone, s.whatsapp_order_ref, s.total,
+              s.payment_method, s.payment_status, s.paid_amount, s.status, s.fulfillment_type, s.delivery_status,
               s.koombiyo_waybill_id, s.koombiyo_status,
               COALESCE(u.name, NULLIF(c.name, '__BEYOS_POS__'), 'Unknown user') AS cashier_name, s.created_at
        FROM pos_sales s
@@ -118,10 +121,13 @@ export async function GET(request: Request) {
         type: "pos" as const,
         orderRef: o.receipt_number,
         customerName: o.customer_name || "Walk-in Customer",
+        whatsappOrderRef: o.whatsapp_order_ref,
         amount: Number(o.total),
         status: o.status,
         paymentMethod: `pos_${o.payment_method}`,
-        paymentStatus: "paid",
+        paymentStatus: o.payment_status,
+        paidAmount: o.paid_amount == null ? Number(o.total) : Number(o.paid_amount),
+        balanceDue: Math.max(0, Number(o.total) - (o.paid_amount == null ? Number(o.total) : Number(o.paid_amount))),
         paymentRef: null as string | null,
         customerPhone: o.customer_phone || "",
         koombiyoWaybillId: o.koombiyo_waybill_id,

@@ -7,6 +7,7 @@ import { makeReceiptNumber } from "@/lib/pos";
 import type { PoolConnection } from "mysql2/promise";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
+import { resolvePosPayment } from "@/lib/pos-payment";
 
 export async function GET(request: Request) {
   const admin = await requireAdminSection("pos");
@@ -14,13 +15,19 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
+  const payment = searchParams.get("payment")?.trim();
 
   try {
     const conditions: string[] = ["s.deleted_at IS NULL"];
     const params: unknown[] = [];
     if (search) {
-      conditions.push("(s.receipt_number LIKE ? OR s.customer_name LIKE ? OR u.name LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      conditions.push("(s.receipt_number LIKE ? OR s.whatsapp_order_ref LIKE ? OR s.customer_name LIKE ? OR u.name LIKE ?)");
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    }
+    if (payment === "balance_due") conditions.push("COALESCE(s.paid_amount, s.total) < s.total");
+    else if (["unpaid", "advance", "paid"].includes(payment || "")) {
+      conditions.push("s.payment_status = ?");
+      params.push(payment);
     }
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -36,12 +43,16 @@ export async function GET(request: Request) {
         receiptNumber: r.receipt_number,
         cashierName: r.cashier_name,
         customerName: r.customer_name,
+        whatsappOrderRef: r.whatsapp_order_ref,
         subtotal: Number(r.subtotal),
         discountAmount: Number(r.discount_amount),
         taxAmount: Number(r.tax_amount),
         deliveryFee: Number(r.delivery_fee || 0),
         total: Number(r.total),
         paymentMethod: r.payment_method,
+        paymentStatus: r.payment_status,
+        paidAmount: r.paid_amount == null ? Number(r.total) : Number(r.paid_amount),
+        balanceDue: Math.max(0, Number(r.total) - (r.paid_amount == null ? Number(r.total) : Number(r.paid_amount))),
         status: r.status,
         fulfillmentType: r.fulfillment_type ?? "pickup",
         deliveryAddress: r.delivery_address,
@@ -74,9 +85,12 @@ export async function POST(request: Request) {
     customerName?: string;
     customerPhone?: string;
     customerPhone2?: string;
+    whatsappOrderRef?: string;
     discountAmount?: number;
     taxRate?: number;
-    paymentMethod?: "cash" | "card";
+    paymentMethod?: "cash" | "card" | "bank_transfer";
+    paymentStatus?: "unpaid" | "advance" | "paid";
+    paidAmount?: number;
     amountTendered?: number;
     fulfillmentType?: "pickup" | "delivery";
     deliveryAddress?: string;
@@ -91,7 +105,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
   const customerId = Number(b.customerId) || null;
-  const paymentMethod = b.paymentMethod === "card" ? "card" : "cash";
+  const paymentMethod = b.paymentMethod === "card" || b.paymentMethod === "bank_transfer" ? b.paymentMethod : "cash";
   const fulfillmentType = b.fulfillmentType === "delivery" ? "delivery" : "pickup";
   const deliveryAddress = (b.deliveryAddress ?? "").trim();
   const deliveryDistrict = (b.deliveryDistrict ?? "").trim();
@@ -217,27 +231,29 @@ export async function POST(request: Request) {
       : deliveryOfferQuote(await getDeliveryOffer(), "pos", fulfillmentType === "delivery" ? lineItems : [], standardDeliveryFee);
     const deliveryFee = deliveryQuote.fee;
     const total = Math.round((taxableAmount + taxAmount + deliveryFee) * 100) / 100;
+    const payment = resolvePosPayment(total, b.paymentStatus, b.paidAmount);
 
     let amountTendered: number | null = null;
     let changeDue: number | null = null;
-    if (paymentMethod === "cash") {
-      amountTendered = b.amountTendered == null ? total : Number(b.amountTendered) || 0;
-      if (amountTendered < total) throw new Error("Amount tendered is less than the total due");
-      changeDue = Math.round((amountTendered - total) * 100) / 100;
+    if (paymentMethod === "cash" && payment.status === "paid") {
+      amountTendered = b.amountTendered == null ? payment.paidAmount : Number(b.amountTendered) || 0;
+      if (amountTendered < payment.paidAmount) throw new Error("Amount tendered is less than the paid amount");
+      changeDue = Math.round((amountTendered - payment.paidAmount) * 100) / 100;
     }
 
     const deliveryStatus = fulfillmentType === "delivery" ? "pending" : null;
     const [saleResult] = await conn.execute(
       `INSERT INTO pos_sales
-        (receipt_number, shift_id, cashier_id, created_by, customer_id, customer_name, customer_phone, customer_phone_2,
-         subtotal, discount_amount, tax_amount, total, payment_method, amount_tendered, change_due, status,
+        (receipt_number, shift_id, cashier_id, created_by, customer_id, customer_name, customer_phone, customer_phone_2, whatsapp_order_ref,
+         subtotal, discount_amount, tax_amount, total, payment_method, payment_status, paid_amount, amount_tendered, change_due, status,
          fulfillment_type, delivery_address, delivery_district, delivery_district_id, delivery_city, delivery_city_id, delivery_status, delivery_fee)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'completed',?,?,?,?,?,?,?,?)`,
       [
         receiptNumber, shiftId, cashierId, admin.id, customerId,
         (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
         (b.customerPhone2 ?? "").trim() || null,
-        subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
+        (b.whatsappOrderRef ?? "").trim().slice(0, 100) || null,
+        subtotal, discountAmount, taxAmount, total, paymentMethod, payment.status, payment.paidAmount, amountTendered, changeDue,
         fulfillmentType, deliveryAddress || null, deliveryDistrict || null, deliveryDistrictId || null,
         deliveryCity || null, deliveryCityId || null, deliveryStatus, deliveryFee,
       ]
@@ -267,9 +283,9 @@ export async function POST(request: Request) {
       receipt: {
         receiptNumber,
         items: lineItems,
-        customerName: b.customerName || "Walk-in Customer",
+        customerName: b.customerName || "Walk-in Customer", whatsappOrderRef: (b.whatsappOrderRef ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, deliveryFee, total,
-        paymentMethod, amountTendered, changeDue,
+        paymentMethod, paymentStatus: payment.status, paidAmount: payment.paidAmount, balanceDue: payment.balanceDue, amountTendered, changeDue,
         fulfillmentType, deliveryAddress: deliveryAddress || null, deliveryCity: deliveryCity || null,
         createdAt: new Date().toISOString(),
       },

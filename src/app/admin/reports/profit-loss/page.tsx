@@ -11,7 +11,7 @@ interface ExpenseCategoryRow { category: string; amount: number; }
 interface ReportData {
   range: { start: string; end: string };
   summary: {
-    totalRevenue: number; totalCost: number; grossProfit: number; grossMarginPct: number;
+    totalRevenue: number; merchandiseCost: number; totalDeliveryCost: number; totalCost: number; grossProfit: number; grossMarginPct: number;
     totalExpenses: number; netProfit: number; netMarginPct: number;
   };
   bySource: { customer: SourceTotals; reseller: SourceTotals; pos: SourceTotals };
@@ -69,7 +69,8 @@ export default function ProfitLossReportPage() {
     const rows = [
       ["Statement Summary", ""],
       ["Revenue", data.summary.totalRevenue.toFixed(2)],
-      ["Cost of Goods Sold", (-data.summary.totalCost).toFixed(2)],
+      ["Cost of Goods Sold", (-data.summary.merchandiseCost).toFixed(2)],
+      ["Weight-based Delivery Cost", (-data.summary.totalDeliveryCost).toFixed(2)],
       ["Gross Profit", data.summary.grossProfit.toFixed(2)],
       ["Gross Margin %", data.summary.grossMarginPct.toFixed(1)],
       ...data.expensesByCategory.map((e) => [`  ${e.category}`, (-e.amount).toFixed(2)]),
@@ -117,7 +118,7 @@ export default function ProfitLossReportPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-navy-800">Profit &amp; Loss Report</h1>
-          <p className="mt-1 text-sm text-navy-800/50">Revenue, cost of goods sold, operating expenses, and net profit across all sales channels.</p>
+          <p className="mt-1 text-sm text-navy-800/50">Revenue, product and weight-based delivery costs, operating expenses, and net profit across all sales channels.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/admin/expenses" className="btn-outline flex items-center gap-2">
@@ -182,7 +183,7 @@ export default function ProfitLossReportPage() {
       {/* P&L statement */}
       <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">
         <h2 className="font-bold text-navy-800">Statement Summary</h2>
-        <p className="text-sm text-navy-800/50">Revenue, cost of goods sold, and operating expenses for the selected range.</p>
+        <p className="text-sm text-navy-800/50">Revenue, product and weight-based delivery costs, and operating expenses for the selected range.</p>
         {loading ? (
           <p className="mt-6 text-navy-800/50">Loading…</p>
         ) : !data ? null : (
@@ -193,7 +194,11 @@ export default function ProfitLossReportPage() {
             </div>
             <div className="flex items-center justify-between border-t border-navy-800/5 py-3">
               <span className="text-navy-800/70">Less: Cost of Goods Sold</span>
-              <span className="font-semibold text-red-600">-{formatPrice(data.summary.totalCost)}</span>
+              <span className="font-semibold text-red-600">-{formatPrice(data.summary.merchandiseCost)}</span>
+            </div>
+            <div className="flex items-center justify-between border-t border-navy-800/5 py-3">
+              <span className="text-navy-800/70">Less: Weight-based Delivery Cost</span>
+              <span className="font-semibold text-red-600">-{formatPrice(data.summary.totalDeliveryCost)}</span>
             </div>
             <div className="flex items-center justify-between border-t border-navy-800/10 bg-navy-50/40 px-3 py-3">
               <span className="font-bold text-navy-800">Gross Profit</span>
@@ -301,9 +306,9 @@ export default function ProfitLossReportPage() {
                   <td className="px-6 py-3">Total</td>
                   <td className="px-6 py-3">{data.productTable.reduce((s, p) => s + p.units, 0)}</td>
                   <td className="px-6 py-3">{formatPrice(data.summary.totalRevenue)}</td>
-                  <td className="px-6 py-3">{formatPrice(data.summary.totalCost)}</td>
-                  <td className={data.summary.grossProfit >= 0 ? "px-6 py-3 text-emerald-600" : "px-6 py-3 text-red-600"}>{formatPrice(data.summary.grossProfit)}</td>
-                  <td className="px-6 py-3">{data.summary.grossMarginPct.toFixed(1)}%</td>
+                  <td className="px-6 py-3">{formatPrice(data.summary.merchandiseCost)}</td>
+                  <td className={data.productTable.reduce((s, p) => s + p.profit, 0) >= 0 ? "px-6 py-3 text-emerald-600" : "px-6 py-3 text-red-600"}>{formatPrice(data.productTable.reduce((s, p) => s + p.profit, 0))}</td>
+                  <td className="px-6 py-3">{data.summary.totalRevenue > 0 ? ((data.productTable.reduce((s, p) => s + p.profit, 0) / data.summary.totalRevenue) * 100).toFixed(1) : "0.0"}%</td>
                 </tr>
               </>
             )}

@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS reseller_orders (
   customer_name  VARCHAR(160) NOT NULL,
   customer_phone VARCHAR(40) NOT NULL DEFAULT '',
   customer_phone_2 VARCHAR(40) NULL,
+  whatsapp_order_ref VARCHAR(100) NULL,
   customer_address VARCHAR(255) NOT NULL DEFAULT '',
   customer_email VARCHAR(190) NULL,
   address_line1 VARCHAR(255) NOT NULL DEFAULT '',
@@ -285,6 +286,8 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   tax_amount      DECIMAL(10,2) NOT NULL DEFAULT 0,
   total           DECIMAL(10,2) NOT NULL,
   payment_method  VARCHAR(20) NOT NULL DEFAULT 'cash',
+  payment_status  VARCHAR(20) NOT NULL DEFAULT 'paid',
+  paid_amount     DECIMAL(10,2) NULL,
   amount_tendered DECIMAL(10,2) NULL,
   change_due      DECIMAL(10,2) NULL,
   status          VARCHAR(20) NOT NULL DEFAULT 'completed',
@@ -307,6 +310,8 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   CONSTRAINT fk_possale_cashier FOREIGN KEY (cashier_id) REFERENCES pos_cashiers(id) ON DELETE CASCADE,
   CONSTRAINT fk_possale_created_by FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_possale_created_by (created_by),
+  INDEX idx_pos_sales_payment_status (payment_status),
+  INDEX idx_pos_sales_whatsapp_order_ref (whatsapp_order_ref),
   INDEX idx_possale_shift (shift_id)
 ) ENGINE=InnoDB;
 

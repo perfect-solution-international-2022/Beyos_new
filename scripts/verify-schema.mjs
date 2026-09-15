@@ -7,7 +7,7 @@ const required = {
   order_items: ["order_id", "product_slug", "product_id", "variant_id", "quantity"],
   reseller_orders: ["id", "order_ref", "reseller_id", "customer_phone_2", "status", "payment_status", "deleted_at"],
   reseller_order_items: ["order_id", "product_id", "variant_id", "quantity"],
-  pos_sales: ["id", "receipt_number", "customer_phone_2", "fulfillment_type", "delivery_status", "delivery_fee", "koombiyo_waybill_id", "koombiyo_status", "inventory_reverted_at", "deleted_at"],
+  pos_sales: ["id", "receipt_number", "customer_phone_2", "whatsapp_order_ref", "payment_status", "paid_amount", "fulfillment_type", "delivery_status", "delivery_fee", "koombiyo_waybill_id", "koombiyo_status", "inventory_reverted_at", "deleted_at"],
   pos_sale_items: ["id", "sale_id", "variant_id", "quantity"],
   promotions: ["id", "image_data", "image_mime"],
   hero_slides: ["id", "image_data", "image_mime", "is_active"],

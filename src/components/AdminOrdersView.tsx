@@ -12,10 +12,13 @@ interface Order {
   type: "customer" | "reseller" | "pos";
   orderRef: string;
   customerName: string;
+  whatsappOrderRef?: string | null;
   amount: number;
   status: string;
   paymentMethod: string;
   paymentStatus: string;
+  paidAmount?: number;
+  balanceDue?: number;
   paymentRef: string | null;
   customerPhone: string;
   koombiyoWaybillId: string | null;
@@ -32,6 +35,7 @@ interface Order {
 const paymentBadge: Record<string, string> = {
   paid: "bg-emerald-100 text-emerald-700",
   unpaid: "bg-amber-100 text-amber-700",
+  advance: "bg-amber-100 text-amber-700",
   refunded: "bg-red-100 text-red-700",
 };
 
@@ -50,6 +54,7 @@ const methodLabel: Record<string, string> = {
   reseller: "Reseller",
   pos_cash: "POS Cash",
   pos_card: "POS Card",
+  pos_bank_transfer: "POS Bank Transfer",
 };
 
 type OrdersView = "all" | "pending" | "delivering" | "completed" | "rejected";
@@ -98,8 +103,8 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
       orders.filter(
         (o) =>
           (typeFilter === "all" || o.type === typeFilter) &&
-          (!unpaidOnly || (o.type === "customer" && o.paymentStatus !== "paid")) &&
-          (!search || `${o.orderRef} ${o.customerName} ${o.customerPhone || ""} ${o.enteredByName || ""}`.toLowerCase().includes(search.toLowerCase()))
+          (!unpaidOnly || o.paymentStatus !== "paid" || (o.balanceDue ?? 0) > 0) &&
+          (!search || `${o.orderRef} ${o.whatsappOrderRef || ""} ${o.customerName} ${o.customerPhone || ""} ${o.enteredByName || ""}`.toLowerCase().includes(search.toLowerCase()))
       ),
     [orders, search, typeFilter, unpaidOnly]
   );
@@ -237,7 +242,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
             unpaidOnly ? "border-amber-400 bg-amber-50 text-amber-700" : "border-navy-800/15 text-navy-800/60 hover:border-brand hover:text-brand"
           }`}
         >
-          Unpaid only
+          Balance due
           {unpaidOnly && (
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" onClick={(e) => { e.stopPropagation(); setUnpaidOnly(false); }}>
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -289,6 +294,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                   <td className="px-6 py-4 text-navy-800">
                     <p className="font-medium">{o.customerName}</p>
                     {o.customerPhone && <p className="mt-0.5 text-xs text-navy-800/45">{o.customerPhone}</p>}
+                    {o.whatsappOrderRef && <p className="mt-0.5 text-xs font-semibold text-emerald-700">WhatsApp #{o.whatsappOrderRef}</p>}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex min-w-[120px] items-center gap-2">
@@ -306,6 +312,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                         <span className={`badge capitalize ${paymentBadge[o.paymentStatus] ?? "bg-navy-50 text-navy-800"}`}>
                           {o.paymentMethod === "onepay" && o.paymentStatus === "paid" ? "Payment successful" : o.paymentStatus}
                         </span>
+                        {o.type === "pos" && (o.balanceDue ?? 0) > 0 && <span className="text-xs font-semibold text-amber-700">{formatPrice(o.balanceDue ?? 0)} due</span>}
                         {o.paymentStatus !== "paid" && o.type === "customer" && (
                           <button
                             disabled={saving === o.orderRef + ":pay"}

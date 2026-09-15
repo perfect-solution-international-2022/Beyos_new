@@ -90,12 +90,16 @@ interface Receipt {
   receiptNumber: string;
   items: { slug?: string; variantId?: number | null; name: string; sku?: string; size: string; color: string; quantity: number; unitPrice: number; lineTotal: number }[];
   customerName: string;
+  whatsappOrderRef?: string | null;
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
   deliveryFee?: number;
   total: number;
   paymentMethod: string;
+  paymentStatus: "unpaid" | "advance" | "paid";
+  paidAmount: number;
+  balanceDue: number;
   amountTendered: number | null;
   changeDue: number | null;
   fulfillmentType?: string;
@@ -157,9 +161,12 @@ function AdminPosRegister() {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [discountAmount, setDiscountAmount] = useState("0");
   const [taxRate, setTaxRate] = useState("0");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "bank_transfer">("cash");
+  const [paidAmount, setPaidAmount] = useState("0");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerPhone2, setCustomerPhone2] = useState("");
+  const [whatsappOrderRef, setWhatsappOrderRef] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerResults, setCustomerResults] = useState<Customer[]>([]);
   const [customerSearching, setCustomerSearching] = useState(false);
@@ -240,11 +247,14 @@ function AdminPosRegister() {
         setCustomerName(r.customerName === "Walk-in Customer" ? "" : r.customerName || "");
         setCustomerPhone(r.customerPhone || "");
         setCustomerPhone2(r.customerPhone2 || "");
+        setWhatsappOrderRef(r.whatsappOrderRef || "");
         setSelectedCustomerId(r.customerId ? `user-${r.customerId}` : null);
         setCustomerWholesale(!!r.customerIsWholesaleCustomer);
         setDiscountAmount(String(r.discountAmount || 0));
         const rate = r.subtotal - r.discountAmount > 0 ? (r.taxAmount / (r.subtotal - r.discountAmount)) * 100 : 0;
         setTaxRate(rate ? String(Math.round(rate * 100) / 100) : "0");
+        setPaymentMethod(r.paymentMethod === "card" || r.paymentMethod === "bank_transfer" ? r.paymentMethod : "cash");
+        setPaidAmount(String(r.paidAmount || 0));
         if (r.fulfillmentType === "delivery") {
           setFulfillmentType("delivery");
           setDeliveryAddress(r.deliveryAddress || "");
@@ -286,6 +296,7 @@ function AdminPosRegister() {
     setCustomerName(customer.name);
     setCustomerPhone(customer.phone);
     setCustomerPhone2("");
+    setWhatsappOrderRef("");
     setDeliveryAddress([customer.addressLine1, customer.addressLine2].filter(Boolean).join(", "));
     setDeliveryCity(customer.city);
     setDeliveryDistrict(customer.district);
@@ -334,11 +345,15 @@ function AdminPosRegister() {
 
   const { fee: deliveryFee, offerName: deliveryOfferName, error: deliveryError, loading: deliveryLoading } = useShippingEstimate(cart, "pos", { enabled: fulfillmentType === "delivery", wholesale: customerWholesale });
   const total = Math.round((taxable + tax + (fulfillmentType === "delivery" ? deliveryFee : 0)) * 100) / 100;
+  const effectivePaidAmount = Math.round((Number(paidAmount) || 0) * 100) / 100;
+  const paymentStatus: "unpaid" | "advance" | "paid" = effectivePaidAmount <= 0 ? "unpaid" : effectivePaidAmount >= total ? "paid" : "advance";
+  const balanceDue = Math.max(0, Math.round((total - effectivePaidAmount) * 100) / 100);
+  const invalidPaidAmount = effectivePaidAmount < 0 || effectivePaidAmount > total;
   const deliveryDetailsComplete = Boolean(
     customerName.trim() && customerPhone.trim() && deliveryDistrictId && deliveryCityId && deliveryAddress.trim()
   );
   const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryCity, deliveryPostalCode.trim()].filter(Boolean).join(", ");
-  const paymentDisabled = completing || deliveryLoading || !!deliveryError || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
+  const paymentDisabled = completing || deliveryLoading || !!deliveryError || invalidPaidAmount || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
 
   const toggleFullscreen = async () => {
     try {
@@ -450,6 +465,8 @@ function AdminPosRegister() {
     setCart([]);
     setDiscountAmount("0");
     setTaxRate("0");
+    setPaymentMethod("cash");
+    setPaidAmount("0");
     setCustomerName("");
     setCustomerPhone("");
     setCustomerPhone2("");
@@ -479,7 +496,8 @@ function AdminPosRegister() {
         body: JSON.stringify({
           items: cart.map((l) => ({ slug: l.slug, variantId: l.variantId, size: l.size, color: l.color, quantity: l.quantity })),
           customerId: selectedCustomerId ? Number(selectedCustomerId.replace(/^user-/, "")) : null,
-          customerName, customerPhone, customerPhone2, discountAmount: discount, taxRate: rate,
+          customerName, customerPhone, customerPhone2, whatsappOrderRef, discountAmount: discount, taxRate: rate,
+          paymentMethod, paymentStatus, paidAmount: effectivePaidAmount,
           fulfillmentType, deliveryAddress: fulfillmentType === "delivery" ? fullDeliveryAddress : "", deliveryDistrict, deliveryDistrictId, deliveryCity, deliveryCityId,
         }),
       });
@@ -738,6 +756,37 @@ function AdminPosRegister() {
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Phone</label>
               <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="input" placeholder="Optional" />
             </div>
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs font-medium text-navy-800/60">WhatsApp Order No.</label>
+              <input value={whatsappOrderRef} onChange={(e) => setWhatsappOrderRef(e.target.value)} maxLength={100} className="input" placeholder="Optional — enter the WhatsApp order number" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-navy-800/60">Payment method</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer")} className="input">
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="bank_transfer">Bank Transfer</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-navy-800/60">Paid amount (LKR)</label>
+              <input type="number" min="0" max={total} step="0.01" value={paidAmount} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setPaidAmount(e.target.value)} className="input" />
+            </div>
+            <div className="col-span-2">
+              <div className="flex flex-wrap gap-1.5">
+                {[500, 1000, 2000, 5000].map((amount) => (
+                  <button key={amount} type="button" onClick={() => setPaidAmount(String(Math.min(amount, total)))} disabled={total <= 0} className="rounded-lg border border-navy-800/15 px-2.5 py-1.5 text-xs font-semibold text-navy-800/65 hover:border-brand hover:text-brand disabled:opacity-40">
+                    {formatPrice(amount)}
+                  </button>
+                ))}
+                <button type="button" onClick={() => setPaidAmount(String(total))} disabled={total <= 0} className="rounded-lg border border-brand bg-brand/5 px-2.5 py-1.5 text-xs font-semibold text-brand disabled:opacity-40">Full Amount</button>
+                <button type="button" onClick={() => setPaidAmount("0")} className="rounded-lg border border-navy-800/15 px-2.5 py-1.5 text-xs font-semibold text-navy-800/65">Clear</button>
+              </div>
+              <p className={`mt-2 text-xs font-semibold ${paymentStatus === "paid" ? "text-emerald-700" : paymentStatus === "advance" ? "text-amber-700" : "text-red-600"}`}>
+                {paymentStatus === "paid" ? "Fully paid" : paymentStatus === "advance" ? "Advance paid" : "Not paid"}
+              </p>
+              {invalidPaidAmount && <p className="mt-1 text-xs text-red-600">Paid amount cannot be greater than the order total.</p>}
+            </div>
           </div>
 
           <div className="mt-4 space-y-2 rounded-xl bg-[#f9fafb] p-4 text-sm">
@@ -746,6 +795,8 @@ function AdminPosRegister() {
             {tax > 0 && <Row label="Tax" value={formatPrice(tax)} />}
             {fulfillmentType === "delivery" && <Row label="Delivery" value={formatPrice(deliveryFee)} />}
             <div className="border-t border-[#e5e7eb] pt-2"><Row label="Total" value={formatPrice(total)} bold /></div>
+            <Row label="Paid" value={formatPrice(effectivePaidAmount)} />
+            <Row label={fulfillmentType === "delivery" ? "Courier COD balance" : "Balance at pickup"} value={formatPrice(balanceDue)} bold />
           </div>
 
           </div>

@@ -40,6 +40,7 @@ const paymentMethod: Record<string, string> = {
   reseller: "cod",
   pos_cash: "cash",
   pos_card: "card",
+  pos_bank_transfer: "bank transfer",
 };
 
 /** Use the POS bill for every order so preview and 80 mm print stay identical. */

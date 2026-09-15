@@ -87,6 +87,7 @@ function loadPosSale(captured) {
     '@/lib/pos':{makeReceiptNumber:()=>'R-TEST-1'},
     '@/lib/sms':{sendOrderConfirmationSms:async()=>{}},
     '@/lib/shipping':{computeDeliveryFee:(weight,pricing)=>weight<=1?pricing.basePrice:pricing.basePrice+Math.ceil(weight-1)*pricing.extraKgPrice,getDeliveryPricing:async()=>({basePrice:500,extraKgPrice:150})},
+    '@/lib/pos-payment':{resolvePosPayment:(total,status)=>({status:status||'paid',paidAmount:total,balanceDue:0})},
   };
   const code=ts.transpileModule(fs.readFileSync('src/app/api/pos/sales/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   new Function('exports','require',code)(api,key=>{if(!(key in mocks))throw new Error(key);return mocks[key];});

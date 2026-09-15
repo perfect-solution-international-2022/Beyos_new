@@ -10,6 +10,7 @@ interface PosSaleRow {
   customer_phone: string | null;
   customer_phone_2: string | null;
   total: string;
+  paid_amount: string;
   fulfillment_type: string | null;
   delivery_address: string | null;
   delivery_district_id: number | null;
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
 
   try {
     const rows = await query<PosSaleRow>(
-      `SELECT receipt_number, customer_name, customer_phone, customer_phone_2, total, fulfillment_type,
+      `SELECT receipt_number, customer_name, customer_phone, customer_phone_2, total, paid_amount, fulfillment_type,
               delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id, delivery_status
        FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1`,
       [body.receiptNumber]
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
       [sale.receipt_number]
     );
     const description = courierItemDescription(orderItems);
-    const codAmount = Number(sale.total);
+    const paidAmount = sale.paid_amount == null ? Number(sale.total) : Number(sale.paid_amount);
+    const codAmount = Math.max(0, Math.round((Number(sale.total) - paidAmount) * 100) / 100);
     if (!Number.isFinite(codAmount) || codAmount < 0) {
       return NextResponse.json({ error: "Invalid order total. Check this sale before submitting it to the courier." }, { status: 400 });
     }
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
       receiverPhone: sale.customer_phone,
       districtId: sale.delivery_district_id ?? undefined,
       cityId: sale.delivery_city_id ?? undefined,
-      // POS delivery customers pay the full saved total, including delivery, to the courier.
+      // Koombiyo collects only the balance that has not already been paid.
       codAmount,
       description,
       specialNote: [sale.customer_phone_2 ? `2nd phone: ${sale.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),

@@ -6,6 +6,7 @@ import { requireAdminSection } from "@/lib/admin";
 import { sendOrderStatusSms } from "@/lib/sms";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 import type { PoolConnection } from "mysql2/promise";
+import { resolvePosPayment } from "@/lib/pos-payment";
 
 export async function GET(
   _request: Request,
@@ -43,6 +44,7 @@ export async function GET(
         customerName: sale.customer_name || "Walk-in Customer",
         customerPhone: sale.customer_phone || "",
         customerPhone2: sale.customer_phone_2 || "",
+        whatsappOrderRef: sale.whatsapp_order_ref || "",
         items: items.map((i: any) => ({
           slug: i.product_slug, variantId: i.variant_id, name: i.name, sku: i.sku, size: i.size, color: i.color,
           quantity: i.quantity, unitPrice: Number(i.unit_price), lineTotal: Number(i.line_total),
@@ -53,6 +55,9 @@ export async function GET(
         deliveryFee: Number(sale.delivery_fee || 0),
         total: Number(sale.total),
         paymentMethod: sale.payment_method,
+        paymentStatus: sale.payment_status,
+        paidAmount: sale.paid_amount == null ? Number(sale.total) : Number(sale.paid_amount),
+        balanceDue: Math.max(0, Number(sale.total) - (sale.paid_amount == null ? Number(sale.total) : Number(sale.paid_amount))),
         amountTendered: sale.amount_tendered !== null ? Number(sale.amount_tendered) : null,
         changeDue: sale.change_due !== null ? Number(sale.change_due) : null,
         fulfillmentType: sale.fulfillment_type ?? "pickup",
@@ -80,10 +85,24 @@ export async function PATCH(
   const admin = await requireAdminSection("pos");
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let b: { deliveryStatus?: string };
+  let b: { deliveryStatus?: string; paymentStatus?: "unpaid" | "advance" | "paid"; paidAmount?: number };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
+  if (b.paymentStatus) {
+    try {
+      const rows = await query<{ id: number; total: string }>(
+        "SELECT id, total FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1",
+        [receiptNumber]
+      );
+      if (!rows[0]) return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
+      const payment = resolvePosPayment(Number(rows[0].total), b.paymentStatus, b.paidAmount);
+      await query("UPDATE pos_sales SET payment_status = ?, paid_amount = ? WHERE id = ?", [payment.status, payment.paidAmount, rows[0].id]);
+      return NextResponse.json({ ok: true, paymentStatus: payment.status, paidAmount: payment.paidAmount, balanceDue: payment.balanceDue });
+    } catch (err) {
+      return NextResponse.json({ error: err instanceof Error ? err.message : "Could not update payment" }, { status: 400 });
+    }
+  }
   if (!b.deliveryStatus || !DELIVERY_STATUSES.includes(b.deliveryStatus)) {
-    return NextResponse.json({ error: "Invalid delivery status" }, { status: 400 });
+    return NextResponse.json({ error: "A valid delivery status or payment update is required" }, { status: 400 });
   }
 
   try {
@@ -113,8 +132,10 @@ export async function PATCH(
           await conn.execute("UPDATE products SET stock = stock + ? WHERE slug = ?", [item.quantity, item.product_slug]);
         }
         await conn.execute(
-          "UPDATE pos_sales SET delivery_status = ?, inventory_reverted_at = NOW() WHERE id = ?",
-          [b.deliveryStatus, sale.id]
+          `UPDATE pos_sales SET delivery_status = ?, inventory_reverted_at = NOW(),
+           payment_status = IF(? = 'delivered', 'paid', payment_status),
+           paid_amount = IF(? = 'delivered', total, paid_amount) WHERE id = ?`,
+          [b.deliveryStatus, b.deliveryStatus, b.deliveryStatus, sale.id]
         );
         await conn.commit();
       } catch (error) {
@@ -124,7 +145,11 @@ export async function PATCH(
         conn.release();
       }
     } else {
-      await query("UPDATE pos_sales SET delivery_status = ? WHERE id = ?", [b.deliveryStatus, sale.id]);
+      await query(
+        `UPDATE pos_sales SET delivery_status = ?, payment_status = IF(? = 'delivered', 'paid', payment_status),
+         paid_amount = IF(? = 'delivered', total, paid_amount) WHERE id = ?`,
+        [b.deliveryStatus, b.deliveryStatus, b.deliveryStatus, sale.id]
+      );
     }
 
     if (sale.delivery_status !== b.deliveryStatus) {
@@ -165,9 +190,13 @@ export async function PUT(
     customerId?: number | string | null;
     customerName?: string;
     customerPhone?: string;
+    customerPhone2?: string;
+    whatsappOrderRef?: string;
     discountAmount?: number;
     taxRate?: number;
-    paymentMethod?: "cash" | "card";
+    paymentMethod?: "cash" | "card" | "bank_transfer";
+    paymentStatus?: "unpaid" | "advance" | "paid";
+    paidAmount?: number;
     amountTendered?: number;
     fulfillmentType?: "pickup" | "delivery";
     deliveryAddress?: string;
@@ -182,7 +211,7 @@ export async function PUT(
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
   const customerId = Number(b.customerId) || null;
-  const paymentMethod = b.paymentMethod === "card" ? "card" : "cash";
+  const paymentMethod = b.paymentMethod === "card" || b.paymentMethod === "bank_transfer" ? b.paymentMethod : "cash";
   const fulfillmentType = b.fulfillmentType === "delivery" ? "delivery" : "pickup";
   const deliveryAddress = (b.deliveryAddress ?? "").trim();
   const deliveryDistrict = (b.deliveryDistrict ?? "").trim();
@@ -303,25 +332,27 @@ export async function PUT(
       : deliveryOfferQuote(await getDeliveryOffer(), "pos", fulfillmentType === "delivery" ? lineItems : [], standardDeliveryFee);
     const deliveryFee = deliveryQuote.fee;
     const total = Math.round((taxableAmount + taxAmount + deliveryFee) * 100) / 100;
+    const payment = resolvePosPayment(total, b.paymentStatus, b.paidAmount);
 
     let amountTendered: number | null = null;
     let changeDue: number | null = null;
-    if (paymentMethod === "cash") {
-      amountTendered = b.amountTendered == null ? total : Number(b.amountTendered) || 0;
-      if (amountTendered < total) throw new Error("Amount tendered is less than the total due");
-      changeDue = Math.round((amountTendered - total) * 100) / 100;
+    if (paymentMethod === "cash" && payment.status === "paid") {
+      amountTendered = b.amountTendered == null ? payment.paidAmount : Number(b.amountTendered) || 0;
+      if (amountTendered < payment.paidAmount) throw new Error("Amount tendered is less than the paid amount");
+      changeDue = Math.round((amountTendered - payment.paidAmount) * 100) / 100;
     }
 
     const deliveryStatus = fulfillmentType === "delivery" ? "pending" : null;
     await conn.execute(
       `UPDATE pos_sales SET
-        customer_id = ?, customer_name = ?, customer_phone = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
-        total = ?, payment_method = ?, amount_tendered = ?, change_due = ?,
+        customer_id = ?, customer_name = ?, customer_phone = ?, customer_phone_2 = ?, whatsapp_order_ref = ?, subtotal = ?, discount_amount = ?, tax_amount = ?,
+        total = ?, payment_method = ?, payment_status = ?, paid_amount = ?, amount_tendered = ?, change_due = ?,
         fulfillment_type = ?, delivery_address = ?, delivery_district = ?, delivery_district_id = ?, delivery_city = ?, delivery_city_id = ?, delivery_status = ?, delivery_fee = ?
        WHERE id = ?`,
       [
         customerId, (b.customerName ?? "").trim() || null, (b.customerPhone ?? "").trim() || null,
-        subtotal, discountAmount, taxAmount, total, paymentMethod, amountTendered, changeDue,
+        (b.customerPhone2 ?? "").trim() || null, (b.whatsappOrderRef ?? "").trim().slice(0, 100) || null,
+        subtotal, discountAmount, taxAmount, total, paymentMethod, payment.status, payment.paidAmount, amountTendered, changeDue,
         fulfillmentType, deliveryAddress || null, deliveryDistrict || null, deliveryDistrictId || null,
         deliveryCity || null, deliveryCityId || null, deliveryStatus, deliveryFee,
         sale.id,
@@ -344,9 +375,9 @@ export async function PUT(
       receipt: {
         receiptNumber,
         items: lineItems,
-        customerName: b.customerName || "Walk-in Customer",
+        customerName: b.customerName || "Walk-in Customer", whatsappOrderRef: (b.whatsappOrderRef ?? "").trim() || null,
         subtotal, discountAmount, taxAmount, deliveryFee, total,
-        paymentMethod, amountTendered, changeDue,
+        paymentMethod, paymentStatus: payment.status, paidAmount: payment.paidAmount, balanceDue: payment.balanceDue, amountTendered, changeDue,
         fulfillmentType, deliveryAddress: deliveryAddress || null, deliveryCity: deliveryCity || null,
         createdAt: new Date().toISOString(),
       },
