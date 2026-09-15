@@ -353,7 +353,8 @@ function AdminPosRegister() {
     customerName.trim() && customerPhone.trim() && deliveryDistrictId && deliveryCityId && deliveryAddress.trim()
   );
   const fullDeliveryAddress = [deliveryAddress.trim(), deliveryDistrict, deliveryCity, deliveryPostalCode.trim()].filter(Boolean).join(", ");
-  const paymentDisabled = completing || deliveryLoading || !!deliveryError || invalidPaidAmount || cart.length === 0 || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
+  const paymentDisabled = completing || cart.length === 0;
+  const confirmPaymentDisabled = completing || deliveryLoading || !!deliveryError || invalidPaidAmount || (fulfillmentType === "delivery" && !deliveryDetailsComplete);
 
   const toggleFullscreen = async () => {
     try {
@@ -373,15 +374,6 @@ function AdminPosRegister() {
     } catch {
       toast("Could not sign out. Please try again.", "error");
     }
-  };
-
-  const saveDeliveryDetails = () => {
-    if (!deliveryDetailsComplete) {
-      toast("Enter the customer, phone, district, city and address");
-      return;
-    }
-    setFulfillmentType("delivery");
-    setDeliveryModalOpen(false);
   };
 
   const [variantPickerProduct, setVariantPickerProduct] = useState<Product | null>(null);
@@ -748,55 +740,13 @@ function AdminPosRegister() {
               <label className="mb-1 block text-xs font-medium text-navy-800/60">Tax %</label>
               <input type="number" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} className="input" />
             </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-navy-800/60">Customer name</label>
-              <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); setCustomerWholesale(false); }} className="input" placeholder="Optional" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-navy-800/60">Phone</label>
-              <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="input" placeholder="Optional" />
-            </div>
-            <div className="col-span-2">
-              <label className="mb-1 block text-xs font-medium text-navy-800/60">WhatsApp Order No.</label>
-              <input value={whatsappOrderRef} onChange={(e) => setWhatsappOrderRef(e.target.value)} maxLength={100} className="input" placeholder="Optional — enter the WhatsApp order number" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-navy-800/60">Payment method</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer")} className="input">
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-navy-800/60">Paid amount (LKR)</label>
-              <input type="number" min="0" max={total} step="0.01" value={paidAmount} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setPaidAmount(e.target.value)} className="input" />
-            </div>
-            <div className="col-span-2">
-              <div className="flex flex-wrap gap-1.5">
-                {[500, 1000, 2000, 5000].map((amount) => (
-                  <button key={amount} type="button" onClick={() => setPaidAmount(String(Math.min(amount, total)))} disabled={total <= 0} className="rounded-lg border border-navy-800/15 px-2.5 py-1.5 text-xs font-semibold text-navy-800/65 hover:border-brand hover:text-brand disabled:opacity-40">
-                    {formatPrice(amount)}
-                  </button>
-                ))}
-                <button type="button" onClick={() => setPaidAmount(String(total))} disabled={total <= 0} className="rounded-lg border border-brand bg-brand/5 px-2.5 py-1.5 text-xs font-semibold text-brand disabled:opacity-40">Full Amount</button>
-                <button type="button" onClick={() => setPaidAmount("0")} className="rounded-lg border border-navy-800/15 px-2.5 py-1.5 text-xs font-semibold text-navy-800/65">Clear</button>
-              </div>
-              <p className={`mt-2 text-xs font-semibold ${paymentStatus === "paid" ? "text-emerald-700" : paymentStatus === "advance" ? "text-amber-700" : "text-red-600"}`}>
-                {paymentStatus === "paid" ? "Fully paid" : paymentStatus === "advance" ? "Advance paid" : "Not paid"}
-              </p>
-              {invalidPaidAmount && <p className="mt-1 text-xs text-red-600">Paid amount cannot be greater than the order total.</p>}
-            </div>
           </div>
 
           <div className="mt-4 space-y-2 rounded-xl bg-[#f9fafb] p-4 text-sm">
             <Row label="Subtotal" value={formatPrice(subtotal)} />
             {discount > 0 && <Row label="Discount" value={`-${formatPrice(discount)}`} />}
             {tax > 0 && <Row label="Tax" value={formatPrice(tax)} />}
-            {fulfillmentType === "delivery" && <Row label="Delivery" value={formatPrice(deliveryFee)} />}
             <div className="border-t border-[#e5e7eb] pt-2"><Row label="Total" value={formatPrice(total)} bold /></div>
-            <Row label="Paid" value={formatPrice(effectivePaidAmount)} />
-            <Row label={fulfillmentType === "delivery" ? "Courier COD balance" : "Balance at pickup"} value={formatPrice(balanceDue)} bold />
           </div>
 
           </div>
@@ -811,32 +761,16 @@ function AdminPosRegister() {
         </div>
 
         <div className="flex items-center gap-5">
-          <button
-            onClick={() => {
-              if (fulfillmentType === "delivery") setFulfillmentType("pickup");
-              else setDeliveryModalOpen(true);
-            }}
-            className="hidden items-center gap-2 text-sm font-semibold text-[#4b5563] md:flex"
-          >
-            <span className={`h-5 w-5 rounded border-2 ${fulfillmentType === "delivery" ? "border-[#f5851f] bg-[#f5851f]" : "border-[#d1d5db] bg-white"}`}>
-              {fulfillmentType === "delivery" && <span className="block text-center text-xs leading-4 text-white">✓</span>}
-            </span>
-            Delivery
-          </button>
           <div className="hidden text-right sm:block">
             <p className="text-xs text-[#9ca3af]">Total Payable</p>
             <p className="text-2xl font-bold text-[#ff8746]">{formatPrice(total)}</p>
           </div>
           <button
-            onClick={completeSale}
+            onClick={() => setDeliveryModalOpen(true)}
             disabled={paymentDisabled}
             className="min-w-36 rounded-lg bg-[#ff8746] px-8 py-3 text-sm font-bold text-white transition hover:bg-[#f5851f] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {completing
-              ? (editReceipt ? "Saving…" : "Processing…")
-              : editReceipt
-                ? "Save Changes"
-                : fulfillmentType === "delivery" ? "Delivery Now" : "Pay Now"}
+            {editReceipt ? "Review & Save" : "Pay Now"}
           </button>
         </div>
       </div>
@@ -959,10 +893,52 @@ function AdminPosRegister() {
 
       {deliveryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setDeliveryModalOpen(false)}>
-          <div className="w-full max-w-4xl rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <h2 className="text-center text-xl font-bold text-[#1f2937]">Delivery Customer Details</h2>
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 className="text-center text-xl font-bold text-[#1f2937]">Payment Details</h2>
 
             <div className="mt-5 rounded-xl bg-[#f7f8fa] p-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <DeliveryField label="WhatsApp Order No. (Optional)">
+                  <input value={whatsappOrderRef} onChange={(e) => setWhatsappOrderRef(e.target.value)} maxLength={100} className="delivery-input" placeholder="Enter WhatsApp order number" />
+                </DeliveryField>
+                <DeliveryField label="Payment Method">
+                  <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as "cash" | "card" | "bank_transfer")} className="delivery-input">
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="bank_transfer">Bank Transfer</option>
+                  </select>
+                </DeliveryField>
+                <div className="md:col-span-2">
+                  <DeliveryField label="Paid Amount (LKR)">
+                    <input type="number" min="0" max={total} step="0.01" value={paidAmount} onFocus={(e) => e.currentTarget.select()} onChange={(e) => setPaidAmount(e.target.value)} className="delivery-input" />
+                  </DeliveryField>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {[500, 1000, 2000, 5000].map((amount) => (
+                      <button key={amount} type="button" onClick={() => setPaidAmount(String(Math.min(amount, total)))} className="rounded-lg border border-[#d1d5db] bg-white px-3 py-2 text-xs font-semibold text-[#4b5563] hover:border-[#f5851f] hover:text-[#f5851f]">{formatPrice(amount)}</button>
+                    ))}
+                    <button type="button" onClick={() => setPaidAmount(String(total))} className="rounded-lg border border-[#f5851f] bg-[#fff7ed] px-3 py-2 text-xs font-semibold text-[#ea580c]">Full Amount</button>
+                    <button type="button" onClick={() => setPaidAmount("0")} className="rounded-lg border border-[#d1d5db] bg-white px-3 py-2 text-xs font-semibold text-[#4b5563]">Clear</button>
+                  </div>
+                  {invalidPaidAmount && <p className="mt-2 text-xs font-semibold text-red-600">Paid amount cannot be greater than the order total.</p>}
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-2 rounded-xl border border-[#e5e7eb] bg-white p-4 text-sm">
+                <Row label="Order total" value={formatPrice(total)} bold />
+                <Row label="Paid" value={formatPrice(effectivePaidAmount)} />
+                <Row label={fulfillmentType === "delivery" ? "Courier COD balance" : "Balance at pickup"} value={formatPrice(balanceDue)} bold />
+                <p className={`text-xs font-semibold ${paymentStatus === "paid" ? "text-emerald-700" : paymentStatus === "advance" ? "text-amber-700" : "text-red-600"}`}>{paymentStatus === "paid" ? "Fully paid" : paymentStatus === "advance" ? "Advance paid" : "Not paid"}</p>
+              </div>
+
+              <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl border border-[#e5e7eb] bg-white p-4">
+                <input type="checkbox" checked={fulfillmentType === "delivery"} onChange={(e) => setFulfillmentType(e.target.checked ? "delivery" : "pickup")} className="h-5 w-5 accent-[#f5851f]" />
+                <span><span className="block text-sm font-bold text-[#1f2937]">Delivery Order</span><span className="block text-xs text-[#6b7280]">Tick to enter courier delivery details.</span></span>
+              </label>
+            </div>
+
+            {fulfillmentType === "delivery" && (
+            <div className="mt-5 rounded-xl bg-[#f7f8fa] p-6">
+              <h3 className="mb-5 font-bold text-[#1f2937]">Delivery Customer Details</h3>
               <div className="grid gap-x-4 gap-y-5 md:grid-cols-2">
                 <DeliveryField label="Customer Name">
                   <input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setCustomerSearch(e.target.value); setSelectedCustomerId(null); setCustomerWholesale(false); }} className="delivery-input" />
@@ -1012,11 +988,15 @@ function AdminPosRegister() {
                   </DeliveryField>
                 </div>
               </div>
+              {deliveryLoading && <p className="mt-4 text-sm text-[#6b7280]">Calculating delivery…</p>}
+              {deliveryError && <p className="mt-4 text-sm font-semibold text-red-600">{deliveryError}</p>}
+              {!deliveryLoading && !deliveryError && <p className="mt-4 text-sm font-semibold text-[#1f2937]">Delivery fee: {formatPrice(deliveryFee)}{deliveryOfferName ? ` · ${deliveryOfferName}` : ""}</p>}
             </div>
+            )}
 
             <div className="mt-7 flex justify-end gap-3">
               <button onClick={() => setDeliveryModalOpen(false)} className="rounded-lg border border-[#d1d5db] px-6 py-3 text-sm font-semibold text-[#6b7280] hover:bg-[#f9fafb]">Cancel</button>
-              <button onClick={saveDeliveryDetails} className="rounded-lg bg-[#ff8746] px-6 py-3 text-sm font-bold text-white hover:bg-[#f5851f]">Save Details</button>
+              <button onClick={completeSale} disabled={confirmPaymentDisabled} className="rounded-lg bg-[#ff8746] px-6 py-3 text-sm font-bold text-white hover:bg-[#f5851f] disabled:cursor-not-allowed disabled:opacity-50">{completing ? "Processing…" : editReceipt ? "Confirm Changes" : "Confirm Order"}</button>
             </div>
           </div>
         </div>
