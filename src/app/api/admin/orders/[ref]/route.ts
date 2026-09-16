@@ -125,6 +125,7 @@ export async function GET(
         customerName: o.customer_name || "Walk-in Customer",
         customerPhone: o.customer_phone,
         customerPhone2: o.customer_phone_2,
+        whatsappOrderRef: o.whatsapp_order_ref,
         fulfillmentType: o.fulfillment_type || "pickup",
         deliveryAddress: o.delivery_address,
         deliveryCity: o.delivery_city,

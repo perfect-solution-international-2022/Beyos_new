@@ -203,6 +203,9 @@ const productTextLimits: Record<string, [string, number]> = {
 
 function productTextError(b: any, requireName: boolean): string | null {
   for (const [key, [label, max]] of Object.entries(productTextLimits)) {
+    // Variable products use the default variation's SKU; the top-level value
+    // is hidden, stale legacy data and must not block saving.
+    if (key === "sku" && b.productType === "variable") continue;
     if (b[key] === undefined || Array.isArray(b[key])) continue;
     const value = String(b[key]).trim();
     if (value.length > max) return `${label} must be ${max} characters or fewer`;
@@ -212,7 +215,7 @@ function productTextError(b: any, requireName: boolean): string | null {
   if (requireName && !name) return "Product name is required";
   if (name && name.length < 2) return "Product name must contain at least 2 characters";
   const sku = String(b.sku ?? "").trim();
-  if (sku && !/^[A-Za-z0-9._-]+$/.test(sku)) return "SKU can only contain letters, numbers, dots, underscores, and hyphens";
+  if (b.productType !== "variable" && sku && !/^[A-Za-z0-9._-]+$/.test(sku)) return "SKU can only contain letters, numbers, dots, underscores, and hyphens";
   return null;
 }
 

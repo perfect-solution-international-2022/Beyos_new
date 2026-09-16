@@ -232,6 +232,9 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
               <InfoBlock label="Name" value={order.customerName} bg="#eff6ff" color="#1e40af" />
               {order.customerPhone && <InfoBlock label="Phone" value={order.customerPhone} bg="#f0fdf4" color="#15803d" />}
               {order.customerPhone2 && <InfoBlock label="2nd Phone" value={order.customerPhone2} bg="#f0fdf4" color="#15803d" />}
+              {order.type === "pos" && order.whatsappOrderRef && (
+                <InfoBlock label="WhatsApp Order No." value={order.whatsappOrderRef} bg="#ecfdf5" color="#047857" />
+              )}
               {order.customerEmail && <InfoBlock label="Email" value={order.customerEmail} bg="#fef3c7" color="#92400e" />}
               {(order.address || order.deliveryAddress) && (
                 <InfoBlock
@@ -402,7 +405,6 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
                 }
               />
               {order.paymentRef && <InfoRow label="Reference" value={order.paymentRef} />}
-              {order.type === "pos" && order.whatsappOrderRef && <InfoRow label="WhatsApp Order No." value={order.whatsappOrderRef} />}
               {order.type === "pos" && <InfoRow label="Paid Amount" value={formatPrice(order.paidAmount ?? order.total)} />}
               {order.type === "pos" && <InfoRow label={order.fulfillmentType === "delivery" ? "Courier COD Balance" : "Balance at Pickup"} value={formatPrice(order.balanceDue ?? 0)} />}
             </div>

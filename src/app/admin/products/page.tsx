@@ -67,6 +67,9 @@ function validateTextFields(form: Form): FieldErrors {
   };
 
   (Object.keys(TEXT_LIMITS) as TextFieldKey[]).forEach((key) => {
+    // A variable product's persisted SKU comes from its default variation.
+    // Its top-level SKU is hidden in the UI and may contain legacy data.
+    if (key === "sku" && form.productType === "variable") return;
     const value = form[key].trim();
     if (value.length > TEXT_LIMITS[key]) errors[key] = `${labels[key]} must be ${TEXT_LIMITS[key]} characters or fewer.`;
     else if (/[<>]/.test(value)) errors[key] = `${labels[key]} cannot contain < or > characters.`;
@@ -77,8 +80,18 @@ function validateTextFields(form: Form): FieldErrors {
   else if (name.length < 2) errors.name = "Product name must contain at least 2 characters.";
 
   const sku = form.sku.trim();
-  if (sku && !/^[A-Za-z0-9._-]+$/.test(sku)) errors.sku = "SKU can only contain letters, numbers, dots, underscores, and hyphens.";
+  if (form.productType !== "variable" && sku && !/^[A-Za-z0-9._-]+$/.test(sku)) errors.sku = "SKU can only contain letters, numbers, dots, underscores, and hyphens.";
   return errors;
+}
+
+function copiedSku(value: unknown, fallback: string, suffix: string, variantNumber?: number): string {
+  const sanitized = String(value || fallback)
+    .trim()
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-._]+|[-._]+$/g, "") || fallback;
+  const ending = `-${suffix}${variantNumber === undefined ? "" : `-${variantNumber}`}`;
+  return `${sanitized.slice(0, Math.max(1, TEXT_LIMITS.sku - ending.length))}${ending}`;
 }
 
 export default function AdminProductsPage() {
@@ -116,6 +129,16 @@ export default function AdminProductsPage() {
     const copySuffix = duplicate ? crypto.randomUUID().replace(/-/g, "").slice(0, 12) : "";
     const arr = (v: unknown) => (Array.isArray(v) ? v.join(", ") : "");
     const str = (v: unknown) => (v === null || v === undefined || v === "" ? "" : String(v));
+    const selectedAttrValues: Record<number, number[]> = {};
+    for (const variant of p.variants ?? []) {
+      for (const value of String(variant.attributeSummary || "").split(" / ").map((item) => item.trim()).filter(Boolean)) {
+        const attribute = attributes.find((item) => item.values.some((option) => option.value === value));
+        const option = attribute?.values.find((item) => item.value === value);
+        if (!attribute || !option) continue;
+        const selected = selectedAttrValues[attribute.id] ?? [];
+        if (!selected.includes(option.id)) selectedAttrValues[attribute.id] = [...selected, option.id];
+      }
+    }
     setEditing({
       ...blank, ...p,
       slug: p.slug || "",
@@ -133,15 +156,15 @@ export default function AdminProductsPage() {
         productionCost: str(v.productionCost), stockStatus: v.stockStatus || "in_stock", stock: str(v.stock),
         lowStockThreshold: str(v.lowStockThreshold || 10), weightKg: str(v.weightKg), lengthCm: str(v.lengthCm),
         widthCm: str(v.widthCm), heightCm: str(v.heightCm), image: v.image || "", isDefault: !!v.isDefault,
-        ...(duplicate ? { sku: `${String(v.sku || "VAR").slice(0, 35)}-${copySuffix}-${index + 1}`, stock: "0", stockStatus: "out_of_stock" } : {}),
+        ...(duplicate ? { sku: copiedSku(v.sku, "VAR", copySuffix, index + 1), stock: "0", stockStatus: "out_of_stock" } : {}),
       })),
       links: p.links ?? [],
-      selectedAttrValues: {},
+      selectedAttrValues,
       ...(duplicate ? {
         id: 0, duplicateSourceId: p.id, copyStock: false,
         name: `${String(p.name).slice(0, 193)} (Copy)`,
         slug: `${String(p.slug).slice(0, 115)}-copy-${copySuffix}`,
-        sku: `${String(p.sku || "BEY").slice(0, 40)}-${copySuffix}`,
+        sku: copiedSku(p.sku, "BEY", copySuffix),
         isPublish: false, stock: "0", stockStatus: "out_of_stock",
         duplicateStock: str(p.stock), duplicateVariantStocks: (p.variants ?? []).map((v: any) => str(v.stock)),
       } : {}),
@@ -294,7 +317,10 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
 
   const generateVariations = () => {
     const chosen = Object.entries(form.selectedAttrValues).filter(([, ids]) => ids.length);
-    if (chosen.length === 0) { setForm((f) => ({ ...f, variants: [] })); return; }
+    if (chosen.length === 0) {
+      setError("Please select attributes first in the Attributes tab.");
+      return;
+    }
     const groups = chosen.map(([attrId, ids]) => {
       const attr = attributes.find((a) => a.id === Number(attrId));
       return ids.map((vid) => attr?.values.find((v) => v.id === vid)?.value ?? "").filter(Boolean);
@@ -302,19 +328,22 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
     let combos: string[][] = [[]];
     for (const g of groups) combos = combos.flatMap((c) => g.map((v) => [...c, v]));
     setForm((f) => {
-      const existing = new Map(f.variants.map((v) => [v.attributeSummary, v]));
-      const variants: Variant[] = combos.map((c, i) => {
+      const existingSummaries = new Set(f.variants.map((variant) => variant.attributeSummary));
+      const additions: Variant[] = [];
+      for (const c of combos) {
         const summary = c.join(" / ");
-        return existing.get(summary) ?? {
-          sku: `${f.sku || "VAR"}-${i + 1}`, attributeSummary: summary,
+        if (existingSummaries.has(summary)) continue;
+        additions.push({
+          sku: `${f.sku || "VAR"}-${f.variants.length + additions.length + 1}`, attributeSummary: summary,
           price: f.regularPrice, salePrice: f.salePrice, resellerPrice: f.resellerPrice,
           wholesalePrice: f.wholesalePrice, productionCost: f.productionCost,
           stockStatus: "in_stock", stock: "0", lowStockThreshold: f.lowStockThreshold,
           weightKg: f.weightKg, lengthCm: f.lengthCm, widthCm: f.widthCm, heightCm: f.heightCm,
-          image: "", isDefault: i === 0,
-        };
-      });
-      return { ...f, variants };
+          image: "", isDefault: f.variants.length === 0 && additions.length === 0,
+        });
+        existingSummaries.add(summary);
+      }
+      return { ...f, variants: [...f.variants, ...additions] };
     });
   };
 

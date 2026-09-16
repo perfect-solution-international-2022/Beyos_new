@@ -175,7 +175,7 @@ function AdminPosRegister() {
   const [customerWholesale, setCustomerWholesale] = useState(false);
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", district: "", city: "", postalCode: "", isWholesaleCustomer: false });
+  const [newCustomer, setNewCustomer] = useState({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "delivery">("pickup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
@@ -323,7 +323,7 @@ function AdminPosRegister() {
       const data = await response.json();
       if (!response.ok) { toast(data.error || "Could not add customer"); return; }
       await selectCustomer(data.customer);
-      setNewCustomer({ name: "", phone: "", address: "", district: "", city: "", postalCode: "", isWholesaleCustomer: false });
+      setNewCustomer({ name: "", phone: "", address: "", district: "", city: "", postalCode: "" });
       setNewCustomerDistrictId(0);
       setNewCustomerCities([]);
       setAddCustomerOpen(false);
@@ -806,15 +806,6 @@ function AdminPosRegister() {
                   <input value={newCustomer.postalCode} onChange={(event) => setNewCustomer((customer) => ({ ...customer, postalCode: event.target.value.replace(/[^0-9]/g, "").slice(0, 5) }))} className="delivery-input" placeholder="Enter ZIP Code" inputMode="numeric" />
                 </DeliveryField>
               </div>
-              <label className="flex items-center gap-2 text-sm font-medium text-[#252525]">
-                <input
-                  type="checkbox"
-                  checked={newCustomer.isWholesaleCustomer}
-                  onChange={(event) => setNewCustomer((customer) => ({ ...customer, isWholesaleCustomer: event.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                Wholesale customer
-              </label>
             </div>
             <div className="mt-7 flex justify-end gap-5">
               <button type="button" onClick={() => setAddCustomerOpen(false)} className="px-2 py-3 text-sm font-semibold text-[#ff7426]">Cancel</button>
