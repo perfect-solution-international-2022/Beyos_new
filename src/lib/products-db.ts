@@ -129,6 +129,32 @@ export async function getProductBySlug(slug: string, resellerOnly = false): Prom
   return { ...mapRow(rows[0]), variants: variants.map(mapVariant) };
 }
 
+/**
+ * Resolve a product using the same catalogue rules as the sales channel that
+ * requested a delivery quote. POS deliberately includes POS-only products,
+ * while public channels retain the storefront publication checks.
+ */
+export async function getProductBySlugForDelivery(
+  slug: string,
+  channel: "website" | "pos" | "reseller"
+): Promise<Product | undefined> {
+  const where = channel === "pos"
+    ? "deleted_at IS NULL"
+    : channel === "reseller"
+      ? `${STOREFRONT_WHERE} AND is_reseller_product = 1`
+      : STOREFRONT_WHERE;
+  const rows = await query<ProductRow>(
+    `SELECT ${SELECT_FIELDS} FROM products WHERE slug = ? AND ${where} LIMIT 1`,
+    [slug]
+  );
+  if (!rows[0]) return undefined;
+  const variants = await query<VariantRow>(
+    `SELECT ${VARIANT_FIELDS} FROM product_variants WHERE product_id = ? ORDER BY is_default DESC, id ASC`,
+    [rows[0].id]
+  );
+  return { ...mapRow(rows[0]), variants: variants.map(mapVariant) };
+}
+
 export async function getProductsByCategory(category: string): Promise<Product[]> {
   const rows = await query<ProductRow>(
     `SELECT ${SELECT_FIELDS} FROM products WHERE category = ? AND ${STOREFRONT_WHERE} ORDER BY created_at DESC, id DESC`,

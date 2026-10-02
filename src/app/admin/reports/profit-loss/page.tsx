@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { formatPrice } from "@/lib/utils";
+import ProductProfitModal from "@/components/ProductProfitModal";
 
 interface SourceTotals { revenue: number; cost: number; profit: number; }
 interface TrendPoint { date: string; revenue: number; cost: number; profit: number; }
@@ -42,6 +43,7 @@ export default function ProfitLossReportPage() {
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedProductSlug, setSelectedProductSlug] = useState<string | null>(null);
 
   const load = (s: string, e: string) => {
     setLoading(true);
@@ -271,8 +273,11 @@ export default function ProfitLossReportPage() {
 
       {/* Product breakdown */}
       <div className="mt-6 overflow-x-auto rounded-2xl border border-navy-800/5 bg-white shadow-sm">
-        <div className="border-b border-navy-800/10 px-6 py-4">
-          <h2 className="font-bold text-navy-800">Profit by Product</h2>
+        <div className="border-b border-navy-800/10 px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-bold text-navy-800">Profit by Product</h2>
+            <p className="text-xs text-navy-800/50">Click &quot;View Details&quot; on any product to see full breakdown (Regular vs Sale vs Wholesale, sizes &amp; colors, and order history).</p>
+          </div>
         </div>
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
@@ -283,23 +288,41 @@ export default function ProfitLossReportPage() {
               <th className="px-6 py-3">Cost</th>
               <th className="px-6 py-3">Profit</th>
               <th className="px-6 py-3">Margin</th>
+              <th className="px-6 py-3 text-right">Details</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
             ) : !data || data.productTable.length === 0 ? (
-              <tr><td colSpan={6} className="px-6 py-10 text-center text-navy-800/50">No sales in this range.</td></tr>
+              <tr><td colSpan={7} className="px-6 py-10 text-center text-navy-800/50">No sales in this range.</td></tr>
             ) : (
               <>
                 {data.productTable.map((p) => (
-                  <tr key={p.slug} className="border-b border-navy-800/5 last:border-0">
+                  <tr
+                    key={p.slug}
+                    onClick={() => setSelectedProductSlug(p.slug)}
+                    className="group border-b border-navy-800/5 last:border-0 hover:bg-navy-50/60 cursor-pointer transition"
+                  >
                     <td className="px-6 py-3 font-medium text-navy-800">{p.name}</td>
                     <td className="px-6 py-3 text-navy-800/70">{p.units}</td>
                     <td className="px-6 py-3 text-navy-800/70">{formatPrice(p.revenue)}</td>
                     <td className="px-6 py-3 text-navy-800/70">{formatPrice(p.cost)}</td>
                     <td className={`px-6 py-3 font-semibold ${p.profit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{formatPrice(p.profit)}</td>
                     <td className="px-6 py-3 text-navy-800/70">{p.marginPct.toFixed(1)}%</td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProductSlug(p.slug);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand shadow-xs transition"
+                      >
+                        <span>View Details</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                      </button>
+                    </td>
                   </tr>
                 ))}
                 <tr className="bg-navy-50/50 font-bold text-navy-800">
@@ -309,12 +332,22 @@ export default function ProfitLossReportPage() {
                   <td className="px-6 py-3">{formatPrice(data.summary.merchandiseCost)}</td>
                   <td className={data.productTable.reduce((s, p) => s + p.profit, 0) >= 0 ? "px-6 py-3 text-emerald-600" : "px-6 py-3 text-red-600"}>{formatPrice(data.productTable.reduce((s, p) => s + p.profit, 0))}</td>
                   <td className="px-6 py-3">{data.summary.totalRevenue > 0 ? ((data.productTable.reduce((s, p) => s + p.profit, 0) / data.summary.totalRevenue) * 100).toFixed(1) : "0.0"}%</td>
+                  <td className="px-6 py-3"></td>
                 </tr>
               </>
             )}
           </tbody>
         </table>
       </div>
+
+      {selectedProductSlug && (
+        <ProductProfitModal
+          slug={selectedProductSlug}
+          start={start}
+          end={end}
+          onClose={() => setSelectedProductSlug(null)}
+        />
+      )}
     </div>
   );
 }

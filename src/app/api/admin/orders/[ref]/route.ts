@@ -74,7 +74,7 @@ export async function GET(
         shipping: Number(o.delivery_fee),
         total: Number(o.amount),
         cost: Number(o.cost),
-        profit: Number(o.profit),
+        profit: o.status === "delivered" ? Number(o.profit) : 0,
         customerName: o.customer_name,
         customerEmail: o.customer_email,
         customerPhone: o.customer_phone,

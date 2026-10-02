@@ -1,7 +1,7 @@
 import { deliveryOfferQuote, type DeliveryChannel } from "@/lib/delivery-offer";
 import { getDeliveryOffer } from "@/lib/delivery-offer-db";
 import { NextResponse } from "next/server";
-import { getProductBySlug } from "@/lib/products-db";
+import { getProductBySlugForDelivery } from "@/lib/products-db";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 
 interface EstimateLine {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
   let totalWeightKg = 0;
   for (const line of items) {
-    const product = await getProductBySlug(line.slug);
+    const product = await getProductBySlugForDelivery(line.slug, channel);
     if (!product) return NextResponse.json({ error: "Unknown product" }, { status: 400 });
     const variant = line.variantId ? product.variants?.find((v) => v.id === Number(line.variantId)) : undefined;
     if (line.variantId && !variant) return NextResponse.json({ error: "Unknown product variation" }, { status: 400 });

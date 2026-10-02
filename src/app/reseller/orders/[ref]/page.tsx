@@ -19,7 +19,7 @@ interface OrderDetail {
   courierStatus: string | null; courierUpdatedAt: string | null; createdAt: string; items: OrderItem[];
 }
 
-const STATUS_STEPS = ["pending", "processing", "confirmed", "shipped", "delivered"];
+const STATUS_STEPS = ["pending", "shipped", "delivered"];
 
 export default function ResellerOrderDetailPage() {
   const { ref } = useParams<{ ref: string }>();
@@ -69,7 +69,7 @@ export default function ResellerOrderDetailPage() {
           <div className="mt-6 grid grid-cols-5 gap-1">
             {STATUS_STEPS.map((step, index) => {
               const active = index <= currentStep || normalizedStatus === "completed";
-              return <div key={step} className="text-center"><div className={`mx-auto h-2 w-full rounded-full ${active ? "bg-brand" : "bg-navy-100"}`} /><p className={`mt-2 text-[10px] font-bold capitalize sm:text-xs ${active ? "text-brand" : "text-navy-800/35"}`}>{step}</p></div>;
+              return <div key={step} className="text-center"><div className={`mx-auto h-2 w-full rounded-full ${active ? "bg-brand" : "bg-navy-100"}`} /><p className={`mt-2 text-[10px] font-bold capitalize sm:text-xs ${active ? "text-brand" : "text-navy-800/35"}`}>{step === "shipped" ? "Out for delivery" : step}</p></div>;
             })}
           </div>
         )}

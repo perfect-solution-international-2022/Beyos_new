@@ -36,8 +36,7 @@ export interface CourierSyncResult {
 
 function posStatus(status: string): string {
   if (["delivered", "returned", "cancelled"].includes(status)) return status;
-  if (status === "shipped") return "out_for_delivery";
-  return "accepted";
+  return "out_for_delivery";
 }
 
 async function notifyOrder(order: CourierOrder, status: string, reseller: boolean) {
@@ -62,15 +61,16 @@ async function syncOrders(table: "orders" | "reseller_orders", reseller: boolean
     `SELECT order_ref, customer_phone, customer_email, ${reseller ? "amount" : "total"} AS total,
             koombiyo_waybill_id, koombiyo_status, status${reseller ? ", reseller_id, profit" : ""}
      FROM ${table}
-     WHERE deleted_at IS NULL AND koombiyo_waybill_id IS NOT NULL
-       AND status NOT IN ('delivered', 'returned', 'cancelled')
+     WHERE deleted_at IS NULL AND koombiyo_waybill_id IS NOT NULL AND koombiyo_status IS NOT NULL
+       AND status IN ('confirmed', 'processing', 'shipped')
      ORDER BY COALESCE(koombiyo_updated_at, created_at) ASC LIMIT ${BATCH_SIZE}`
   );
 
   for (const order of rows) {
     try {
       const tracking = await trackOrder(order.koombiyo_waybill_id);
-      const status = mapKoombiyoStatus(tracking.status);
+      const mapped = mapKoombiyoStatus(tracking.status);
+      const status = ["delivered", "returned", "cancelled"].includes(mapped) ? mapped : "shipped";
       const changed = order.status !== status || order.koombiyo_status !== tracking.status;
       await query(
         `UPDATE ${table} SET koombiyo_status = ?, koombiyo_response = ?, koombiyo_updated_at = NOW(),
@@ -105,8 +105,8 @@ async function syncPosDeliveries(result: CourierSyncResult) {
   const rows = await query<PosDelivery>(
     `SELECT receipt_number, customer_phone, koombiyo_waybill_id, koombiyo_status, delivery_status
      FROM pos_sales
-     WHERE deleted_at IS NULL AND fulfillment_type = 'delivery' AND koombiyo_waybill_id IS NOT NULL
-       AND COALESCE(delivery_status, '') NOT IN ('delivered', 'returned', 'cancelled')
+     WHERE deleted_at IS NULL AND fulfillment_type = 'delivery' AND koombiyo_waybill_id IS NOT NULL AND koombiyo_status IS NOT NULL
+       AND delivery_status IN ('accepted', 'out_for_delivery')
      ORDER BY COALESCE(koombiyo_updated_at, created_at) ASC LIMIT ${BATCH_SIZE}`
   );
   for (const sale of rows) {

@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ orders: orders.map((o) => ({
       orderRef: o.order_ref, customerName: o.customer_name, customerPhone: o.customer_phone,
       amount: Number(o.amount), subtotal: Number(o.subtotal), deliveryFee: Number(o.delivery_fee),
-      profit: Number(o.profit), status: o.status, rejectReason: o.reject_reason,
+      profit: o.status === "delivered" ? Number(o.profit) : 0, status: o.status, rejectReason: o.reject_reason,
       paymentStatus: o.payment_status, quantity: itemsByOrder.get(o.id) ?? 0,
       koombiyoWaybillId: o.koombiyo_waybill_id, koombiyoStatus: o.koombiyo_status,
       createdAt: o.created_at,

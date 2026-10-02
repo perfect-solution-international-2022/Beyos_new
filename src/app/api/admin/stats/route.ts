@@ -12,8 +12,8 @@ export async function GET() {
     const [[revenue], [counts], weeklyRows] = await Promise.all([
       query<{ count: number; daily: string | null; monthly: string | null }>(
         `SELECT COUNT(*) AS count,
-                COALESCE(SUM(CASE WHEN status IN ('completed','delivered') AND DATE(created_at) = CURDATE() THEN amount ELSE 0 END), 0) AS daily,
-                COALESCE(SUM(CASE WHEN status IN ('completed','delivered') AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END), 0) AS monthly
+                COALESCE(SUM(CASE WHEN status = 'delivered' AND DATE(created_at) = CURDATE() THEN amount ELSE 0 END), 0) AS daily,
+                COALESCE(SUM(CASE WHEN status = 'delivered' AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) THEN amount ELSE 0 END), 0) AS monthly
          FROM (
            SELECT created_at, status, total AS amount FROM orders WHERE deleted_at IS NULL
            UNION ALL

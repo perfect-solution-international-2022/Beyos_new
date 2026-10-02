@@ -43,7 +43,7 @@ export async function GET(
 
   const [orderAgg] = await query<{ total: number; pending: number; sales: string | null }>(
     `SELECT COUNT(*) AS total, SUM(status = 'pending') AS pending,
-            COALESCE(SUM(CASE WHEN status IN ('completed','delivered') THEN amount ELSE 0 END),0) AS sales
+            COALESCE(SUM(CASE WHEN status = 'delivered' THEN amount ELSE 0 END),0) AS sales
      FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL`,
     [id]
   );
@@ -122,7 +122,7 @@ export async function GET(
       orderRef: o.order_ref,
       customerName: o.customer_name,
       amount: Number(o.amount),
-      profit: Number(o.profit),
+      profit: o.status === "delivered" ? Number(o.profit) : 0,
       status: o.status,
       paymentStatus: o.payment_status,
       createdAt: o.created_at,

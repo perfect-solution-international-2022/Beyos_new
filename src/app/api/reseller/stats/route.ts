@@ -15,7 +15,7 @@ export async function GET() {
       `SELECT
          COUNT(*) AS total,
          SUM(status = 'pending') AS pending,
-         COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END),0) AS sales
+         COALESCE(SUM(CASE WHEN status = 'delivered' THEN amount ELSE 0 END),0) AS sales
        FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL`,
       [reseller.id]
     );

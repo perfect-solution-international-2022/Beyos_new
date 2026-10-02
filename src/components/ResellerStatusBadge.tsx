@@ -7,5 +7,5 @@ export default function ResellerStatusBadge({ status }: { status: string }) {
     cls = "bg-red-100 text-red-700";
   else if (["processing", "confirmed", "shipped", "out_for_delivery"].includes(s))
     cls = "bg-blue-100 text-blue-700";
-  return <span className={`badge capitalize ${cls}`}>{status.replace(/_/g, " ")}</span>;
+  return <span className={`badge capitalize ${cls}`}>{["confirmed", "shipped", "accepted"].includes(s) ? "Out for delivery" : status.replace(/_/g, " ")}</span>;
 }

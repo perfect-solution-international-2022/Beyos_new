@@ -86,6 +86,7 @@ function statusColor(status: string): { bg: string; color: string } {
 }
 
 function formatStatus(status: string): string {
+  if (["shipped", "confirmed", "accepted"].includes(status)) return "Out for delivery";
   return status
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
@@ -120,13 +121,14 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
     return <div className="mt-10 text-center text-red-600">{error || "Order not found"}</div>;
   }
 
-  const status = statusColor(order.status);
+  const displayStatus = order.type === "pos" && order.fulfillmentType === "delivery" ? (order.deliveryStatus || "pending") : order.status;
+  const status = statusColor(displayStatus);
 
   const isPendingReseller = order.type === "reseller" && order.status === "pending";
   const isPendingCustomer = order.type === "customer" && order.status === "pending";
   const isPendingPosDelivery = order.type === "pos" && order.fulfillmentType === "delivery" && order.deliveryStatus === "pending";
 
-  const decideOrder = async (type: "reseller" | "customer", status: "confirmed" | "rejected" | "cancelled") => {
+  const decideOrder = async (type: "reseller" | "customer", status: "shipped" | "rejected" | "cancelled") => {
     setDeciding(true);
     try {
       const response = await fetch("/api/admin/orders", {
@@ -136,7 +138,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not update order");
-      toast(status === "confirmed" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
+      toast(status === "shipped" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
       load();
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : "Could not update order", "error");
@@ -145,7 +147,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
     }
   };
 
-  const decidePos = async (deliveryStatus: "accepted" | "cancelled") => {
+  const decidePos = async (deliveryStatus: "out_for_delivery" | "cancelled") => {
     setDeciding(true);
     try {
       const response = await fetch(`/api/pos/sales/${encodeURIComponent(order.orderRef)}`, {
@@ -155,7 +157,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not update delivery order");
-      toast(deliveryStatus === "accepted" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
+      toast(deliveryStatus === "out_for_delivery" ? `Accepted ${order.orderRef}` : `Rejected ${order.orderRef}`);
       load();
     } catch (cause) {
       toast(cause instanceof Error ? cause.message : "Could not update delivery order", "error");
@@ -188,7 +190,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
         <OrderMetric label="Order total" value={formatPrice(order.total)} />
         <OrderMetric label="Payment" value={`${methodLabel[order.paymentMethod] ?? order.paymentMethod} · ${formatStatus(order.paymentStatus)}`} />
         <OrderMetric label="Current status">
-          <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: status.bg, color: status.color }}>{formatStatus(order.status)}</span>
+          <span className="inline-flex rounded-full px-2.5 py-1 text-xs font-bold" style={{ backgroundColor: status.bg, color: status.color }}>{formatStatus(displayStatus)}</span>
         </OrderMetric>
       </div>
 
@@ -201,7 +203,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
           <div className="flex shrink-0 gap-2">
             <button
               disabled={deciding}
-              onClick={() => isPendingPosDelivery ? decidePos("accepted") : decideOrder(isPendingReseller ? "reseller" : "customer", "confirmed")}
+              onClick={() => isPendingPosDelivery ? decidePos("out_for_delivery") : decideOrder(isPendingReseller ? "reseller" : "customer", "shipped")}
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
             >
               Accept order
@@ -356,7 +358,7 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
               className="mt-4 rounded-lg py-3 text-center text-sm font-bold"
               style={{ backgroundColor: status.bg, color: status.color }}
             >
-              {formatStatus(order.status)}
+              {formatStatus(displayStatus)}
             </div>
           </div>
 
@@ -564,8 +566,8 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
   };
 
   const isAccepted = !order.koombiyoStatus && (isPos
-    ? order.deliveryStatus === "accepted"
-    : order.status === "confirmed");
+    ? ["accepted", "out_for_delivery"].includes(order.deliveryStatus || "")
+    : ["confirmed", "shipped"].includes(order.status));
 
   return (
     <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">

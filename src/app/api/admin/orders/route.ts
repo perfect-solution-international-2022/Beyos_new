@@ -145,10 +145,10 @@ export async function GET(request: Request) {
       // was paid. POS pickup sales are the only orders completed immediately.
       .filter((o) => {
         const isPending = o.type === "pos"
-          ? "deliveryStatus" in o && ["pending", "accepted"].includes(o.deliveryStatus || "")
+          ? "deliveryStatus" in o && o.deliveryStatus === "pending"
           : o.type === "reseller"
-            ? ["pending", "confirmed"].includes(o.status) && !o.koombiyoStatus
-            : o.type === "customer" && ["pending", "confirmed"].includes(o.status) && !o.koombiyoStatus;
+            ? o.status === "pending"
+            : o.type === "customer" && o.status === "pending";
         const isRejected = o.type === "pos"
           ? "deliveryStatus" in o && o.deliveryStatus === "cancelled"
           : o.status === "cancelled" || o.status === "rejected";
@@ -157,8 +157,8 @@ export async function GET(request: Request) {
             ("deliveryStatus" in o && o.deliveryStatus === "delivered")
           : o.status === "delivered" || o.status === "completed";
         const isPendingDelivery = o.type === "pos"
-          ? "deliveryStatus" in o && ["out_for_delivery"].includes(o.deliveryStatus || "")
-          : Boolean(o.koombiyoStatus) && !["delivered", "completed", "returned", "cancelled", "rejected"].includes(o.status);
+          ? "deliveryStatus" in o && ["accepted", "out_for_delivery"].includes(o.deliveryStatus || "")
+          : ["confirmed", "processing", "shipped"].includes(o.status);
         if (view === "pending") return isPending;
         if (view === "delivering") return isPendingDelivery;
         if (view === "completed") return isCompleted;
@@ -185,7 +185,11 @@ export async function PATCH(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { type, orderRef, status, paymentStatus } = body;
+  const { type, orderRef, paymentStatus } = body;
+  const status = body.status === "confirmed" ? "shipped" : body.status;
+  if (status === "delivered" || status === "completed") {
+    return NextResponse.json({ error: "Delivery completion is confirmed by courier tracking" }, { status: 409 });
+  }
   if (!orderRef || (!status && !paymentStatus)) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }

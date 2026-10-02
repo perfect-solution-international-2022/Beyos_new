@@ -47,7 +47,7 @@ export async function GET(
         },
         notes: order.notes,
         subtotal: Number(order.subtotal), deliveryFee: Number(order.delivery_fee), amount: Number(order.amount),
-        cost: Number(order.cost), profit: Number(order.profit), status: order.status,
+        cost: Number(order.cost), profit: order.status === "delivered" ? Number(order.profit) : 0, status: order.status,
         rejectReason: order.reject_reason, paymentStatus: order.payment_status,
         waybillNumber: order.koombiyo_waybill_id, courierStatus: order.koombiyo_status,
         courierUpdatedAt: order.koombiyo_updated_at, createdAt: order.created_at,
@@ -55,7 +55,7 @@ export async function GET(
           slug: item.product_slug, name: item.name, sku: item.sku, variant: item.variant_summary,
           image: item.image, quantity: Number(item.quantity), resellerPrice: Number(item.reseller_price),
           sellingPrice: Number(item.selling_price), lineTotal: Number(item.line_total),
-          profit: (Number(item.selling_price) - Number(item.reseller_price)) * Number(item.quantity),
+          profit: order.status === "delivered" ? (Number(item.selling_price) - Number(item.reseller_price)) * Number(item.quantity) : 0,
         })),
       },
     });

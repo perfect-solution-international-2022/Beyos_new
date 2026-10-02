@@ -18,6 +18,7 @@ interface PosSaleRow {
   delivery_city_id: number | null;
   koombiyo_waybill_id: string | null;
   delivery_status: string | null;
+  koombiyo_status: string | null;
 }
 
 export async function POST(request: Request) {
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
   try {
     const rows = await query<PosSaleRow>(
       `SELECT receipt_number, customer_name, customer_phone, customer_phone_2, total, paid_amount, fulfillment_type,
-              delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id, delivery_status
+              delivery_address, delivery_district_id, delivery_city, delivery_city_id, koombiyo_waybill_id, delivery_status, koombiyo_status
        FROM pos_sales WHERE receipt_number = ? AND deleted_at IS NULL LIMIT 1`,
       [body.receiptNumber]
     );
@@ -46,18 +47,24 @@ export async function POST(request: Request) {
     if (sale.fulfillment_type !== "delivery") {
       return NextResponse.json({ error: "This sale is not a delivery order" }, { status: 400 });
     }
-    if (sale.delivery_status !== "accepted") {
+    if (!["accepted", "out_for_delivery"].includes(sale.delivery_status || "")) {
       return NextResponse.json({ error: "Accept this delivery order before requesting a waybill or submitting it to the courier" }, { status: 409 });
     }
 
     if (body.action === "request-waybill") {
       const waybillId = sale.koombiyo_waybill_id || (await requestWaybill());
-      if (!sale.koombiyo_waybill_id) {
+      if (sale.koombiyo_status) {
+      return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
+    }
+    if (!sale.koombiyo_waybill_id) {
         await query(`UPDATE pos_sales SET koombiyo_waybill_id = ? WHERE receipt_number = ? AND deleted_at IS NULL`, [waybillId, sale.receipt_number]);
       }
       return NextResponse.json({ ok: true, waybillId });
     }
 
+    if (sale.koombiyo_status) {
+      return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
+    }
     if (!sale.koombiyo_waybill_id) {
       return NextResponse.json({ error: "Request a waybill ID before placing the order" }, { status: 400 });
     }

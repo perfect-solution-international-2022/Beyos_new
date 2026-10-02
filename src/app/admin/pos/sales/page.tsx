@@ -13,7 +13,7 @@ function canEditSale(s: { fulfillmentType?: string; deliveryStatus?: string | nu
 
 const DELIVERY_STATUS_LABELS: Record<string, string> = {
   pending: "Pending",
-  accepted: "Accepted",
+  accepted: "Out for delivery",
   out_for_delivery: "Out for delivery",
   delivered: "Delivered",
   returned: "Returned",

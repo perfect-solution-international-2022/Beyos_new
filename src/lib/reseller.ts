@@ -21,10 +21,10 @@ export function makeRef(prefix: string): string {
   return `${prefix}-${stamp}-${rand}`;
 }
 
-/** Wallet balance = profit from completed orders − non-rejected withdrawals. */
+/** Wallet balance = profit from delivered orders − non-rejected withdrawals. */
 export async function walletBalance(resellerId: number): Promise<number> {
   const earned = await query<{ total: string | null }>(
-    "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL AND status IN ('completed','delivered')",
+    "SELECT COALESCE(SUM(profit),0) AS total FROM reseller_orders WHERE reseller_id = ? AND deleted_at IS NULL AND status = 'delivered'",
     [resellerId]
   );
   const withdrawn = await query<{ total: string | null }>(

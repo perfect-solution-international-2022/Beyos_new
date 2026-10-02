@@ -87,6 +87,10 @@ export async function PATCH(
 
   let b: { deliveryStatus?: string; paymentStatus?: "unpaid" | "advance" | "paid"; paidAmount?: number };
   try { b = await request.json(); } catch { return NextResponse.json({ error: "Invalid request" }, { status: 400 }); }
+  if (b.deliveryStatus === "accepted") b.deliveryStatus = "out_for_delivery";
+  if (b.deliveryStatus === "delivered") {
+    return NextResponse.json({ error: "Delivery completion is confirmed by courier tracking" }, { status: 409 });
+  }
   if (b.paymentStatus) {
     try {
       const rows = await query<{ id: number; total: string }>(

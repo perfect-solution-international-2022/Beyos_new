@@ -28,8 +28,8 @@ interface Leak {
 }
 
 const CHANNEL_SQL = {
-  pos: "s.deleted_at IS NULL AND s.status = 'completed' AND COALESCE(s.delivery_status, '') <> 'cancelled'",
-  website: "o.deleted_at IS NULL AND o.status IN ('completed','delivered')",
+  pos: "s.deleted_at IS NULL AND s.status = 'completed' AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status = 'delivered')",
+  website: "o.deleted_at IS NULL AND o.status = 'delivered'",
 } as const;
 
 export async function GET(request: Request) {
@@ -152,7 +152,7 @@ export async function GET(request: Request) {
        LEFT JOIN products p ON p.slug = roi.product_slug
        LEFT JOIN product_variants v ON v.id = roi.variant_id
        LEFT JOIN delivery_offer_snapshots dos ON dos.channel = 'reseller' AND dos.order_reference = ro.order_ref
-       WHERE ro.deleted_at IS NULL AND ro.status IN ('completed','delivered') AND DATE(ro.created_at) BETWEEN ? AND ?
+       WHERE ro.deleted_at IS NULL AND ro.status = 'delivered' AND DATE(ro.created_at) BETWEEN ? AND ?
        GROUP BY ro.id`,
       range
     );

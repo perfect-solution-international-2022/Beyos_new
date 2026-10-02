@@ -33,16 +33,22 @@ test('validation rejects invalid tiers, dates and channels', () => {
 });
 function loadEstimate() {
   const api = {};
+  const lookedUpChannels = [];
   const mocks = {
     '@/lib/delivery-offer': exported,
     '@/lib/delivery-offer-db': {getDeliveryOffer: async()=>offer},
     'next/server': {NextResponse:{json:(data,options={})=>({data,status:options.status??200})}},
-    '@/lib/products-db': {getProductBySlug:async slug => slug==='missing'?null:{weightKg:0.25,variants:[{id:1,weightKg:2}]}},
+    '@/lib/products-db': {getProductBySlugForDelivery:async (slug,channel) => {
+      lookedUpChannels.push(channel);
+      return slug==='missing'?null:{weightKg:0.25,variants:[{id:1,weightKg:2}]};
+    }},
     '@/lib/shipping': {computeDeliveryFee:(weight)=>weight>1?650:500,getDeliveryPricing:async()=>({basePrice:500,extraKgPrice:150})},
   };
   const code=ts.transpileModule(fs.readFileSync('src/app/api/shipping/estimate/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   new Function('exports','require',code)(api,key=>{if(!(key in mocks))throw new Error(key);return mocks[key];});
-  return payload=>api.POST({json:async()=>payload});
+  const post = payload=>api.POST({json:async()=>payload});
+  post.lookedUpChannels = lookedUpChannels;
+  return post;
 }
 test('estimate endpoint agrees across channels and ignores product prices',async()=>{
   const post=loadEstimate();
@@ -55,6 +61,11 @@ test('website-only free-shipping threshold does not leak to POS or reseller',asy
   const post=loadEstimate();
   assert.equal((await post({items:items(1),discountedSubtotal:10000})).data.shipping,0);
   for(const channel of ['pos','reseller']) assert.equal((await post({channel,items:items(1),discountedSubtotal:10000,freeShipping:true})).data.shipping,350);
+});
+test('estimate resolves products using the requesting sales channel',async()=>{
+  const post=loadEstimate();
+  for(const channel of ['website','pos','reseller']) await post({channel,items:items(1)});
+  assert.deepEqual(post.lookedUpChannels,['website','pos','reseller']);
 });
 test('estimate rejects invalid quantities, products, variants and payloads',async()=>{
   const post=loadEstimate();

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.slug = oi.product_slug
-       WHERE o.deleted_at IS NULL AND o.status IN ('completed','delivered') AND DATE(o.created_at) BETWEEN ? AND ?`,
+       WHERE o.deleted_at IS NULL AND o.status = 'delivered' AND DATE(o.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
@@ -45,17 +45,17 @@ export async function GET(request: Request) {
        FROM reseller_order_items roi
        JOIN reseller_orders ro ON ro.id = roi.order_id
        LEFT JOIN products p ON p.slug = roi.product_slug
-       WHERE ro.deleted_at IS NULL AND ro.status IN ('completed','delivered') AND DATE(ro.created_at) BETWEEN ? AND ?`,
+       WHERE ro.deleted_at IS NULL AND ro.status = 'delivered' AND DATE(ro.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
     // ---- Order counts + status breakdown in range ----
     const buyerOrders = await query<{ id: number; total: string; status: string; created_at: string }>(
-      `SELECT id, total, status, DATE(created_at) AS created_at FROM orders WHERE deleted_at IS NULL AND status IN ('completed','delivered') AND DATE(created_at) BETWEEN ? AND ?`,
+      `SELECT id, total, status, DATE(created_at) AS created_at FROM orders WHERE deleted_at IS NULL AND status = 'delivered' AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const resellerOrders = await query<{ id: number; amount: string; status: string; created_at: string }>(
-      `SELECT id, amount, status, DATE(created_at) AS created_at FROM reseller_orders WHERE deleted_at IS NULL AND status IN ('completed','delivered') AND DATE(created_at) BETWEEN ? AND ?`,
+      `SELECT id, amount, status, DATE(created_at) AS created_at FROM reseller_orders WHERE deleted_at IS NULL AND status = 'delivered' AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );
 
@@ -71,12 +71,12 @@ export async function GET(request: Request) {
        JOIN pos_sales s ON s.id = psi.sale_id
        LEFT JOIN products p ON p.slug = psi.product_slug
        WHERE s.deleted_at IS NULL AND s.status = 'completed'
-         AND COALESCE(s.delivery_status, '') <> 'cancelled' AND DATE(s.created_at) BETWEEN ? AND ?`,
+         AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status = 'delivered') AND DATE(s.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const posSales = await query<{ id: number; total: string; status: string; created_at: string }>(
       `SELECT id, total, status, DATE(created_at) AS created_at FROM pos_sales
-       WHERE deleted_at IS NULL AND status = 'completed' AND COALESCE(delivery_status, '') <> 'cancelled'
+       WHERE deleted_at IS NULL AND status = 'completed' AND (COALESCE(fulfillment_type, 'pickup') <> 'delivery' OR delivery_status = 'delivered')
          AND DATE(created_at) BETWEEN ? AND ?`,
       [start, end]
     );

@@ -256,6 +256,7 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   data: Form; categories: { name: string; slug: string }[]; attributes: AttrData[]; allProducts: Product[];
   onClose: () => void; onSaved: (edit: boolean) => void; embedded?: boolean;
 }) {
+  const { toast } = useToast();
   const [form, setForm] = useState<Form>(data);
   const [tab, setTab] = useState("general");
   const [saving, setSaving] = useState(false);
@@ -263,6 +264,16 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [paymentError, setPaymentError] = useState("");
+  const [selectedVariantIndexes, setSelectedVariantIndexes] = useState<number[]>([]);
+  const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+  const [showPriceEditor, setShowPriceEditor] = useState(false);
+  const [bulkPrices, setBulkPrices] = useState({
+    price: "",
+    salePrice: "",
+    resellerPrice: "",
+    wholesalePrice: "",
+    productionCost: "",
+  });
   const isEdit = form.id > 0;
   const set = (k: keyof Form) => (v: any) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -315,6 +326,33 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
   };
   useEffect(() => { if (!tabs.includes(tab)) setTab(tabs[0]); }, [isVariable]); // eslint-disable-line
 
+  const availableImages = useMemo(() => {
+    const list: string[] = [];
+    const add = (url?: string) => {
+      const trimmed = (url ?? "").trim();
+      if (trimmed && !list.includes(trimmed)) list.push(trimmed);
+    };
+    add(form.image);
+    if (form.images) {
+      form.images.split(",").forEach((u) => add(u));
+    }
+    form.variants.forEach((v) => add(v.image));
+    return list;
+  }, [form.image, form.images, form.variants]);
+
+  const variantAttrValues = useMemo(() => {
+    const setVals = new Set<string>();
+    form.variants.forEach((v) => {
+      if (v.attributeSummary) {
+        v.attributeSummary.split("/").forEach((part) => {
+          const trimmed = part.trim();
+          if (trimmed) setVals.add(trimmed);
+        });
+      }
+    });
+    return Array.from(setVals);
+  }, [form.variants]);
+
   const generateVariations = () => {
     const chosen = Object.entries(form.selectedAttrValues).filter(([, ids]) => ids.length);
     if (chosen.length === 0) {
@@ -345,6 +383,9 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
       }
       return { ...f, variants: [...f.variants, ...additions] };
     });
+    setSelectedVariantIndexes([]);
+    setShowGalleryPicker(false);
+    setShowPriceEditor(false);
   };
 
   const save = async () => {
@@ -579,73 +620,452 @@ function ProductModal({ data, categories, attributes, allProducts, onClose, onSa
                     No variations yet. Select attributes and click &quot;Generate Variations&quot; to create them.
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {form.variants.map((v, i) => (
-                      <details key={`${v.attributeSummary}-${i}`} className="group rounded-lg border border-[#e5e7eb] bg-[#fafafa]" open={i === 0}>
-                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-                          <div className="flex min-w-0 flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-[#374151]">Variation #{i + 1}:</span>
-                            {(v.attributeSummary || `Variant ${i + 1}`).split(" / ").map((value) => (
-                              <span key={value} className="rounded-full bg-sky-100 px-2.5 py-1 text-xs text-sky-700">{value}</span>
-                            ))}
-                            {v.isDefault && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Default</span>}
+                  <div>
+                    {/* Sticky / Floating Bulk Action Toolbar */}
+                    {selectedVariantIndexes.length > 0 && (
+                      <div className="sticky top-2 z-10 mb-4 rounded-xl border border-brand/30 bg-brand-50 p-3.5 shadow-md">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-2 text-xs font-bold text-white">
+                              {selectedVariantIndexes.length}
+                            </span>
+                            <span className="text-sm font-semibold text-navy-900">
+                              {selectedVariantIndexes.length === 1 ? "1 variation selected" : `${selectedVariantIndexes.length} variations selected`}
+                            </span>
                           </div>
-                          <div className="flex shrink-0 items-center gap-3">
-                            <button type="button" onClick={(event) => {
-                              event.preventDefault(); event.stopPropagation();
-                              setForm((f) => {
-                                const variants = f.variants.filter((_, index) => index !== i);
-                                if (variants.length && !variants.some((item) => item.isDefault)) variants[0] = { ...variants[0], isDefault: true };
-                                return { ...f, variants };
-                              });
-                            }} className="text-xl leading-none text-red-500" aria-label={`Remove variation ${i + 1}`}>×</button>
-                            <span className="text-[#6b7280] transition group-open:rotate-180">⌄</span>
-                          </div>
-                        </summary>
-                        <div className="border-t border-[#e5e7eb] bg-white p-4">
-                          <label className="mb-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-[#374151]">
-                            <input type="checkbox" checked={v.isDefault} onChange={(event) => {
-                              if (!event.target.checked) return;
-                              setForm((f) => ({ ...f, variants: f.variants.map((item, index) => ({ ...item, isDefault: index === i })) }));
-                            }} className="h-4 w-4 rounded border-[#d1d5db] text-emerald-600 focus:ring-emerald-500" />
-                            Is Default?
-                          </label>
-                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            <VarField label="SKU"><input value={v.sku} onChange={(e) => updateVariant(setForm, i, "sku", e.target.value)} className="input" maxLength={60} /></VarField>
-                            <VarMoney label="Regular Price" value={v.price} onChange={(value) => updateVariant(setForm, i, "price", value)} />
-                            <VarMoney label="Sale Price" value={v.salePrice} onChange={(value) => updateVariant(setForm, i, "salePrice", value)} />
-                            <VarMoney label="Reseller Price" value={v.resellerPrice} onChange={(value) => updateVariant(setForm, i, "resellerPrice", value)} />
-                            <VarMoney label="Wholesale Price" value={v.wholesalePrice} onChange={(value) => updateVariant(setForm, i, "wholesalePrice", value)} />
-                            <VarMoney label="Product Cost" value={v.productionCost} onChange={(value) => updateVariant(setForm, i, "productionCost", value)} />
-                            <VarField label="Stock Status"><select value={v.stockStatus} onChange={(e) => updateVariant(setForm, i, "stockStatus", e.target.value)} className="input"><option value="in_stock">In Stock</option><option value="out_of_stock">Out of Stock</option><option value="on_backorder">On Backorder</option></select></VarField>
-                            <VarInt label="Stock Quantity" value={v.stock} onChange={(value) => updateVariant(setForm, i, "stock", value)} />
-                            <VarInt label="Low Stock Threshold" value={v.lowStockThreshold} onChange={(value) => updateVariant(setForm, i, "lowStockThreshold", value)} />
-                            <VarMoney label="Weight (kg)" value={v.weightKg} onChange={(value) => updateVariant(setForm, i, "weightKg", value)} />
-                            <VarMoney label="Length (cm)" value={v.lengthCm} onChange={(value) => updateVariant(setForm, i, "lengthCm", value)} />
-                            <VarMoney label="Width (cm)" value={v.widthCm} onChange={(value) => updateVariant(setForm, i, "widthCm", value)} />
-                            <VarMoney label="Height (cm)" value={v.heightCm} onChange={(value) => updateVariant(setForm, i, "heightCm", value)} />
-                          </div>
-                          <div className="mt-5">
-                            <p className="mb-2 text-xs font-medium text-[#374151]">Variation Image</p>
-                            <div className="flex items-center gap-3">
-                              <label className={`cursor-pointer rounded-lg border border-[#d1d5db] px-3 py-2 text-xs font-medium text-[#374151] hover:border-brand hover:bg-brand-50 ${uploadingImages ? "pointer-events-none opacity-50" : ""}`}>
-                                {uploadingImages ? "Uploading..." : "Upload Image"}
-                                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={async (event) => {
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Upload New Image */}
+                            <label className={`cursor-pointer rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-brand-600 transition flex items-center gap-1.5 ${uploadingImages ? "pointer-events-none opacity-50" : ""}`}>
+                              <span>📷</span>
+                              <span>{uploadingImages ? "Uploading..." : "Upload & Apply Image"}</span>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                className="hidden"
+                                onChange={async (event) => {
                                   const file = event.target.files?.[0];
                                   if (!file) return;
                                   try {
+                                    setError("");
+                                    setUploadingImages(true);
                                     const [url] = await uploadImages([file]);
-                                    if (url) updateVariant(setForm, i, "image", url);
-                                  } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "Image upload failed"); }
-                                  event.target.value = "";
-                                }} />
-                              </label>
-                              {v.image && <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#f9fafb]"><Image src={v.image} alt={`Variation ${i + 1}`} fill className="object-cover" /><button type="button" onClick={() => updateVariant(setForm, i, "image", "")} className="absolute right-0 top-0 grid h-5 w-5 place-items-center bg-red-500 text-xs text-white" aria-label="Remove variation image">×</button></div>}
-                            </div>
+                                    if (url) {
+                                      setForm((f) => ({
+                                        ...f,
+                                        variants: f.variants.map((v, idx) =>
+                                          selectedVariantIndexes.includes(idx) ? { ...v, image: url } : v
+                                        ),
+                                      }));
+                                      toast(`Image applied to ${selectedVariantIndexes.length} variation(s)`);
+                                    }
+                                  } catch (err) {
+                                    setError(err instanceof Error ? err.message : "Image upload failed");
+                                  } finally {
+                                    setUploadingImages(false);
+                                    event.target.value = "";
+                                  }
+                                }}
+                              />
+                            </label>
+
+                            {/* Choose from existing images */}
+                            {availableImages.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowGalleryPicker((prev) => !prev);
+                                  setShowPriceEditor(false);
+                                }}
+                                className="rounded-lg border border-navy-800/20 bg-white px-3 py-1.5 text-xs font-semibold text-navy-800 hover:bg-gray-50 transition flex items-center gap-1.5 shadow-xs"
+                              >
+                                <span>🖼️</span>
+                                <span>Existing Images ({availableImages.length})</span>
+                              </button>
+                            )}
+
+                            {/* Set Prices & Cost */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowPriceEditor((prev) => !prev);
+                                setShowGalleryPicker(false);
+                              }}
+                              className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs ${
+                                showPriceEditor
+                                  ? "bg-navy-800 text-white border-navy-800"
+                                  : "bg-white text-navy-800 border-navy-800/20 hover:bg-gray-50"
+                              }`}
+                            >
+                              <span>💰</span>
+                              <span>Set Prices & Cost</span>
+                            </button>
+
+                            {/* Clear image for selected */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setForm((f) => ({
+                                  ...f,
+                                  variants: f.variants.map((v, idx) =>
+                                    selectedVariantIndexes.includes(idx) ? { ...v, image: "" } : v
+                                  ),
+                                }));
+                                toast(`Cleared image for ${selectedVariantIndexes.length} variation(s)`);
+                              }}
+                              className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition shadow-xs"
+                            >
+                              Clear Image
+                            </button>
+
+                            {/* Deselect */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedVariantIndexes([]);
+                                setShowGalleryPicker(false);
+                                setShowPriceEditor(false);
+                              }}
+                              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-xs"
+                            >
+                              Deselect
+                            </button>
                           </div>
                         </div>
-                      </details>
-                    ))}
+
+                        {/* Existing Images Drawer */}
+                        {showGalleryPicker && availableImages.length > 0 && (
+                          <div className="mt-3 border-t border-brand/20 pt-3">
+                            <p className="mb-2 text-xs font-medium text-navy-800">
+                              Click an image below to assign it to all {selectedVariantIndexes.length} selected variation(s):
+                            </p>
+                            <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-white p-2">
+                              {availableImages.map((imgUrl, imgIdx) => (
+                                <button
+                                  key={`${imgUrl}-${imgIdx}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setForm((f) => ({
+                                      ...f,
+                                      variants: f.variants.map((v, idx) =>
+                                        selectedVariantIndexes.includes(idx) ? { ...v, image: imgUrl } : v
+                                      ),
+                                    }));
+                                    setShowGalleryPicker(false);
+                                    toast(`Image assigned to ${selectedVariantIndexes.length} variation(s)`);
+                                  }}
+                                  className="group relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border-2 border-gray-200 hover:border-brand transition"
+                                  title="Click to apply to selected"
+                                >
+                                  <Image src={imgUrl} alt="Thumbnail" fill className="object-cover" />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-brand/30 opacity-0 group-hover:opacity-100 transition text-sm font-bold text-white">
+                                    ✓
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Bulk Price & Cost Editor Drawer */}
+                        {showPriceEditor && (
+                          <div className="mt-3 border-t border-brand/20 pt-3">
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-xs font-medium text-navy-800">
+                                Enter prices to apply to all <strong>{selectedVariantIndexes.length}</strong> selected variation(s) (leave empty to keep unchanged):
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBulkPrices({
+                                    price: form.regularPrice || "",
+                                    salePrice: form.salePrice || "",
+                                    resellerPrice: form.resellerPrice || "",
+                                    wholesalePrice: form.wholesalePrice || "",
+                                    productionCost: form.productionCost || "",
+                                  });
+                                  toast("Copied prices from General tab");
+                                }}
+                                className="text-xs font-semibold text-brand hover:underline"
+                              >
+                                📋 Copy from General product prices
+                              </button>
+                            </div>
+
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 rounded-lg border border-gray-200 bg-white p-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-800/70">Regular Price</label>
+                                <input
+                                  value={bulkPrices.price}
+                                  onChange={(e) => setBulkPrices((p) => ({ ...p, price: e.target.value.replace(/[^0-9.]/g, "") }))}
+                                  inputMode="decimal"
+                                  placeholder="e.g. 2500"
+                                  className="input text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-800/70">Selling / Sale Price</label>
+                                <input
+                                  value={bulkPrices.salePrice}
+                                  onChange={(e) => setBulkPrices((p) => ({ ...p, salePrice: e.target.value.replace(/[^0-9.]/g, "") }))}
+                                  inputMode="decimal"
+                                  placeholder="e.g. 1990"
+                                  className="input text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-800/70">Reseller Price</label>
+                                <input
+                                  value={bulkPrices.resellerPrice}
+                                  onChange={(e) => setBulkPrices((p) => ({ ...p, resellerPrice: e.target.value.replace(/[^0-9.]/g, "") }))}
+                                  inputMode="decimal"
+                                  placeholder="e.g. 1700"
+                                  className="input text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-800/70">Wholesale Price</label>
+                                <input
+                                  value={bulkPrices.wholesalePrice}
+                                  onChange={(e) => setBulkPrices((p) => ({ ...p, wholesalePrice: e.target.value.replace(/[^0-9.]/g, "") }))}
+                                  inputMode="decimal"
+                                  placeholder="e.g. 1500"
+                                  className="input text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-800/70">Product Cost</label>
+                                <input
+                                  value={bulkPrices.productionCost}
+                                  onChange={(e) => setBulkPrices((p) => ({ ...p, productionCost: e.target.value.replace(/[^0-9.]/g, "") }))}
+                                  inputMode="decimal"
+                                  placeholder="e.g. 1200"
+                                  className="input text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBulkPrices({ price: "", salePrice: "", resellerPrice: "", wholesalePrice: "", productionCost: "" });
+                                }}
+                                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition"
+                              >
+                                Clear Inputs
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowPriceEditor(false)}
+                                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const hasAny = Object.values(bulkPrices).some((val) => val.trim() !== "");
+                                  if (!hasAny) {
+                                    setError("Enter at least one price or cost to apply to selected variations.");
+                                    return;
+                                  }
+                                  setError("");
+                                  setForm((f) => ({
+                                    ...f,
+                                    variants: f.variants.map((v, idx) => {
+                                      if (!selectedVariantIndexes.includes(idx)) return v;
+                                      return {
+                                        ...v,
+                                        ...(bulkPrices.price.trim() !== "" ? { price: bulkPrices.price.trim() } : {}),
+                                        ...(bulkPrices.salePrice.trim() !== "" ? { salePrice: bulkPrices.salePrice.trim() } : {}),
+                                        ...(bulkPrices.resellerPrice.trim() !== "" ? { resellerPrice: bulkPrices.resellerPrice.trim() } : {}),
+                                        ...(bulkPrices.wholesalePrice.trim() !== "" ? { wholesalePrice: bulkPrices.wholesalePrice.trim() } : {}),
+                                        ...(bulkPrices.productionCost.trim() !== "" ? { productionCost: bulkPrices.productionCost.trim() } : {}),
+                                      };
+                                    }),
+                                  }));
+                                  toast(`Prices applied to ${selectedVariantIndexes.length} variation(s)`);
+                                  setShowPriceEditor(false);
+                                }}
+                                className="btn-primary px-4 py-1.5 text-xs font-semibold shadow-xs"
+                              >
+                                Apply Prices to {selectedVariantIndexes.length} Variation(s)
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Selection Controls & Quick Select Filter Chips */}
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50/70 px-3.5 py-2.5 text-xs text-navy-800">
+                      <div className="flex items-center gap-3">
+                        <label className="flex cursor-pointer items-center gap-2 font-medium">
+                          <input
+                            type="checkbox"
+                            checked={form.variants.length > 0 && selectedVariantIndexes.length === form.variants.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedVariantIndexes(form.variants.map((_, idx) => idx));
+                              } else {
+                                setSelectedVariantIndexes([]);
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+                          />
+                          <span>Select All ({form.variants.length})</span>
+                        </label>
+                        {selectedVariantIndexes.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedVariantIndexes([]);
+                              setShowGalleryPicker(false);
+                              setShowPriceEditor(false);
+                            }}
+                            className="text-xs text-gray-500 underline hover:text-gray-700"
+                          >
+                            Clear ({selectedVariantIndexes.length})
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Smart Filter Chips by Attribute */}
+                      {variantAttrValues.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-gray-500">Quick select:</span>
+                          {variantAttrValues.map((val) => {
+                            const matchingIndices = form.variants
+                              .map((v, idx) => (v.attributeSummary?.split("/").map((s) => s.trim()).includes(val) ? idx : -1))
+                              .filter((idx) => idx !== -1);
+                            const isFullySelected = matchingIndices.length > 0 && matchingIndices.every((idx) => selectedVariantIndexes.includes(idx));
+                            return (
+                              <button
+                                key={val}
+                                type="button"
+                                onClick={() => {
+                                  if (isFullySelected) {
+                                    setSelectedVariantIndexes((prev) => prev.filter((idx) => !matchingIndices.includes(idx)));
+                                  } else {
+                                    setSelectedVariantIndexes((prev) => Array.from(new Set([...prev, ...matchingIndices])));
+                                  }
+                                }}
+                                className={`rounded-full px-2.5 py-1 text-xs font-medium transition border ${
+                                  isFullySelected
+                                    ? "bg-brand text-white border-brand shadow-xs"
+                                    : "bg-white text-gray-700 border-gray-300 hover:border-brand hover:text-brand"
+                                }`}
+                              >
+                                {val} ({matchingIndices.length})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      {form.variants.map((v, i) => {
+                        const isSelected = selectedVariantIndexes.includes(i);
+                        return (
+                          <details
+                            key={`${v.attributeSummary}-${i}`}
+                            className={`group rounded-lg border transition ${
+                              isSelected ? "border-brand/60 bg-brand-50/20" : "border-[#e5e7eb] bg-[#fafafa]"
+                            }`}
+                            open={i === 0}
+                          >
+                            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+                              <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(event) => {
+                                    const checked = event.target.checked;
+                                    setSelectedVariantIndexes((prev) =>
+                                      checked ? [...prev, i] : prev.filter((idx) => idx !== i)
+                                    );
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand"
+                                  aria-label={`Select variation ${i + 1}`}
+                                />
+                                {v.image ? (
+                                  <div className="relative h-7 w-7 shrink-0 overflow-hidden rounded border border-gray-200 bg-white shadow-xs">
+                                    <Image src={v.image} alt="" fill className="object-cover" />
+                                  </div>
+                                ) : (
+                                  <div className="grid h-7 w-7 shrink-0 place-items-center rounded border border-dashed border-gray-300 bg-gray-100 text-[10px] text-gray-400 font-medium" title="No image assigned">
+                                    ∅
+                                  </div>
+                                )}
+                                <span className="text-sm font-semibold text-[#374151]">Variation #{i + 1}:</span>
+                                {(v.attributeSummary || `Variant ${i + 1}`).split(" / ").map((value) => (
+                                  <span key={value} className="rounded-full bg-sky-100 px-2.5 py-1 text-xs text-sky-700">{value}</span>
+                                ))}
+                                {v.isDefault && <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Default</span>}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-3">
+                                <button type="button" onClick={(event) => {
+                                  event.preventDefault(); event.stopPropagation();
+                                  setForm((f) => {
+                                    const variants = f.variants.filter((_, index) => index !== i);
+                                    if (variants.length && !variants.some((item) => item.isDefault)) variants[0] = { ...variants[0], isDefault: true };
+                                    return { ...f, variants };
+                                  });
+                                  setSelectedVariantIndexes((prev) =>
+                                    prev.filter((index) => index !== i).map((index) => (index > i ? index - 1 : index))
+                                  );
+                                }} className="text-xl leading-none text-red-500" aria-label={`Remove variation ${i + 1}`}>×</button>
+                                <span className="text-[#6b7280] transition group-open:rotate-180">⌄</span>
+                              </div>
+                            </summary>
+                            <div className="border-t border-[#e5e7eb] bg-white p-4">
+                              <label className="mb-4 flex cursor-pointer items-center gap-2 text-sm font-medium text-[#374151]">
+                                <input type="checkbox" checked={v.isDefault} onChange={(event) => {
+                                  if (!event.target.checked) return;
+                                  setForm((f) => ({ ...f, variants: f.variants.map((item, index) => ({ ...item, isDefault: index === i })) }));
+                                }} className="h-4 w-4 rounded border-[#d1d5db] text-emerald-600 focus:ring-emerald-500" />
+                                Is Default?
+                              </label>
+                              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <VarField label="SKU"><input value={v.sku} onChange={(e) => updateVariant(setForm, i, "sku", e.target.value)} className="input" maxLength={60} /></VarField>
+                                <VarMoney label="Regular Price" value={v.price} onChange={(value) => updateVariant(setForm, i, "price", value)} />
+                                <VarMoney label="Sale Price" value={v.salePrice} onChange={(value) => updateVariant(setForm, i, "salePrice", value)} />
+                                <VarMoney label="Reseller Price" value={v.resellerPrice} onChange={(value) => updateVariant(setForm, i, "resellerPrice", value)} />
+                                <VarMoney label="Wholesale Price" value={v.wholesalePrice} onChange={(value) => updateVariant(setForm, i, "wholesalePrice", value)} />
+                                <VarMoney label="Product Cost" value={v.productionCost} onChange={(value) => updateVariant(setForm, i, "productionCost", value)} />
+                                <VarField label="Stock Status"><select value={v.stockStatus} onChange={(e) => updateVariant(setForm, i, "stockStatus", e.target.value)} className="input"><option value="in_stock">In Stock</option><option value="out_of_stock">Out of Stock</option><option value="on_backorder">On Backorder</option></select></VarField>
+                                <VarInt label="Stock Quantity" value={v.stock} onChange={(value) => updateVariant(setForm, i, "stock", value)} />
+                                <VarInt label="Low Stock Threshold" value={v.lowStockThreshold} onChange={(value) => updateVariant(setForm, i, "lowStockThreshold", value)} />
+                                <VarMoney label="Weight (kg)" value={v.weightKg} onChange={(value) => updateVariant(setForm, i, "weightKg", value)} />
+                                <VarMoney label="Length (cm)" value={v.lengthCm} onChange={(value) => updateVariant(setForm, i, "lengthCm", value)} />
+                                <VarMoney label="Width (cm)" value={v.widthCm} onChange={(value) => updateVariant(setForm, i, "widthCm", value)} />
+                                <VarMoney label="Height (cm)" value={v.heightCm} onChange={(value) => updateVariant(setForm, i, "heightCm", value)} />
+                              </div>
+                              <div className="mt-5">
+                                <p className="mb-2 text-xs font-medium text-[#374151]">Variation Image</p>
+                                <div className="flex items-center gap-3">
+                                  <label className={`cursor-pointer rounded-lg border border-[#d1d5db] px-3 py-2 text-xs font-medium text-[#374151] hover:border-brand hover:bg-brand-50 ${uploadingImages ? "pointer-events-none opacity-50" : ""}`}>
+                                    {uploadingImages ? "Uploading..." : "Upload Image"}
+                                    <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={async (event) => {
+                                      const file = event.target.files?.[0];
+                                      if (!file) return;
+                                      try {
+                                        const [url] = await uploadImages([file]);
+                                        if (url) updateVariant(setForm, i, "image", url);
+                                      } catch (uploadError) { setError(uploadError instanceof Error ? uploadError.message : "Image upload failed"); }
+                                      event.target.value = "";
+                                    }} />
+                                  </label>
+                                  {v.image && <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-[#e5e7eb] bg-[#f9fafb]"><Image src={v.image} alt={`Variation ${i + 1}`} fill className="object-cover" /><button type="button" onClick={() => updateVariant(setForm, i, "image", "")} className="absolute right-0 top-0 grid h-5 w-5 place-items-center bg-red-500 text-xs text-white" aria-label="Remove variation image">×</button></div>}
+                                </div>
+                              </div>
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

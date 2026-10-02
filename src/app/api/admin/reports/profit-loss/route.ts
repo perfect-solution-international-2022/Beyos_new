@@ -37,7 +37,7 @@ export async function GET(request: Request) {
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.slug = oi.product_slug
-       WHERE o.deleted_at IS NULL AND o.status IN ('completed','delivered') AND DATE(o.created_at) BETWEEN ? AND ?`,
+       WHERE o.deleted_at IS NULL AND o.status = 'delivered' AND DATE(o.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const customerLines: Line[] = buyerLines.map((l) => ({
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
               roi.reseller_price, DATE(ro.created_at) AS order_date
        FROM reseller_order_items roi
        JOIN reseller_orders ro ON ro.id = roi.order_id
-       WHERE ro.deleted_at IS NULL AND ro.status IN ('completed','delivered') AND DATE(ro.created_at) BETWEEN ? AND ?`,
+       WHERE ro.deleted_at IS NULL AND ro.status = 'delivered' AND DATE(ro.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const resellerLineRows: Line[] = resellerLines.map((l) => ({
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
        FROM pos_sale_items psi
        JOIN pos_sales s ON s.id = psi.sale_id
        LEFT JOIN products p ON p.slug = psi.product_slug
-       WHERE s.deleted_at IS NULL AND s.status = 'completed' AND COALESCE(s.delivery_status, '') <> 'cancelled' AND DATE(s.created_at) BETWEEN ? AND ?`,
+       WHERE s.deleted_at IS NULL AND s.status = 'completed' AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status = 'delivered') AND DATE(s.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
     const posLineRows: Line[] = posLines.map((l) => ({
@@ -98,7 +98,7 @@ export async function GET(request: Request) {
          JOIN order_items oi ON oi.order_id = o.id
          LEFT JOIN products p ON p.slug = oi.product_slug
          LEFT JOIN product_variants v ON v.id = oi.variant_id
-         WHERE o.deleted_at IS NULL AND o.status IN ('completed','delivered')
+         WHERE o.deleted_at IS NULL AND o.status = 'delivered'
                AND DATE(o.created_at) BETWEEN ? AND ?
          GROUP BY o.id, DATE(o.created_at)`,
         [start, end]
@@ -110,7 +110,7 @@ export async function GET(request: Request) {
          JOIN reseller_order_items roi ON roi.order_id = ro.id
          LEFT JOIN products p ON p.slug = roi.product_slug
          LEFT JOIN product_variants v ON v.id = roi.variant_id
-         WHERE ro.deleted_at IS NULL AND ro.status IN ('completed','delivered')
+         WHERE ro.deleted_at IS NULL AND ro.status = 'delivered'
                AND DATE(ro.created_at) BETWEEN ? AND ?
          GROUP BY ro.id, DATE(ro.created_at)`,
         [start, end]
@@ -123,7 +123,7 @@ export async function GET(request: Request) {
          LEFT JOIN products p ON p.slug = psi.product_slug
          LEFT JOIN product_variants v ON v.id = psi.variant_id
          WHERE s.deleted_at IS NULL AND s.status = 'completed'
-               AND COALESCE(s.delivery_status, '') <> 'cancelled'
+               AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status = 'delivered')
                AND s.fulfillment_type = 'delivery'
                AND DATE(s.created_at) BETWEEN ? AND ?
          GROUP BY s.id, DATE(s.created_at)`,

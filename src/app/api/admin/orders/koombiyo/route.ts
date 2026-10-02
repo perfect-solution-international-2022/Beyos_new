@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     };
 
     if (body.action === "request-waybill") {
-      if (order.status !== "confirmed") {
+      if (!["confirmed", "shipped"].includes(order.status)) {
         return NextResponse.json({ error: "Accept this order before requesting a waybill" }, { status: 409 });
       }
       const waybillId = order.koombiyo_waybill_id || (await requestWaybill());
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "place-order") {
-      if (order.status !== "confirmed") {
+      if (!["confirmed", "shipped"].includes(order.status)) {
         return NextResponse.json({ error: "Accept this order before submitting it to the courier" }, { status: 409 });
       }
       if (!order.koombiyo_waybill_id) {
@@ -127,21 +127,22 @@ export async function POST(request: Request) {
       });
       await query(
         `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_status = 'Booked',
-         koombiyo_response = ?, koombiyo_updated_at = NOW(), status = 'confirmed'
+         koombiyo_response = ?, koombiyo_updated_at = NOW(), status = 'shipped'
          WHERE order_ref = ?`,
         [JSON.stringify(response), order.order_ref]
       );
-      if (order.status !== "confirmed") {
-        await notify("confirmed");
+      if (!["confirmed", "shipped"].includes(order.status)) {
+        await notify("shipped");
       }
-      return NextResponse.json({ ok: true, waybillId: order.koombiyo_waybill_id, courierStatus: "Booked", status: "confirmed" });
+      return NextResponse.json({ ok: true, waybillId: order.koombiyo_waybill_id, courierStatus: "Booked", status: "shipped" });
     }
 
-    if (!order.koombiyo_waybill_id) {
+    if (!order.koombiyo_waybill_id || !order.koombiyo_status || order.status === "pending") {
       return NextResponse.json({ error: "Send this order to Koombiyo before tracking it" }, { status: 400 });
     }
     const tracking = await trackOrder(order.koombiyo_waybill_id);
-    const status = mapKoombiyoStatus(tracking.status);
+    const mapped = mapKoombiyoStatus(tracking.status);
+    const status = ["delivered", "returned", "cancelled"].includes(mapped) ? mapped : "shipped";
     await query(
       `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_status = ?, koombiyo_response = ?, koombiyo_updated_at = NOW(),
        status = ?, payment_status = IF(? = 'delivered', 'paid', payment_status),
