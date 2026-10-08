@@ -8,6 +8,8 @@ import type { PoolConnection } from "mysql2/promise";
 import { sendOrderConfirmationSms } from "@/lib/sms";
 import { computeDeliveryFee, getDeliveryPricing } from "@/lib/shipping";
 import { resolvePosPayment } from "@/lib/pos-payment";
+import { courierItemDescription } from "@/lib/courier-description";
+import { requestWaybill, submitOrder } from "@/lib/koombiyo";
 
 export async function GET(request: Request) {
   const admin = await requireAdminSection("pos");
@@ -206,9 +208,12 @@ export async function POST(request: Request) {
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
       totalWeightKg += Number(variant?.weight_kg ?? product.weight_kg ?? 0) * qty;
+      const vTokens = variant ? String(variant.attribute_summary || "").split("/").map((s) => s.trim()).filter(Boolean) : [];
+      const itemSize = (line.size && !line.size.includes("/") ? line.size : vTokens[0] || line.size || "");
+      const itemColor = (line.color || vTokens[1] || "");
       lineItems.push({
         slug: product.slug, variantId: variant?.id ?? null, sku: variant?.sku || product.sku, name: product.name,
-        size: line.size || variant?.attribute_summary || "", color: line.color || "",
+        size: itemSize, color: itemColor,
         quantity: qty, unitPrice, lineTotal,
       });
 
@@ -271,11 +276,52 @@ export async function POST(request: Request) {
 
     await conn.commit();
 
+    let koombiyoWaybillId: string | null = null;
+    let koombiyoStatus: string | null = null;
+    let effectiveDeliveryStatus = deliveryStatus;
+
+    if (fulfillmentType === "delivery" && (b.customerPhone ?? "").trim() && deliveryAddress) {
+      try {
+        const waybillId = await requestWaybill();
+        const description = courierItemDescription(
+          lineItems.map((li) => ({ sku: li.sku, variation: [li.size, li.color].filter(Boolean).join(" / ") }))
+        );
+        const codAmount = Math.max(0, Math.round(payment.balanceDue));
+        const courierRes = await submitOrder({
+          waybillId,
+          orderRef: receiptNumber,
+          receiverName: (b.customerName ?? "").trim() || "Walk-in Customer",
+          receiverStreet: `${deliveryAddress}${deliveryCity ? `, ${deliveryCity}` : ""}`,
+          receiverPhone: (b.customerPhone ?? "").trim(),
+          districtId: deliveryDistrictId || undefined,
+          cityId: deliveryCityId || undefined,
+          codAmount,
+          description,
+          specialNote: [
+            b.customerPhone2 ? `2nd phone: ${b.customerPhone2}` : "",
+            (b.whatsappOrderRef ?? "").trim() ? `WhatsApp: ${b.whatsappOrderRef}` : "",
+          ].filter(Boolean).join(" | "),
+        });
+
+        await query(
+          `UPDATE pos_sales SET koombiyo_waybill_id = ?, koombiyo_status = 'Booked', koombiyo_response = ?,
+           koombiyo_updated_at = NOW(), delivery_status = 'out_for_delivery'
+           WHERE id = ?`,
+          [waybillId, JSON.stringify(courierRes), saleId]
+        );
+        koombiyoWaybillId = waybillId;
+        koombiyoStatus = "Booked";
+        effectiveDeliveryStatus = "out_for_delivery";
+      } catch (courierErr) {
+        console.error("Auto Koombiyo booking on POS sale failed (left as pending):", courierErr);
+      }
+    }
+
     await sendOrderConfirmationSms({
       phone: b.customerPhone,
       orderRef: receiptNumber,
       total,
-      status: fulfillmentType === "delivery" ? "pending" : "completed",
+      status: fulfillmentType === "delivery" ? (koombiyoWaybillId ? "shipped" : "pending") : "completed",
     });
 
     return NextResponse.json({
@@ -287,6 +333,9 @@ export async function POST(request: Request) {
         subtotal, discountAmount, taxAmount, deliveryFee, total,
         paymentMethod, paymentStatus: payment.status, paidAmount: payment.paidAmount, balanceDue: payment.balanceDue, amountTendered, changeDue,
         fulfillmentType, deliveryAddress: deliveryAddress || null, deliveryCity: deliveryCity || null,
+        deliveryStatus: effectiveDeliveryStatus,
+        koombiyoWaybillId,
+        koombiyoStatus,
         createdAt: new Date().toISOString(),
       },
     });

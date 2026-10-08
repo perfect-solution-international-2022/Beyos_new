@@ -166,6 +166,29 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
     }
   };
 
+  const acceptAndDispatchOrder = async () => {
+    setDeciding(true);
+    try {
+      const response = await fetch(order.type === "pos" ? "/api/admin/pos/sales/koombiyo" : "/api/admin/orders/koombiyo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          order.type === "pos"
+            ? { receiptNumber: order.orderRef, action: "place-order" }
+            : { orderRef: order.orderRef, action: "place-order", type: order.type }
+        ),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not dispatch order to Koombiyo");
+      toast(`Accepted & sent to Koombiyo (Waybill: ${data.waybillId})`);
+      load();
+    } catch (cause) {
+      toast(cause instanceof Error ? cause.message : "Could not dispatch to Koombiyo", "error");
+    } finally {
+      setDeciding(false);
+    }
+  };
+
   return (
     <div className="mt-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -200,13 +223,20 @@ export default function OrderDetailView({ orderRef }: { orderRef: string }) {
             <p className="font-semibold text-amber-900">This order needs your review</p>
             <p className="mt-1 text-sm text-amber-800/75">Check the customer, delivery and item details below, then accept or reject the order.</p>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              disabled={deciding}
+              onClick={acceptAndDispatchOrder}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40"
+            >
+              {deciding ? "Dispatching…" : "Accept & Send to Courier"}
+            </button>
             <button
               disabled={deciding}
               onClick={() => isPendingPosDelivery ? decidePos("out_for_delivery") : decideOrder(isPendingReseller ? "reseller" : "customer", "shipped")}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
             >
-              Accept order
+              Accept only
             </button>
             <button
               disabled={deciding}
@@ -505,7 +535,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: () => void }) {
   const [waybillId, setWaybillId] = useState(order.koombiyoWaybillId ?? "");
   const [specialNote, setSpecialNote] = useState("");
-  const [busy, setBusy] = useState<"waybill" | "place" | null>(null);
+  const [busy, setBusy] = useState<"waybill" | "place" | "track" | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -514,6 +544,8 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
   const isPos = order.type === "pos";
   if (!isPos && (order.status === "cancelled" || order.status === "rejected")) return null;
   if (isPos && order.deliveryStatus === "cancelled") return null;
+
+  const isBooked = Boolean(order.koombiyoWaybillId && order.koombiyoStatus && order.koombiyoStatus !== "Unknown");
 
   const requestWaybill = async () => {
     setBusy("waybill");
@@ -533,6 +565,7 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
       if (!res.ok) throw new Error(data.error || "Could not request a waybill ID");
       setWaybillId(data.waybillId);
       setSuccess("Waybill ID retrieved successfully");
+      onUpdated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not request a waybill ID");
     } finally {
@@ -556,7 +589,7 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not place the order with Koombiyo");
-      setSuccess("Order successfully placed with Koombiyo courier");
+      setSuccess(`Order successfully dispatched to Koombiyo (Waybill: ${data.waybillId || waybillId})`);
       onUpdated();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not place the order with Koombiyo");
@@ -565,65 +598,95 @@ function KoombiyoWizard({ order, onUpdated }: { order: OrderDetail; onUpdated: (
     }
   };
 
-  const isAccepted = !order.koombiyoStatus && (isPos
-    ? ["accepted", "out_for_delivery"].includes(order.deliveryStatus || "")
-    : ["confirmed", "shipped"].includes(order.status));
+  const trackDelivery = async () => {
+    setBusy("track");
+    setError("");
+    setSuccess("");
+    try {
+      const res = await fetch(isPos ? "/api/admin/orders/courier-sync" : "/api/admin/orders/koombiyo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: isPos ? JSON.stringify({}) : JSON.stringify({ orderRef: order.orderRef, type: order.type }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not check courier status");
+      setSuccess("Courier status updated");
+      onUpdated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not check courier status");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <div className="mt-6 rounded-2xl border border-navy-800/5 bg-white p-6 shadow-sm">
-      <h2 className="font-bold text-navy-800">Koombiyo Delivery Management</h2>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="font-bold text-navy-800">Koombiyo Delivery Management</h2>
+          <p className="mt-0.5 text-xs text-navy-800/55">Book and manage courier delivery for this order.</p>
+        </div>
+        {isBooked && (
+          <button
+            onClick={trackDelivery}
+            disabled={busy !== null}
+            className="rounded-lg bg-navy-50 px-3.5 py-1.5 text-xs font-semibold text-navy-800 hover:bg-navy-100 disabled:opacity-50"
+          >
+            {busy === "track" ? "Checking…" : "Refresh Courier Status"}
+          </button>
+        )}
+      </div>
 
       {error && <p className="mt-4 rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">{error}</p>}
       {success && <p className="mt-4 rounded-lg bg-emerald-50 px-4 py-2.5 text-sm text-emerald-700">{success}</p>}
 
-      {isAccepted ? (
+      {order.koombiyoStatus === "Unknown" && (
+        <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          The previous courier submission did not confirm. You can retry dispatching below.
+        </div>
+      )}
+
+      {isBooked ? (
+        <div className="mt-4 rounded-lg bg-navy-50 px-4 py-3 text-sm text-navy-800/70">
+          Waybill ID: <span className="font-mono font-semibold text-navy-800">{order.koombiyoWaybillId}</span>
+          <span className="ml-3 text-navy-800/55">Status: <strong className="text-emerald-700">{order.koombiyoStatus}</strong></span>
+        </div>
+      ) : (
         <div className="mt-4 space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-navy-800">Waybill ID</label>
-            <div className="flex items-center gap-3">
-              <input
-                readOnly
-                value={waybillId}
-                placeholder="Click 'Request Way Bill ID' to get a waybill"
-                className="input flex-1 bg-navy-50 text-navy-800/70"
-              />
+            <label className="mb-1.5 block text-sm font-medium text-navy-800">Special Notes (Optional)</label>
+            <textarea
+              value={specialNote}
+              onChange={(e) => setSpecialNote(e.target.value)}
+              placeholder="e.g. Call before delivery, handle with care"
+              rows={2}
+              className="input w-full resize-none"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={placeOrder}
+              disabled={busy !== null}
+              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {busy === "place" ? "Sending to Koombiyo…" : "Dispatch to Koombiyo Courier"}
+            </button>
+            {!waybillId && (
               <button
                 onClick={requestWaybill}
                 disabled={busy !== null}
-                className="btn-primary shrink-0 disabled:opacity-50"
+                className="btn-outline text-xs disabled:opacity-50"
               >
-                {busy === "waybill" ? "Requesting…" : "Request Way Bill ID"}
+                {busy === "waybill" ? "Requesting…" : "Request Waybill ID First"}
               </button>
-            </div>
+            )}
+            {waybillId && (
+              <span className="font-mono text-xs text-navy-800/60">
+                Waybill ID: <strong>{waybillId}</strong>
+              </span>
+            )}
           </div>
-
-          {waybillId && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-navy-800">Special Notes</label>
-              <textarea
-                value={specialNote}
-                onChange={(e) => setSpecialNote(e.target.value)}
-                rows={3}
-                className="input w-full resize-none"
-              />
-              <button
-                onClick={placeOrder}
-                disabled={busy !== null}
-                className="btn-primary mt-3 w-full py-3 disabled:opacity-50"
-              >
-                {busy === "place" ? "Processing…" : "Place Order"}
-              </button>
-            </div>
-          )}
-        </div>
-      ) : order.koombiyoWaybillId || order.koombiyoStatus ? (
-        <div className="mt-4 rounded-lg bg-navy-50 px-4 py-3 text-sm text-navy-800/70">
-          Waybill ID: <span className="font-mono font-semibold text-navy-800">{order.koombiyoWaybillId || "—"}</span>
-          {order.koombiyoStatus && <span className="ml-3 text-navy-800/55">Status: {order.koombiyoStatus}</span>}
-        </div>
-      ) : (
-        <div className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Accept this order before requesting a waybill and submitting it to Koombiyo.
         </div>
       )}
     </div>

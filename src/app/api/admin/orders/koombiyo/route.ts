@@ -67,29 +67,28 @@ export async function POST(request: Request) {
     };
 
     if (body.action === "request-waybill") {
-      if (!["confirmed", "shipped"].includes(order.status)) {
-        return NextResponse.json({ error: "Accept this order before requesting a waybill" }, { status: 409 });
+      if (order.status === "cancelled" || order.status === "rejected") {
+        return NextResponse.json({ error: "Cannot request a waybill for a cancelled or rejected order" }, { status: 409 });
       }
-      const waybillId = order.koombiyo_waybill_id || (await requestWaybill());
-      if (!order.koombiyo_waybill_id) {
-        await query(
-          `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_waybill_id = ? WHERE order_ref = ?`,
-          [waybillId, order.order_ref]
-        );
+      if (order.koombiyo_status && order.koombiyo_status !== "Unknown") {
+        return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
       }
+      const waybillId = (order.koombiyo_status !== "Unknown" && order.koombiyo_waybill_id) || (await requestWaybill());
+      await query(
+        `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_waybill_id = ? WHERE order_ref = ?`,
+        [waybillId, order.order_ref]
+      );
       return NextResponse.json({ ok: true, waybillId });
     }
 
     if (body.action === "place-order") {
-      if (!["confirmed", "shipped"].includes(order.status)) {
-        return NextResponse.json({ error: "Accept this order before submitting it to the courier" }, { status: 409 });
+      if (order.status === "cancelled" || order.status === "rejected") {
+        return NextResponse.json({ error: "Cannot submit a cancelled or rejected order to the courier" }, { status: 409 });
       }
-      if (!order.koombiyo_waybill_id) {
-        return NextResponse.json({ error: "Request a waybill ID before placing the order" }, { status: 400 });
-      }
-      if (order.koombiyo_status) {
+      if (order.koombiyo_status && order.koombiyo_status !== "Unknown") {
         return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
       }
+      const waybillId = (order.koombiyo_status !== "Unknown" && order.koombiyo_waybill_id) || (await requestWaybill());
       const orderItems = await query<{ name: string; variation: string; sku: string }>(
         isReseller
           ? `SELECT oi.name, COALESCE(oi.variant_summary, '') AS variation, COALESCE(oi.sku, p.sku, '') AS sku
@@ -114,7 +113,7 @@ export async function POST(request: Request) {
       }
       const codAmount = isCardOrder ? 0 : total;
       const response = await submitOrder({
-        waybillId: order.koombiyo_waybill_id,
+        waybillId,
         orderRef: order.order_ref,
         receiverName: order.customer_name,
         receiverStreet: `${order.address}${order.city ? `, ${order.city}` : ""}`,
@@ -126,15 +125,15 @@ export async function POST(request: Request) {
         cityId: order.city_id ?? undefined,
       });
       await query(
-        `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_status = 'Booked',
+        `UPDATE ${isReseller ? "reseller_orders" : "orders"} SET koombiyo_waybill_id = ?, koombiyo_status = 'Booked',
          koombiyo_response = ?, koombiyo_updated_at = NOW(), status = 'shipped'
          WHERE order_ref = ?`,
-        [JSON.stringify(response), order.order_ref]
+        [waybillId, JSON.stringify(response), order.order_ref]
       );
       if (!["confirmed", "shipped"].includes(order.status)) {
         await notify("shipped");
       }
-      return NextResponse.json({ ok: true, waybillId: order.koombiyo_waybill_id, courierStatus: "Booked", status: "shipped" });
+      return NextResponse.json({ ok: true, waybillId, courierStatus: "Booked", status: "shipped" });
     }
 
     if (!order.koombiyo_waybill_id || !order.koombiyo_status || order.status === "pending") {

@@ -32,7 +32,39 @@ export interface ReceiptBillData {
   fulfillmentType?: string;
   deliveryAddress?: string | null;
   deliveryCity?: string | null;
+  koombiyoWaybillId?: string | null;
   createdAt: string;
+}
+
+
+function formatItemDetails(item: { sku?: string; size?: string; color?: string }): string {
+  const parts: string[] = [];
+  const sku = (item.sku || "").trim();
+
+  const tokens: string[] = [];
+  if (item.size) {
+    const sub = item.size.split("/").map((s) => s.trim()).filter(Boolean);
+    tokens.push(...sub);
+  }
+  if (item.color) {
+    const sub = item.color.split("/").map((s) => s.trim()).filter(Boolean);
+    for (const c of sub) {
+      if (!tokens.some((t) => t.toLowerCase() === c.toLowerCase())) {
+        tokens.push(c);
+      }
+    }
+  }
+
+  const cleanedTokens = tokens.filter((t) => !sku || t.toLowerCase() !== sku.toLowerCase());
+
+  if (sku) {
+    parts.push(sku);
+  }
+  if (cleanedTokens.length > 0) {
+    parts.push(cleanedTokens.join(" / "));
+  }
+
+  return parts.join(" · ");
 }
 
 function billPrice(amount: number) {
@@ -107,6 +139,12 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
             </span>
           </div>
         )}
+        {receipt.koombiyoWaybillId && (
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-navy-800/60">Courier Waybill</span>
+            <span className="font-mono font-bold text-navy-900">{receipt.koombiyoWaybillId}</span>
+          </div>
+        )}
       </div>
 
       {/* Items table */}
@@ -124,8 +162,8 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
               <tr key={i} className="border-t border-navy-800/10 align-top">
                 <td className="px-4 py-3.5">
                   <span className="font-semibold text-navy-900">{it.name}</span>
-                  {(it.size || it.color || it.sku) && (
-                    <span className="mt-0.5 block text-[10px] text-navy-800/45">{[it.sku, it.size, it.color].filter(Boolean).join(" · ")}</span>
+                  {formatItemDetails(it) && (
+                    <span className="mt-0.5 block text-[10px] text-navy-800/45">{formatItemDetails(it)}</span>
                   )}
                   <span className="mt-0.5 block text-[10px] text-navy-800/45">{billPrice(it.unitPrice)} each</span>
                 </td>
@@ -153,8 +191,8 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
             <tr key={i} className="border-b border-black/20 align-top">
               <td className="py-2 pr-2">
                 <span className="font-semibold">{it.name}</span>
-                {(it.size || it.color || it.sku) && (
-                  <span className="block text-[9px] text-black/60">{[it.sku, it.size, it.color].filter(Boolean).join(" · ")}</span>
+                {formatItemDetails(it) && (
+                  <span className="block text-[9px] text-black/60">{formatItemDetails(it)}</span>
                 )}
               </td>
               <td className="py-2 text-center">{it.quantity}</td>
@@ -195,7 +233,13 @@ export default function POSReceiptBill({ receipt }: { receipt: ReceiptBillData }
           <span className="text-lg font-extrabold text-white">{billPrice(receipt.total)}</span>
         </div>
 
-        <div className="flex justify-between border-t border-dashed border-navy-800/15 pt-2.5">
+        {receipt.koombiyoWaybillId && (
+          <div className="flex justify-between border-t border-dashed border-navy-800/15 pt-2.5">
+            <span className="text-navy-800/60">Courier Waybill</span>
+            <span className="font-mono font-bold text-navy-900">{receipt.koombiyoWaybillId}</span>
+          </div>
+        )}
+        <div className={`flex justify-between ${receipt.koombiyoWaybillId ? "" : "border-t border-dashed border-navy-800/15 pt-2.5"}`}>
           <span className="text-navy-800/60">Payment</span>
           <span className="font-semibold text-navy-900">{paymentLabels[receipt.paymentMethod] ?? receipt.paymentMethod}</span>
         </div>

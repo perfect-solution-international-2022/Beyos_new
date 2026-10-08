@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminSection } from "@/lib/admin";
 import { query } from "@/lib/db";
 import { requestWaybill, submitOrder } from "@/lib/koombiyo";
+import { sendOrderStatusSms } from "@/lib/sms";
 
 interface PosSaleRow {
   receipt_number: string;
@@ -47,27 +48,23 @@ export async function POST(request: Request) {
     if (sale.fulfillment_type !== "delivery") {
       return NextResponse.json({ error: "This sale is not a delivery order" }, { status: 400 });
     }
-    if (!["accepted", "out_for_delivery"].includes(sale.delivery_status || "")) {
-      return NextResponse.json({ error: "Accept this delivery order before requesting a waybill or submitting it to the courier" }, { status: 409 });
+    if (!["pending", "accepted", "out_for_delivery"].includes(sale.delivery_status || "")) {
+      return NextResponse.json({ error: "This delivery order cannot be submitted to the courier" }, { status: 409 });
     }
 
     if (body.action === "request-waybill") {
-      const waybillId = sale.koombiyo_waybill_id || (await requestWaybill());
-      if (sale.koombiyo_status) {
-      return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
-    }
-    if (!sale.koombiyo_waybill_id) {
-        await query(`UPDATE pos_sales SET koombiyo_waybill_id = ? WHERE receipt_number = ? AND deleted_at IS NULL`, [waybillId, sale.receipt_number]);
+      if (sale.koombiyo_status && sale.koombiyo_status !== "Unknown") {
+        return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
       }
+      const waybillId = (sale.koombiyo_status !== "Unknown" && sale.koombiyo_waybill_id) || (await requestWaybill());
+      await query(`UPDATE pos_sales SET koombiyo_waybill_id = ? WHERE receipt_number = ? AND deleted_at IS NULL`, [waybillId, sale.receipt_number]);
       return NextResponse.json({ ok: true, waybillId });
     }
 
-    if (sale.koombiyo_status) {
+    if (sale.koombiyo_status && sale.koombiyo_status !== "Unknown") {
       return NextResponse.json({ error: "This order has already been submitted to the courier" }, { status: 409 });
     }
-    if (!sale.koombiyo_waybill_id) {
-      return NextResponse.json({ error: "Request a waybill ID before placing the order" }, { status: 400 });
-    }
+    const waybillId = (sale.koombiyo_status !== "Unknown" && sale.koombiyo_waybill_id) || (await requestWaybill());
     if (!sale.customer_phone || !sale.delivery_address) {
       return NextResponse.json({ error: "Missing delivery details for this sale" }, { status: 400 });
     }
@@ -83,7 +80,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid order total. Check this sale before submitting it to the courier." }, { status: 400 });
     }
     const response = await submitOrder({
-      waybillId: sale.koombiyo_waybill_id,
+      waybillId,
       orderRef: sale.receipt_number,
       receiverName: sale.customer_name || "Walk-in Customer",
       receiverStreet: `${sale.delivery_address}${sale.delivery_city ? `, ${sale.delivery_city}` : ""}`,
@@ -96,11 +93,14 @@ export async function POST(request: Request) {
       specialNote: [sale.customer_phone_2 ? `2nd phone: ${sale.customer_phone_2}` : "", body.specialNote || ""].filter(Boolean).join(" | "),
     });
     await query(
-      `UPDATE pos_sales SET koombiyo_status = 'Booked', koombiyo_response = ?, koombiyo_updated_at = NOW(),
+      `UPDATE pos_sales SET koombiyo_waybill_id = ?, koombiyo_status = 'Booked', koombiyo_response = ?, koombiyo_updated_at = NOW(),
        delivery_status = 'out_for_delivery' WHERE receipt_number = ? AND deleted_at IS NULL`,
-      [JSON.stringify(response), sale.receipt_number]
+      [waybillId, JSON.stringify(response), sale.receipt_number]
     );
-    return NextResponse.json({ ok: true, waybillId: sale.koombiyo_waybill_id, courierStatus: "Booked", deliveryStatus: "out_for_delivery" });
+    if (sale.customer_phone) {
+      await sendOrderStatusSms(sale.customer_phone, sale.receipt_number, "out_for_delivery").catch(() => {});
+    }
+    return NextResponse.json({ ok: true, waybillId, courierStatus: "Booked", deliveryStatus: "out_for_delivery" });
   } catch (error) {
     console.error("POS Koombiyo action failed:", error);
     const message = error instanceof Error ? error.message : "Koombiyo request failed";

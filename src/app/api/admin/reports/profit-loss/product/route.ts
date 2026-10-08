@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   try {
     // 1. Fetch Product details
     const productRows = await query<any>(
-      `SELECT id, slug, name, price, sale_price, wholesale_price, production_cost, image
+      `SELECT id, slug, name, price, compare_at_price, wholesale_price, production_cost, image
        FROM products WHERE slug = ? AND deleted_at IS NULL LIMIT 1`,
       [slug]
     );
@@ -38,8 +38,8 @@ export async function GET(request: Request) {
       `SELECT oi.id, o.order_ref AS reference, o.customer_name, oi.name, oi.size, oi.color,
               oi.quantity, oi.unit_price, oi.line_total,
               COALESCE(v.production_cost, p.production_cost) AS production_cost,
-              COALESCE(v.price, p.price) AS list_price,
-              COALESCE(v.sale_price, p.sale_price) AS sale_price,
+              COALESCE(v.price, p.compare_at_price, p.price) AS list_price,
+              COALESCE(v.sale_price, IF(p.compare_at_price IS NOT NULL, p.price, NULL)) AS sale_price,
               COALESCE(v.wholesale_price, p.wholesale_price) AS wholesale_price,
               v.sku AS variant_sku, v.attribute_summary,
               DATE(o.created_at) AS order_date, TIME(o.created_at) AS order_time,
@@ -58,8 +58,8 @@ export async function GET(request: Request) {
       `SELECT psi.id, s.receipt_number AS reference, s.customer_name, psi.name, psi.size, psi.color,
               psi.quantity, psi.unit_price, psi.line_total,
               COALESCE(v.production_cost, p.production_cost) AS production_cost,
-              COALESCE(v.price, p.price) AS list_price,
-              COALESCE(v.sale_price, p.sale_price) AS sale_price,
+              COALESCE(v.price, p.compare_at_price, p.price) AS list_price,
+              COALESCE(v.sale_price, IF(p.compare_at_price IS NOT NULL, p.price, NULL)) AS sale_price,
               COALESCE(v.wholesale_price, p.wholesale_price) AS wholesale_price,
               v.sku AS variant_sku, v.attribute_summary,
               DATE(s.created_at) AS order_date, TIME(s.created_at) AS order_time,
@@ -79,8 +79,8 @@ export async function GET(request: Request) {
       `SELECT roi.id, ro.order_ref AS reference, ro.customer_name, roi.name, '' AS size, '' AS color,
               roi.quantity, roi.selling_price AS unit_price, roi.line_total,
               roi.reseller_price AS production_cost,
-              COALESCE(v.price, p.price) AS list_price,
-              COALESCE(v.sale_price, p.sale_price) AS sale_price,
+              COALESCE(v.price, p.compare_at_price, p.price) AS list_price,
+              COALESCE(v.sale_price, IF(p.compare_at_price IS NOT NULL, p.price, NULL)) AS sale_price,
               COALESCE(v.wholesale_price, p.wholesale_price) AS wholesale_price,
               v.sku AS variant_sku, roi.variant_summary AS attribute_summary,
               DATE(ro.created_at) AS order_date, TIME(ro.created_at) AS order_time,
@@ -122,8 +122,8 @@ export async function GET(request: Request) {
       const quantity = Number(r.quantity || 1);
       const unitPrice = Number(r.unit_price || 0);
       const lineTotal = Number(r.line_total || (quantity * unitPrice));
-      const listPrice = Number(r.list_price || product.price || 0);
-      const salePrice = Number(r.sale_price || product.sale_price || 0);
+      const listPrice = Number(r.list_price || product.compare_at_price || product.price || 0);
+      const salePrice = Number(r.sale_price || (product.compare_at_price ? product.price : 0) || 0);
       const wholesalePrice = Number(r.wholesale_price || product.wholesale_price || 0);
 
       let unitCost = 0;
@@ -253,11 +253,11 @@ export async function GET(request: Request) {
         slug: product.slug,
         name: product.name,
         image: product.image,
-        regularPrice: Number(product.price || 0),
-        salePrice: product.sale_price ? Number(product.sale_price) : null,
+        regularPrice: Number(product.compare_at_price || product.price || 0),
+        salePrice: product.compare_at_price ? Number(product.price) : null,
         wholesalePrice: product.wholesale_price ? Number(product.wholesale_price) : null,
         productionCost: product.production_cost ? Number(product.production_cost) : null,
-        hasConfiguredCost: product.production_cost != null && product.production_cost !== "" && Number(product.production_cost) > 0,
+        hasConfiguredCost: (product.production_cost != null && product.production_cost !== "" && Number(product.production_cost) > 0) || (processedLines.length > 0 && processedLines.some((l) => !l.isCostEstimated)),
       },
       range: { start, end },
       summary: {

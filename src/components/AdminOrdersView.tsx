@@ -326,7 +326,7 @@ export default function AdminOrdersView({ view = "all" }: { view?: OrdersView })
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {(o.type === "customer" || o.type === "reseller") && o.koombiyoWaybillId ? (
+                    {o.koombiyoWaybillId ? (
                       <div className="flex min-w-[130px] flex-col gap-1">
                         <span className="font-mono text-xs font-semibold text-navy-800">{o.koombiyoWaybillId}</span>
                         <span className="text-xs text-navy-800/55">{o.koombiyoStatus || "Awaiting update"}</span>

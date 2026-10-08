@@ -163,7 +163,6 @@ export async function GET(request: Request) {
         if (view === "delivering") return isPendingDelivery;
         if (view === "completed") return isCompleted;
         if (view === "rejected") return isRejected;
-        if (isPending) return false;
         return true;
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

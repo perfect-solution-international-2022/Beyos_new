@@ -33,10 +33,11 @@ export async function GET(request: Request) {
       line_total: string; production_cost: string | null; order_date: string;
     }>(
       `SELECT oi.product_slug, oi.name, oi.quantity, oi.unit_price, oi.line_total,
-              p.production_cost, DATE(o.created_at) AS order_date
+              COALESCE(v.production_cost, p.production_cost) AS production_cost, DATE(o.created_at) AS order_date
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        LEFT JOIN products p ON p.slug = oi.product_slug
+       LEFT JOIN product_variants v ON v.id = oi.variant_id
        WHERE o.deleted_at IS NULL AND o.status = 'delivered' AND DATE(o.created_at) BETWEEN ? AND ?`,
       [start, end]
     );
@@ -72,10 +73,11 @@ export async function GET(request: Request) {
       line_total: string; production_cost: string | null; sale_date: string;
     }>(
       `SELECT psi.product_slug, psi.name, psi.quantity, psi.unit_price, psi.line_total,
-              p.production_cost, DATE(s.created_at) AS sale_date
+              COALESCE(v.production_cost, p.production_cost) AS production_cost, DATE(s.created_at) AS sale_date
        FROM pos_sale_items psi
        JOIN pos_sales s ON s.id = psi.sale_id
        LEFT JOIN products p ON p.slug = psi.product_slug
+       LEFT JOIN product_variants v ON v.id = psi.variant_id
        WHERE s.deleted_at IS NULL AND s.status = 'completed' AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status = 'delivered') AND DATE(s.created_at) BETWEEN ? AND ?`,
       [start, end]
     );

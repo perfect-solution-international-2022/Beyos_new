@@ -207,6 +207,8 @@ function ReceiptModal({
 }) {
   const editable = canEditSale(receipt, receipt.koombiyoWaybillId);
   const [settling, setSettling] = useState(false);
+  const [dispatching, setDispatching] = useState(false);
+
   const settleBalance = async () => {
     setSettling(true);
     try {
@@ -216,15 +218,43 @@ function ReceiptModal({
       if (response.ok) onPaymentUpdated();
     } finally { setSettling(false); }
   };
+
+  const dispatchCourier = async () => {
+    setDispatching(true);
+    try {
+      const response = await fetch("/api/admin/pos/sales/koombiyo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiptNumber: receipt.receiptNumber, action: "place-order" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to dispatch courier");
+      onPaymentUpdated();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to dispatch courier");
+    } finally {
+      setDispatching(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-900/50 p-4 print:static print:bg-transparent print:p-0" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-[560px] overflow-y-auto rounded-2xl bg-white shadow-2xl print:max-h-none print:w-auto print:overflow-visible print:rounded-none print:shadow-none" onClick={(e) => e.stopPropagation()}>
         <POSReceiptBill receipt={receipt} />
 
-        <div className="flex justify-end gap-3 px-6 pb-8 print:hidden">
+        <div className="flex flex-wrap justify-end gap-3 px-6 pb-8 print:hidden">
           <button onClick={onClose} className="btn-outline">Close</button>
           {editable && (
             <button onClick={onEdit} className="btn-outline">Edit</button>
+          )}
+          {receipt.fulfillmentType === "delivery" && (!receipt.koombiyoWaybillId || receipt.deliveryStatus === "pending") && (
+            <button
+              onClick={dispatchCourier}
+              disabled={dispatching}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {dispatching ? "Dispatching…" : "Send to Courier"}
+            </button>
           )}
           {receipt.balanceDue > 0 && <button onClick={settleBalance} disabled={settling} className="btn-outline disabled:opacity-50">{settling ? "Saving…" : "Mark Fully Paid"}</button>}
           <button onClick={() => window.print()} className="btn-primary">Print</button>
