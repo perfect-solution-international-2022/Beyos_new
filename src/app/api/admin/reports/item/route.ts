@@ -17,7 +17,7 @@ interface Line {
 }
 
 function parseWindow(searchParams: URLSearchParams) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo" }).format(new Date());
   const startDate = searchParams.get("startDate") || today;
   const endDate = searchParams.get("endDate") || today;
   const startTime = searchParams.get("startTime") || "00:00";
@@ -40,33 +40,35 @@ export async function GET(request: Request) {
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit")) || 10));
 
   try {
-    // ---- Buyer order line items in window ----
+    // ---- Buyer order line items in window (excludes cancelled and rejected) ----
     const buyerLines = await query<any>(
       `SELECT oi.product_slug, oi.name, oi.size, oi.color, oi.quantity, oi.unit_price, oi.line_total,
-              DATE(o.created_at) AS d, TIME(o.created_at) AS t
+              DATE_FORMAT(o.created_at, '%Y-%m-%d') AS d, DATE_FORMAT(o.created_at, '%H:%i') AS t
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
-       WHERE o.deleted_at IS NULL AND o.status = 'delivered' AND o.created_at BETWEEN ? AND ?`,
+       WHERE o.deleted_at IS NULL AND o.status NOT IN ('cancelled', 'rejected') AND o.created_at BETWEEN ? AND ?`,
       [start, end]
     );
 
-    // ---- Reseller order line items in window (excludes rejected) ----
+    // ---- Reseller order line items in window (excludes cancelled and rejected) ----
     const resellerLines = await query<any>(
       `SELECT roi.product_slug, roi.name, roi.sku, roi.variant_summary, roi.quantity, roi.selling_price AS unit_price, roi.line_total,
-              DATE(ro.created_at) AS d, TIME(ro.created_at) AS t
+              DATE_FORMAT(ro.created_at, '%Y-%m-%d') AS d, DATE_FORMAT(ro.created_at, '%H:%i') AS t
        FROM reseller_order_items roi
        JOIN reseller_orders ro ON ro.id = roi.order_id
-       WHERE ro.deleted_at IS NULL AND ro.status = 'delivered' AND ro.created_at BETWEEN ? AND ?`,
+       WHERE ro.deleted_at IS NULL AND ro.status NOT IN ('cancelled', 'rejected') AND ro.created_at BETWEEN ? AND ?`,
       [start, end]
     );
 
-    // ---- POS sale line items in window ----
+    // ---- POS sale line items in window (excludes cancelled) ----
     const posLines = await query<any>(
       `SELECT psi.product_slug, psi.name, psi.sku, psi.size, psi.color, psi.quantity, psi.unit_price, psi.line_total,
-              DATE(s.created_at) AS d, TIME(s.created_at) AS t
+              DATE_FORMAT(s.created_at, '%Y-%m-%d') AS d, DATE_FORMAT(s.created_at, '%H:%i') AS t
        FROM pos_sale_items psi
        JOIN pos_sales s ON s.id = psi.sale_id
-       WHERE s.deleted_at IS NULL AND s.created_at BETWEEN ? AND ? AND s.status = 'completed' AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status = 'delivered')`,
+       WHERE s.deleted_at IS NULL AND s.created_at BETWEEN ? AND ?
+         AND s.status != 'cancelled'
+         AND (COALESCE(s.fulfillment_type, 'pickup') <> 'delivery' OR s.delivery_status IS NULL OR s.delivery_status != 'cancelled')`,
       [start, end]
     );
 
@@ -95,15 +97,17 @@ export async function GET(request: Request) {
 
     // ---- Order/receipt counts + revenue totals (order-level, incl. shipping/discount/tax) ----
     const buyerOrders = await query<{ id: number; total: string }>(
-      `SELECT id, total FROM orders WHERE deleted_at IS NULL AND status = 'delivered' AND created_at BETWEEN ? AND ?`,
+      `SELECT id, total FROM orders WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'rejected') AND created_at BETWEEN ? AND ?`,
       [start, end]
     );
     const resellerOrders = await query<{ id: number; amount: string }>(
-      `SELECT id, amount FROM reseller_orders WHERE deleted_at IS NULL AND status = 'delivered' AND created_at BETWEEN ? AND ?`,
+      `SELECT id, amount FROM reseller_orders WHERE deleted_at IS NULL AND status NOT IN ('cancelled', 'rejected') AND created_at BETWEEN ? AND ?`,
       [start, end]
     );
     const posSales = await query<{ id: number; total: string }>(
-      `SELECT id, total FROM pos_sales WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ? AND status = 'completed' AND (COALESCE(fulfillment_type, 'pickup') <> 'delivery' OR delivery_status = 'delivered')`,
+      `SELECT id, total FROM pos_sales WHERE deleted_at IS NULL AND created_at BETWEEN ? AND ?
+         AND status != 'cancelled'
+         AND (COALESCE(fulfillment_type, 'pickup') <> 'delivery' OR delivery_status IS NULL OR delivery_status != 'cancelled')`,
       [start, end]
     );
 
@@ -145,7 +149,16 @@ export async function GET(request: Request) {
     // ---- Aggregate per product ----
     const byProduct = new Map<
       string,
-      { name: string; unitsSold: number; totalRevenue: number; minPrice: number; maxPrice: number; date: string; time: string; variants: Map<string, { key: string; sku: string; size: string; color: string; sold: number; revenue: number; minPrice: number; maxPrice: number }> }
+      {
+        name: string;
+        unitsSold: number;
+        totalRevenue: number;
+        minPrice: number;
+        maxPrice: number;
+        date: string;
+        time: string;
+        variants: Map<string, { key: string; sku: string; size: string; color: string; sold: number; revenue: number; minPrice: number; maxPrice: number; date: string; time: string }>;
+      }
     >();
     for (const l of lines) {
       let agg = byProduct.get(l.productSlug);
@@ -157,18 +170,19 @@ export async function GET(request: Request) {
       agg.totalRevenue += l.lineTotal;
       agg.minPrice = Math.min(agg.minPrice, l.unitPrice);
       agg.maxPrice = Math.max(agg.maxPrice, l.unitPrice);
-      if (`${l.date}T${l.time}` > `${agg.date}T${agg.time}`) { agg.date = l.date; agg.time = l.time; }
+      if (`${l.date} ${l.time}` > `${agg.date} ${agg.time}`) { agg.date = l.date; agg.time = l.time; }
 
       const vKey = l.variantKey || "Standard";
       let v = agg.variants.get(vKey);
       if (!v) {
-        v = { key: vKey, sku: l.sku, size: l.size, color: l.color, sold: 0, revenue: 0, minPrice: l.unitPrice, maxPrice: l.unitPrice };
+        v = { key: vKey, sku: l.sku, size: l.size, color: l.color, sold: 0, revenue: 0, minPrice: l.unitPrice, maxPrice: l.unitPrice, date: l.date, time: l.time };
         agg.variants.set(vKey, v);
       }
       v.sold += l.quantity;
       v.revenue += l.lineTotal;
       v.minPrice = Math.min(v.minPrice, l.unitPrice);
       v.maxPrice = Math.max(v.maxPrice, l.unitPrice);
+      if (`${l.date} ${l.time}` > `${v.date} ${v.time}`) { v.date = l.date; v.time = l.time; }
       if (!v.sku && l.sku) v.sku = l.sku;
     }
 
@@ -207,6 +221,8 @@ export async function GET(request: Request) {
                   stock: match ? Number(match.stock) : null,
                   sold: v.sold,
                   totalRevenue: v.revenue,
+                  date: v.date,
+                  time: v.time,
                 };
               })
           : [];

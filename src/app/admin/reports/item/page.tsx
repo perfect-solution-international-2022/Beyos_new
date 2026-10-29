@@ -13,6 +13,8 @@ interface VariantRow {
   stock: number | null;
   sold: number;
   totalRevenue: number;
+  date?: string;
+  time?: string;
 }
 interface SaleDetailRow {
   slug: string;
@@ -41,6 +43,8 @@ interface FlatRow {
   stock: number | null;
   unitsSold: number;
   totalRevenue: number;
+  date: string;
+  time: string;
 }
 interface ChartPoint { date: string; label: string; revenue: number; itemsSold: number; }
 interface ReportData {
@@ -53,7 +57,7 @@ interface ReportData {
 interface Category { name: string; slug: string; }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Colombo" }).format(new Date());
 }
 
 function priceLabel(v: string | number) {
@@ -80,6 +84,8 @@ function flattenRows(details: SaleDetailRow[]): FlatRow[] {
         stock: v.stock,
         unitsSold: v.sold,
         totalRevenue: v.totalRevenue,
+        date: v.date || r.date,
+        time: v.time || r.time,
       }));
     }
     return [{
@@ -95,6 +101,8 @@ function flattenRows(details: SaleDetailRow[]): FlatRow[] {
       stock: null,
       unitsSold: r.unitsSold,
       totalRevenue: r.totalRevenue,
+      date: r.date,
+      time: r.time,
     }];
   });
 }
@@ -151,9 +159,9 @@ export default function ItemReportPage() {
   const exportCsv = () => {
     if (!data) return;
     const rows = [
-      ["Product", "SKU", "Attribute", "Type", "Category", "Unit Price", "Units Sold", "Total Revenue"],
+      ["Product", "SKU", "Attribute", "Type", "Category", "Date", "Time", "Unit Price", "Units Sold", "Total Revenue"],
       ...flatRows.map((r) => [
-        r.productName, r.sku, r.attribute, r.type, r.category ?? "", String(r.unitPrice), String(r.unitsSold), r.totalRevenue.toFixed(2),
+        r.productName, r.sku, r.attribute, r.type, r.category ?? "", r.date || "", r.time || "", String(r.unitPrice), String(r.unitsSold), r.totalRevenue.toFixed(2),
       ]),
     ];
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
@@ -290,6 +298,7 @@ export default function ItemReportPage() {
                 <th className="px-6 py-3">Attribute</th>
                 <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3">Category</th>
+                <th className="px-6 py-3">Date & Time</th>
                 <th className="px-6 py-3">Unit Price</th>
                 <th className="px-6 py-3">Units Sold</th>
                 <th className="px-6 py-3">Total Revenue</th>
@@ -297,9 +306,9 @@ export default function ItemReportPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
+                <tr><td colSpan={9} className="px-6 py-10 text-center text-navy-800/50">Loading…</td></tr>
               ) : flatRows.length === 0 ? (
-                <tr><td colSpan={8} className="px-6 py-10 text-center text-navy-800/50">No sales details found.</td></tr>
+                <tr><td colSpan={9} className="px-6 py-10 text-center text-navy-800/50">No sales details found.</td></tr>
               ) : (
                 flatRows.map((r) => (
                   <tr key={r.key} className="border-b border-navy-800/5 last:border-0 hover:bg-navy-50/50">
@@ -324,6 +333,15 @@ export default function ItemReportPage() {
                       </span>
                     </td>
                     <td className="px-6 py-3 capitalize text-navy-800/70">{r.category ?? "—"}</td>
+                    <td className="px-6 py-3 text-xs text-navy-800/70 whitespace-nowrap">
+                      {r.date ? (
+                        <>
+                          <span>{r.date}</span> {r.time && <span className="ml-1 font-mono text-navy-800/45">{r.time}</span>}
+                        </>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="px-6 py-3 text-navy-800/70">{priceLabel(r.unitPrice)}</td>
                     <td className="px-6 py-3 font-semibold text-navy-800">{r.unitsSold}</td>
                     <td className="px-6 py-3 font-semibold text-navy-800">{formatPrice(r.totalRevenue)}</td>
